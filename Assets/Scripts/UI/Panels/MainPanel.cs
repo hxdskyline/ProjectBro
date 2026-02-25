@@ -14,7 +14,6 @@ public class MainPanel : UIPanel
     {
         base.Initialize();
 
-        // 绑定按钮事件
         if (_startButton != null)
         {
             _startButton.onClick.AddListener(OnStartButtonClicked);
@@ -37,26 +36,22 @@ public class MainPanel : UIPanel
     {
         Debug.Log("[MainPanel] Start button clicked");
 
-        // 隐藏主界面
-        GameManager.Instance.UIManager.HidePanel("MainPanel");
-
-        // 显示卡牌构建界面
-        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("CardBuildPanel", UIManager.UILayer.Normal);
+        GameManager.Instance.UIManager.HidePanel("ui/MainPanel");
+        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("ui/CardBuildPanel", UIManager.UILayer.Normal);
     }
 
     private void OnSettingsButtonClicked()
     {
         Debug.Log("[MainPanel] Settings button clicked");
-        // TODO: 打开设置面板
     }
 
     private void OnQuitButtonClicked()
     {
         Debug.Log("[MainPanel] Quit button clicked");
 #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
+        UnityEditor.EditorApplication.isPlaying = false;
 #else
-        Application.Quit();
+            Application.Quit();
 #endif
     }
 }

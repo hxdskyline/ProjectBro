@@ -8,7 +8,7 @@ public class AudioManager : MonoBehaviour
 {
     private AudioSource _bgmSource;
     private List<AudioSource> _sfxSources = new List<AudioSource>();
-    
+
     private float _bgmVolume = 0.5f;
     private float _sfxVolume = 0.5f;
 
@@ -125,7 +125,7 @@ public class AudioManager : MonoBehaviour
         AudioSource newSource = sfxGo.AddComponent<AudioSource>();
         newSource.volume = _sfxVolume;
         _sfxSources.Add(newSource);
-        
+
         return newSource;
     }
 

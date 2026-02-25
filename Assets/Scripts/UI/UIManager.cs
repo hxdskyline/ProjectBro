@@ -3,15 +3,12 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 
 /// <summary>
-/// UI管理器 - 负责UI面板的加载、显示、隐藏和销毁
+/// UI管理器 - 负责UI面板的加载、显示、隐藏和销毁（使用 Addressable）
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     private Canvas _mainCanvas;
     private Dictionary<string, UIPanel> _activePanels = new Dictionary<string, UIPanel>();
-
-    // UI Bundle 名称
-    private const string UI_BUNDLE_NAME = "ui";
 
     public enum UILayer
     {
@@ -24,6 +21,7 @@ public class UIManager : MonoBehaviour
 
     public void Initialize()
     {
+        // 查找或创建主Canvas
         _mainCanvas = FindObjectOfType<Canvas>();
         if (_mainCanvas == null)
         {
@@ -44,24 +42,24 @@ public class UIManager : MonoBehaviour
     /// <summary>
     /// 显示面板
     /// </summary>
-    public T ShowPanel<T>(string panelName, UILayer layer = UILayer.Normal) where T : UIPanel
+    public T ShowPanel<T>(string panelAddress, UILayer layer = UILayer.Normal) where T : UIPanel
     {
-        if (_activePanels.ContainsKey(panelName))
+        if (_activePanels.ContainsKey(panelAddress))
         {
-            _activePanels[panelName].Show();
-            return _activePanels[panelName] as T;
+            _activePanels[panelAddress].Show();
+            return _activePanels[panelAddress] as T;
         }
 
-        // 从 AssetBundle 加载预制体
-        GameObject panelPrefab = GameManager.Instance.ResourceManager.LoadPrefab(panelName);
+        // 使用 Addressable 加载预制体
+        GameObject panelPrefab = GameManager.Instance.ResourceManager.LoadPrefab(panelAddress);
         if (panelPrefab == null)
         {
-            Debug.LogError($"[UIManager] Panel prefab not found: {panelName}");
+            Debug.LogError($"[UIManager] Panel prefab not found: {panelAddress}");
             return null;
         }
 
         GameObject panelInstance = Instantiate(panelPrefab, GetUILayerTransform(layer));
-        panelInstance.name = panelName;
+        panelInstance.name = panelPrefab.name;
 
         T panel = panelInstance.GetComponent<T>();
         if (panel == null)
@@ -72,36 +70,80 @@ public class UIManager : MonoBehaviour
         panel.Initialize();
         panel.Show();
 
-        _activePanels[panelName] = panel;
-        Debug.Log($"[UIManager] Panel shown: {panelName}");
+        _activePanels[panelAddress] = panel;
+        Debug.Log($"[UIManager] Panel shown: {panelAddress}");
 
         return panel;
     }
 
     /// <summary>
+    /// 异步显示面板
+    /// </summary>
+    public void ShowPanelAsync<T>(string panelAddress, UILayer layer, System.Action<T> onComplete) where T : UIPanel
+    {
+        if (_activePanels.ContainsKey(panelAddress))
+        {
+            _activePanels[panelAddress].Show();
+            onComplete?.Invoke(_activePanels[panelAddress] as T);
+            return;
+        }
+
+        GameManager.Instance.ResourceManager.LoadPrefabAsync(panelAddress, (prefab) =>
+        {
+            if (prefab == null)
+            {
+                Debug.LogError($"[UIManager] Panel prefab not found: {panelAddress}");
+                onComplete?.Invoke(null);
+                return;
+            }
+
+            GameObject panelInstance = Instantiate(prefab, GetUILayerTransform(layer));
+            panelInstance.name = prefab.name;
+
+            T panel = panelInstance.GetComponent<T>();
+            if (panel == null)
+            {
+                panel = panelInstance.AddComponent<T>();
+            }
+
+            panel.Initialize();
+            panel.Show();
+
+            _activePanels[panelAddress] = panel;
+            Debug.Log($"[UIManager] Panel shown async: {panelAddress}");
+
+            onComplete?.Invoke(panel);
+        });
+    }
+
+    /// <summary>
     /// 隐藏面板
     /// </summary>
-    public void HidePanel(string panelName)
+    public void HidePanel(string panelAddress)
     {
-        if (_activePanels.ContainsKey(panelName))
+        if (_activePanels.ContainsKey(panelAddress))
         {
-            _activePanels[panelName].Hide();
-            Debug.Log($"[UIManager] Panel hidden: {panelName}");
+            _activePanels[panelAddress].Hide();
+            Debug.Log($"[UIManager] Panel hidden: {panelAddress}");
         }
     }
 
     /// <summary>
     /// 关闭并销毁面板
     /// </summary>
-    public void ClosePanel(string panelName)
+    public void ClosePanel(string panelAddress)
     {
-        if (_activePanels.ContainsKey(panelName))
+        if (_activePanels.ContainsKey(panelAddress))
         {
-            UIPanel panel = _activePanels[panelName];
+            UIPanel panel = _activePanels[panelAddress];
             panel.Close();
-            _activePanels.Remove(panelName);
+            _activePanels.Remove(panelAddress);
             Destroy(panel.gameObject);
-            Debug.Log($"[UIManager] Panel closed: {panelName}");
+
+            // 释放资源
+            GameManager.Instance.ResourceManager.UnloadResource(panelAddress);
+
+            Debug.Log($"[UIManager] Panel closed: {panelAddress}");
         }
     }
 
@@ -133,11 +175,11 @@ public class UIManager : MonoBehaviour
     /// <summary>
     /// 获取已显示的面板
     /// </summary>
-    public T GetPanel<T>(string panelName) where T : UIPanel
+    public T GetPanel<T>(string panelAddress) where T : UIPanel
     {
-        if (_activePanels.ContainsKey(panelName))
+        if (_activePanels.ContainsKey(panelAddress))
         {
-            return _activePanels[panelName] as T;
+            return _activePanels[panelAddress] as T;
         }
         return null;
     }

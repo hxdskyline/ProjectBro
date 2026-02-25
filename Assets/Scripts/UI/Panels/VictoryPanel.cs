@@ -19,7 +19,6 @@ public class VictoryPanel : UIPanel
     {
         base.Initialize();
 
-        // 绑定按钮事件
         if (_continueButton != null)
         {
             _continueButton.onClick.AddListener(OnContinueButtonClicked);
@@ -28,9 +27,6 @@ public class VictoryPanel : UIPanel
         Debug.Log("[VictoryPanel] Initialized");
     }
 
-    /// <summary>
-    /// 显示胜利奖励
-    /// </summary>
     public void ShowVictoryRewards(int levelId)
     {
         _currentLevel = levelId;
@@ -40,7 +36,6 @@ public class VictoryPanel : UIPanel
             _victoryText.text = "VICTORY!";
         }
 
-        // 计算奖励
         int goldReward = 100 * levelId;
         int expReward = 50 * levelId;
 
@@ -49,16 +44,12 @@ public class VictoryPanel : UIPanel
             _rewardText.text = $"Gold: +{goldReward}\nExp: +{expReward}";
         }
 
-        // 显示星级评价
         if (_starRating != null)
         {
-            _starRating.fillAmount = 1f; // 满分3星
+            _starRating.fillAmount = 1f;
         }
 
-        // 播放显示动画
         StartCoroutine(PlayVictoryAnimation());
-
-        // 更新玩家数据
         UpdatePlayerData(levelId, goldReward);
 
         Debug.Log("[VictoryPanel] Victory rewards shown for level: " + levelId);
@@ -89,16 +80,12 @@ public class VictoryPanel : UIPanel
         PlayerData playerData = GameManager.Instance.DataManager.PlayerData;
         if (playerData != null)
         {
-            // 更新等级进度
             if (playerData.currentLevel == levelId)
             {
                 playerData.currentLevel = levelId + 1;
             }
 
-            // ���加金币
             playerData.gold += goldReward;
-
-            // 保存数据
             GameManager.Instance.DataManager.SavePlayerData();
 
             Debug.Log("[VictoryPanel] Player data updated");
@@ -109,10 +96,7 @@ public class VictoryPanel : UIPanel
     {
         Debug.Log("[VictoryPanel] Continue button clicked");
 
-        // 关闭胜利界面
-        GameManager.Instance.UIManager.ClosePanel("VictoryPanel");
-
-        // 显示卡牌构建界面
-        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("CardBuildPanel", UIManager.UILayer.Normal);
+        GameManager.Instance.UIManager.ClosePanel("ui/VictoryPanel");
+        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("ui/CardBuildPanel", UIManager.UILayer.Normal);
     }
 }

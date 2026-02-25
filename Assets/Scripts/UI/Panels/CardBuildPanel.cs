@@ -17,7 +17,6 @@ public class CardBuildPanel : UIPanel
     {
         base.Initialize();
 
-        // 绑定按钮事件
         if (_startBattleButton != null)
         {
             _startBattleButton.onClick.AddListener(OnStartBattleButtonClicked);
@@ -28,7 +27,6 @@ public class CardBuildPanel : UIPanel
             _backButton.onClick.AddListener(OnBackButtonClicked);
         }
 
-        // 从玩家数据获取当前关卡
         if (GameManager.Instance.DataManager.PlayerData != null)
         {
             _currentLevel = GameManager.Instance.DataManager.PlayerData.currentLevel;
@@ -40,13 +38,11 @@ public class CardBuildPanel : UIPanel
 
     private void UpdateUI()
     {
-        // 更新关卡显示
         if (_levelText != null)
         {
             _levelText.text = $"Level: {_currentLevel}";
         }
 
-        // 更新卡牌信息显示
         if (_cardInfoText != null)
         {
             _cardInfoText.text = "Select your cards...\n(Card selection UI will be added later)";
@@ -57,13 +53,10 @@ public class CardBuildPanel : UIPanel
     {
         Debug.Log("[CardBuildPanel] Start Battle button clicked");
 
-        // 隐藏卡牌构建界面
-        GameManager.Instance.UIManager.HidePanel("CardBuildPanel");
+        GameManager.Instance.UIManager.HidePanel("ui/CardBuildPanel");
 
-        // 显示战斗界面
-        BattlePanel battlePanel = GameManager.Instance.UIManager.ShowPanel<BattlePanel>("BattlePanel", UIManager.UILayer.Normal);
+        BattlePanel battlePanel = GameManager.Instance.UIManager.ShowPanel<BattlePanel>("ui/BattlePanel", UIManager.UILayer.Normal);
 
-        // 开始战斗
         if (battlePanel != null)
         {
             battlePanel.StartBattle(_currentLevel);
@@ -74,10 +67,7 @@ public class CardBuildPanel : UIPanel
     {
         Debug.Log("[CardBuildPanel] Back button clicked");
 
-        // 隐藏卡牌构建界面
-        GameManager.Instance.UIManager.HidePanel("CardBuildPanel");
-
-        // 显示主界面
-        GameManager.Instance.UIManager.ShowPanel<MainPanel>("MainPanel", UIManager.UILayer.Normal);
+        GameManager.Instance.UIManager.HidePanel("ui/CardBuildPanel");
+        GameManager.Instance.UIManager.ShowPanel<MainPanel>("ui/MainPanel", UIManager.UILayer.Normal);
     }
 }

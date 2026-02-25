@@ -10,7 +10,7 @@ public class ResourceManager : MonoBehaviour
 {
     // 缓存已加载的资源
     private Dictionary<string, object> _resourceCache = new Dictionary<string, object>();
-    
+
     // 缓存 AsyncOperationHandle，用于卸载
     private Dictionary<string, AsyncOperationHandle> _asyncHandleCache = new Dictionary<string, AsyncOperationHandle>();
 
@@ -41,7 +41,7 @@ public class ResourceManager : MonoBehaviour
                 T resource = handle.Result;
                 _resourceCache[address] = resource;
                 _asyncHandleCache[address] = handle;
-                
+
                 Debug.Log($"[ResourceManager] Loaded resource: {address}");
                 return resource;
             }
@@ -80,7 +80,7 @@ public class ResourceManager : MonoBehaviour
                     T resource = asyncHandle.Result;
                     _resourceCache[address] = resource;
                     _asyncHandleCache[address] = asyncHandle;
-                    
+
                     Debug.Log($"[ResourceManager] Loaded resource async: {address}");
                     onComplete?.Invoke(resource);
                 }

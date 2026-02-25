@@ -97,8 +97,8 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Loading Game...");
         _dataManager.LoadPlayerData();
 
-        // 显示主界面
-        _uiManager.ShowPanel<MainPanel>("MainPanel", UIManager.UILayer.Normal);
+        // 显示主界面 - 使用完整的 Address
+        _uiManager.ShowPanel<MainPanel>("ui/MainPanel", UIManager.UILayer.Normal);
     }
 
     public void SaveGame()
