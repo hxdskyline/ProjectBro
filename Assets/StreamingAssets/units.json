@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1",
+    "name": "Warrior",
+    "attack": 10,
+    "defense": 5,
+    "hp": 100
+  },
+  {
+    "id": "2",
+    "name": "Mage",
+    "attack": 15,
+    "defense": 2,
+    "hp": 50
+  },
+  {
+    "id": "3",
+    "name": "Archer",
+    "attack": 12,
+    "defense": 3,
+    "hp": 70
+  }
+]

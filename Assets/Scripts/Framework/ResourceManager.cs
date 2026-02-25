@@ -1,80 +1,128 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.IO;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
-/// 资源管理器 - 负责所有资源的加载、缓存和卸载
+/// 资源管理器 - 负责所有资源的加载、缓存和卸载（使用 Addressable Asset System）
 /// </summary>
 public class ResourceManager : MonoBehaviour
 {
-    private Dictionary<string, Object> _resourceCache = new Dictionary<string, Object>();
-    private Dictionary<string, GameObject> _prefabCache = new Dictionary<string, GameObject>();
+    // 缓存已加载的资源
+    private Dictionary<string, object> _resourceCache = new Dictionary<string, object>();
     
-    // 资源路径配置
-    private const string RESOURCES_PATH = "Assets/Resources";
-    private const string PREFABS_PATH = "Prefabs";
-    private const string TEXTURES_PATH = "Textures";
-    private const string AUDIO_PATH = "Audio";
-    private const string SPRITES_PATH = "Sprites";
-    private const string DATA_PATH = "Data";
+    // 缓存 AsyncOperationHandle，用于卸载
+    private Dictionary<string, AsyncOperationHandle> _asyncHandleCache = new Dictionary<string, AsyncOperationHandle>();
 
     public void Initialize()
     {
-        Debug.Log("[ResourceManager] Initialized");
+        Debug.Log("[ResourceManager] Initialized with Addressable Asset System");
     }
 
     /// <summary>
-    /// 加载资源（通用方法）
+    /// 同步加载资源
     /// </summary>
-    public T LoadResource<T>(string resourceName) where T : Object
+    public T LoadResource<T>(string address) where T : Object
     {
-        if (_resourceCache.ContainsKey(resourceName))
+        // 检查缓存
+        if (_resourceCache.ContainsKey(address))
         {
-            return _resourceCache[resourceName] as T;
+            return _resourceCache[address] as T;
         }
 
-        T resource = Resources.Load<T>(resourceName);
-        if (resource != null)
+        try
         {
-            _resourceCache[resourceName] = resource;
-            Debug.Log($"[ResourceManager] Loaded resource: {resourceName}");
+            // 同步加载
+            var handle = Addressables.LoadAssetAsync<T>(address);
+            handle.WaitForCompletion();
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+            {
+                T resource = handle.Result;
+                _resourceCache[address] = resource;
+                _asyncHandleCache[address] = handle;
+                
+                Debug.Log($"[ResourceManager] Loaded resource: {address}");
+                return resource;
+            }
+            else
+            {
+                Debug.LogError($"[ResourceManager] Failed to load resource: {address}");
+                return null;
+            }
         }
-        else
+        catch (System.Exception e)
         {
-            Debug.LogError($"[ResourceManager] Failed to load resource: {resourceName}");
+            Debug.LogError($"[ResourceManager] Error loading resource {address}: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 异步加载资源
+    /// </summary>
+    public void LoadResourceAsync<T>(string address, System.Action<T> onComplete) where T : Object
+    {
+        // 检查缓存
+        if (_resourceCache.ContainsKey(address))
+        {
+            onComplete?.Invoke(_resourceCache[address] as T);
+            return;
         }
 
-        return resource;
+        try
+        {
+            var handle = Addressables.LoadAssetAsync<T>(address);
+            handle.Completed += (asyncHandle) =>
+            {
+                if (asyncHandle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    T resource = asyncHandle.Result;
+                    _resourceCache[address] = resource;
+                    _asyncHandleCache[address] = asyncHandle;
+                    
+                    Debug.Log($"[ResourceManager] Loaded resource async: {address}");
+                    onComplete?.Invoke(resource);
+                }
+                else
+                {
+                    Debug.LogError($"[ResourceManager] Failed to load resource async: {address}");
+                    onComplete?.Invoke(null);
+                }
+            };
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[ResourceManager] Error loading resource async {address}: {e.Message}");
+            onComplete?.Invoke(null);
+        }
     }
 
     /// <summary>
     /// 加载预制体
     /// </summary>
-    public GameObject LoadPrefab(string prefabName)
+    public GameObject LoadPrefab(string address)
     {
-        if (_prefabCache.ContainsKey(prefabName))
-        {
-            return _prefabCache[prefabName];
-        }
+        return LoadResource<GameObject>(address);
+    }
 
-        GameObject prefab = LoadResource<GameObject>($"{PREFABS_PATH}/{prefabName}");
-        if (prefab != null)
-        {
-            _prefabCache[prefabName] = prefab;
-        }
-
-        return prefab;
+    /// <summary>
+    /// 异步加载预制体
+    /// </summary>
+    public void LoadPrefabAsync(string address, System.Action<GameObject> onComplete)
+    {
+        LoadResourceAsync<GameObject>(address, onComplete);
     }
 
     /// <summary>
     /// 实例化预制体
     /// </summary>
-    public GameObject InstantiatePrefab(string prefabName, Transform parent = null)
+    public GameObject InstantiatePrefab(string address, Transform parent = null)
     {
-        GameObject prefab = LoadPrefab(prefabName);
+        GameObject prefab = LoadPrefab(address);
         if (prefab == null)
         {
-            Debug.LogError($"[ResourceManager] Prefab not found: {prefabName}");
+            Debug.LogError($"[ResourceManager] Prefab not found: {address}");
             return null;
         }
 
@@ -84,39 +132,74 @@ public class ResourceManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 加载贴图
+    /// 异步实例化预制体
     /// </summary>
-    public Sprite LoadSprite(string spriteName)
+    public void InstantiatePrefabAsync(string address, Transform parent, System.Action<GameObject> onComplete)
     {
-        return LoadResource<Sprite>($"{SPRITES_PATH}/{spriteName}");
+        LoadPrefabAsync(address, (prefab) =>
+        {
+            if (prefab != null)
+            {
+                GameObject instance = Instantiate(prefab, parent);
+                instance.name = prefab.name;
+                onComplete?.Invoke(instance);
+            }
+            else
+            {
+                onComplete?.Invoke(null);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 加载精灵/贴图
+    /// </summary>
+    public Sprite LoadSprite(string address)
+    {
+        return LoadResource<Sprite>(address);
+    }
+
+    /// <summary>
+    /// 异步加载精灵/贴图
+    /// </summary>
+    public void LoadSpriteAsync(string address, System.Action<Sprite> onComplete)
+    {
+        LoadResourceAsync<Sprite>(address, onComplete);
     }
 
     /// <summary>
     /// 加载音频
     /// </summary>
-    public AudioClip LoadAudio(string audioName)
+    public AudioClip LoadAudio(string address)
     {
-        return LoadResource<AudioClip>($"{AUDIO_PATH}/{audioName}");
+        return LoadResource<AudioClip>(address);
     }
 
     /// <summary>
-    /// 加载TextAsset（用于JSON等文本数据）
+    /// 异步加载音频
     /// </summary>
-    public TextAsset LoadTextAsset(string assetName)
+    public void LoadAudioAsync(string address, System.Action<AudioClip> onComplete)
     {
-        return LoadResource<TextAsset>($"{DATA_PATH}/{assetName}");
+        LoadResourceAsync<AudioClip>(address, onComplete);
     }
 
     /// <summary>
     /// 卸载资源
     /// </summary>
-    public void UnloadResource(string resourceName)
+    public void UnloadResource(string address)
     {
-        if (_resourceCache.ContainsKey(resourceName))
+        // 从缓存移除
+        if (_resourceCache.ContainsKey(address))
         {
-            _resourceCache.Remove(resourceName);
-            Resources.UnloadAsset(_resourceCache[resourceName]);
-            Debug.Log($"[ResourceManager] Unloaded resource: {resourceName}");
+            _resourceCache.Remove(address);
+        }
+
+        // 释放 AsyncOperationHandle
+        if (_asyncHandleCache.ContainsKey(address))
+        {
+            Addressables.Release(_asyncHandleCache[address]);
+            _asyncHandleCache.Remove(address);
+            Debug.Log($"[ResourceManager] Unloaded resource: {address}");
         }
     }
 
@@ -125,9 +208,27 @@ public class ResourceManager : MonoBehaviour
     /// </summary>
     public void ClearCache()
     {
+        // 释放所有 handle
+        foreach (var handle in _asyncHandleCache.Values)
+        {
+            Addressables.Release(handle);
+        }
+
         _resourceCache.Clear();
-        _prefabCache.Clear();
-        Resources.UnloadUnusedAssets();
+        _asyncHandleCache.Clear();
+
         Debug.Log("[ResourceManager] Cache cleared");
+    }
+
+    /// <summary>
+    /// 获取资源信息（调试用）
+    /// </summary>
+    public void PrintResourceInfo()
+    {
+        Debug.Log($"[ResourceManager] Cached Resources: {_resourceCache.Count}");
+        foreach (string address in _resourceCache.Keys)
+        {
+            Debug.Log($"  - {address}");
+        }
     }
 }

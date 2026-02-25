@@ -9,9 +9,10 @@ public class UIManager : MonoBehaviour
 {
     private Canvas _mainCanvas;
     private Dictionary<string, UIPanel> _activePanels = new Dictionary<string, UIPanel>();
-    private Dictionary<string, GameObject> _panelPrefabs = new Dictionary<string, GameObject>();
 
-    // UI层级定义
+    // UI Bundle 名称
+    private const string UI_BUNDLE_NAME = "ui";
+
     public enum UILayer
     {
         Background = 0,
@@ -23,7 +24,6 @@ public class UIManager : MonoBehaviour
 
     public void Initialize()
     {
-        // 查找或创建主Canvas
         _mainCanvas = FindObjectOfType<Canvas>();
         if (_mainCanvas == null)
         {
@@ -52,7 +52,8 @@ public class UIManager : MonoBehaviour
             return _activePanels[panelName] as T;
         }
 
-        GameObject panelPrefab = GameManager.Instance.ResourceManager.LoadPrefab($"UI/{panelName}");
+        // 从 AssetBundle 加载预制体
+        GameObject panelPrefab = GameManager.Instance.ResourceManager.LoadPrefab(panelName);
         if (panelPrefab == null)
         {
             Debug.LogError($"[UIManager] Panel prefab not found: {panelName}");
@@ -109,7 +110,6 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private Transform GetUILayerTransform(UILayer layer)
     {
-        // 可以在Canvas下创建多个子物体来管理不同的层级
         Transform layerTransform = _mainCanvas.transform.Find(layer.ToString());
         if (layerTransform == null)
         {

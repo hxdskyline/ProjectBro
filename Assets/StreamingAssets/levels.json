@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1",
+    "name": "Level 1",
+    "difficulty": 1,
+    "targetScore": 100,
+    "enemies": [ "1", "2" ]
+  },
+  {
+    "id": "2",
+    "name": "Level 2",
+    "difficulty": 2,
+    "targetScore": 200,
+    "enemies": [ "2", "3" ]
+  },
+  {
+    "id": "3",
+    "name": "Level 3",
+    "difficulty": 3,
+    "targetScore": 300,
+    "enemies": [ "1", "2", "3" ]
+  }
+]

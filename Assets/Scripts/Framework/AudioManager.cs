@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// 音频管理器 - 负责背景音乐和音效的播放
+/// 音频管理器 - 负责背景音乐和音效的播放（使用 Addressable）
 /// </summary>
 public class AudioManager : MonoBehaviour
 {
@@ -27,18 +27,39 @@ public class AudioManager : MonoBehaviour
     /// <summary>
     /// 播放背景音乐
     /// </summary>
-    public void PlayBGM(string bgmName)
+    public void PlayBGM(string bgmAddress)
     {
-        AudioClip clip = GameManager.Instance.ResourceManager.LoadAudio(bgmName);
+        // 从 Addressable 加载音频
+        AudioClip clip = GameManager.Instance.ResourceManager.LoadAudio(bgmAddress);
         if (clip == null)
         {
-            Debug.LogError($"[AudioManager] BGM not found: {bgmName}");
+            Debug.LogError($"[AudioManager] BGM not found: {bgmAddress}");
             return;
         }
 
         _bgmSource.clip = clip;
         _bgmSource.Play();
-        Debug.Log($"[AudioManager] Playing BGM: {bgmName}");
+        Debug.Log($"[AudioManager] Playing BGM: {bgmAddress}");
+    }
+
+    /// <summary>
+    /// 异步播放背景音乐
+    /// </summary>
+    public void PlayBGMAsync(string bgmAddress)
+    {
+        GameManager.Instance.ResourceManager.LoadAudioAsync(bgmAddress, (clip) =>
+        {
+            if (clip != null)
+            {
+                _bgmSource.clip = clip;
+                _bgmSource.Play();
+                Debug.Log($"[AudioManager] Playing BGM async: {bgmAddress}");
+            }
+            else
+            {
+                Debug.LogError($"[AudioManager] BGM not found: {bgmAddress}");
+            }
+        });
     }
 
     /// <summary>
@@ -52,18 +73,39 @@ public class AudioManager : MonoBehaviour
     /// <summary>
     /// 播放音效
     /// </summary>
-    public void PlaySFX(string sfxName)
+    public void PlaySFX(string sfxAddress)
     {
-        AudioClip clip = GameManager.Instance.ResourceManager.LoadAudio(sfxName);
+        // 从 Addressable 加载音频
+        AudioClip clip = GameManager.Instance.ResourceManager.LoadAudio(sfxAddress);
         if (clip == null)
         {
-            Debug.LogError($"[AudioManager] SFX not found: {sfxName}");
+            Debug.LogError($"[AudioManager] SFX not found: {sfxAddress}");
             return;
         }
 
         AudioSource sfxSource = GetAvailableSFXSource();
         sfxSource.PlayOneShot(clip, _sfxVolume);
-        Debug.Log($"[AudioManager] Playing SFX: {sfxName}");
+        Debug.Log($"[AudioManager] Playing SFX: {sfxAddress}");
+    }
+
+    /// <summary>
+    /// 异步播放音效
+    /// </summary>
+    public void PlaySFXAsync(string sfxAddress)
+    {
+        GameManager.Instance.ResourceManager.LoadAudioAsync(sfxAddress, (clip) =>
+        {
+            if (clip != null)
+            {
+                AudioSource sfxSource = GetAvailableSFXSource();
+                sfxSource.PlayOneShot(clip, _sfxVolume);
+                Debug.Log($"[AudioManager] Playing SFX async: {sfxAddress}");
+            }
+            else
+            {
+                Debug.LogError($"[AudioManager] SFX not found: {sfxAddress}");
+            }
+        });
     }
 
     /// <summary>
@@ -106,5 +148,13 @@ public class AudioManager : MonoBehaviour
         {
             source.volume = _sfxVolume;
         }
+    }
+
+    /// <summary>
+    /// 卸载音频资源
+    /// </summary>
+    public void UnloadAudio(string audioAddress)
+    {
+        GameManager.Instance.ResourceManager.UnloadResource(audioAddress);
     }
 }

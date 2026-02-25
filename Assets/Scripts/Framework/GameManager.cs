@@ -33,6 +33,7 @@ public class GameManager : MonoBehaviour
     private AudioManager _audioManager;
     private DataManager _dataManager;
     private SceneManager _sceneManager;
+    private TableReader _tableReader;
 
     public ResourceManager ResourceManager => _resourceManager;
     public UIManager UIManager => _uiManager;
@@ -40,6 +41,7 @@ public class GameManager : MonoBehaviour
     public AudioManager AudioManager => _audioManager;
     public DataManager DataManager => _dataManager;
     public SceneManager SceneManager => _sceneManager;
+    public TableReader TableReader => _tableReader;
 
     private void Awake()
     {
@@ -59,27 +61,31 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("[GameManager] Initializing Game Framework...");
 
-        // 初始化资源管理器（必须首先初始化）
+        // 1. 初始化资源管理器（必须首先初始化）
         _resourceManager = gameObject.AddComponent<ResourceManager>();
         _resourceManager.Initialize();
 
-        // 初始化数据管理器
+        // 2. 初始化表读取器（依赖文件系统，不依赖 ResourceManager）
+        _tableReader = gameObject.AddComponent<TableReader>();
+        _tableReader.Initialize();
+
+        // 3. 初始化数据管理器
         _dataManager = gameObject.AddComponent<DataManager>();
         _dataManager.Initialize();
 
-        // 初始化音频管理器
+        // 4. 初始化音频管理器（依赖 ResourceManager）
         _audioManager = gameObject.AddComponent<AudioManager>();
         _audioManager.Initialize();
 
-        // 初始化场景管理器
+        // 5. 初始化场景管理器
         _sceneManager = gameObject.AddComponent<SceneManager>();
         _sceneManager.Initialize();
 
-        // 初始化UI管理器
+        // 6. 初始化UI管理器（依赖 ResourceManager）
         _uiManager = gameObject.AddComponent<UIManager>();
         _uiManager.Initialize();
 
-        // 初始化关卡管理器
+        // 7. 初始化关卡管理器（依赖 TableReader）
         _levelManager = gameObject.AddComponent<LevelManager>();
         _levelManager.Initialize();
 
