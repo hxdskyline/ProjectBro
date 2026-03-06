@@ -10,6 +10,6 @@ public class DemoStarter : MonoBehaviour
         // 加载游戏数据
         GameManager.Instance.LoadGame();
 
-        Debug.Log("[DemoStarter] Game demo started!");
+        Debug.Log("[DemoStarter] by ai");
     }
 }

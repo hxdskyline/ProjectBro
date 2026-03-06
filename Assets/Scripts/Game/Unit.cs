@@ -14,6 +14,7 @@ public class Unit : MonoBehaviour
     [SerializeField] protected int _maxHp;
     [SerializeField] protected int _attack;
     [SerializeField] protected int _defense;
+    [SerializeField] protected BattleAvatar _battleAvatar;
 
     public int UnitId => _unitId;
     public string UnitName => _unitName;
@@ -92,5 +93,15 @@ public class Unit : MonoBehaviour
     public virtual bool IsDead()
     {
         return _hp <= 0;
+    }
+
+    public virtual void PlayAttackAnimation()
+    {
+        if (_battleAvatar == null)
+        {
+            _battleAvatar = GetComponent<BattleAvatar>();
+        }
+
+        _battleAvatar?.PlayAttackAndReturnIdle();
     }
 }

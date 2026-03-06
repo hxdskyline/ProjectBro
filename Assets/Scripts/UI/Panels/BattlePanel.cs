@@ -1,19 +1,21 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
 
 /// <summary>
-/// Õ½¶·½çÃæ - ÏÔÊ¾Õ½¶·½øÐÐÖÐµÄUI
+/// Õ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½Ê¾Õ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½UI
 /// </summary>
 public class BattlePanel : UIPanel
 {
     [SerializeField] private Text _battleInfoText;
     [SerializeField] private Text _levelText;
-    [SerializeField] private Image _battleProgress;
     [SerializeField] private Button _pauseButton;
+    [SerializeField] private GameObject _fighterPrefab;
+    [SerializeField] private AvatarAnimationDefinition _playerAvatarDefinition;
+    [SerializeField] private AvatarAnimationDefinition _enemyAvatarDefinition;
 
-    private BattleManager _battleManager;
+    private BattleFlowController _flowController;
     private int _currentLevel;
+    private bool _isPaused;
 
     public override void Initialize()
     {
@@ -30,6 +32,12 @@ public class BattlePanel : UIPanel
     public void StartBattle(int levelId)
     {
         _currentLevel = levelId;
+        _isPaused = false;
+
+        if (_flowController == null)
+        {
+            _flowController = new BattleFlowController();
+        }
 
         if (_levelText != null)
         {
@@ -38,52 +46,37 @@ public class BattlePanel : UIPanel
 
         if (_battleInfoText != null)
         {
-            _battleInfoText.text = "Battle Start!";
+            _battleInfoText.text = "Battle Running (Scene Avatar)";
         }
 
-        _battleManager = FindObjectOfType<BattleManager>();
-        if (_battleManager == null)
-        {
-            GameObject battleGo = new GameObject("BattleManager");
-            _battleManager = battleGo.AddComponent<BattleManager>();
-        }
-
-        _battleManager.Initialize(levelId);
-        _battleManager.StartBattle();
-
-        StartCoroutine(SimulateBattle());
+        _flowController.StartBattle(
+            levelId,
+            _fighterPrefab,
+            _playerAvatarDefinition,
+            _enemyAvatarDefinition,
+            OnBattleEnded);
 
         Debug.Log("[BattlePanel] Battle started for level: " + levelId);
     }
 
-    private IEnumerator SimulateBattle()
+    private void OnBattleEnded(bool victory)
     {
-        float battleDuration = 3f;
-        float elapsedTime = 0f;
+        _isPaused = false;
+        Time.timeScale = 1f;
 
-        while (elapsedTime < battleDuration)
+        if (victory)
         {
-            elapsedTime += Time.deltaTime;
-
-            if (_battleProgress != null)
-            {
-                _battleProgress.fillAmount = elapsedTime / battleDuration;
-            }
-
-            if (_battleInfoText != null)
-            {
-                _battleInfoText.text = $"Battling... {(elapsedTime / battleDuration * 100):F0}%";
-            }
-
-            yield return null;
+            Debug.Log("[BattlePanel] Battle Victory!");
+        }
+        else
+        {
+            Debug.Log("[BattlePanel] Battle Defeat!");
         }
 
-        OnBattleVictory();
-    }
-
-    private void OnBattleVictory()
-    {
-        Debug.Log("[BattlePanel] Battle Victory!");
+        if (_battleInfoText != null)
+        {
+            _battleInfoText.text = victory ? "Victory!" : "Defeat!";
+        }
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
 
@@ -96,14 +89,34 @@ public class BattlePanel : UIPanel
 
     private void OnPauseButtonClicked()
     {
-        Debug.Log("[BattlePanel] Pause button clicked");
+        if (_flowController == null)
+        {
+            return;
+        }
+
+        _isPaused = _flowController.TogglePause();
+        if (_isPaused)
+        {
+            if (_battleInfoText != null)
+            {
+                _battleInfoText.text = "Paused";
+            }
+        }
+        else
+        {
+            if (_battleInfoText != null)
+            {
+                _battleInfoText.text = "Battle Running (Scene Avatar)";
+            }
+        }
     }
 
     public override void Close()
     {
-        if (_battleManager != null)
+        if (_flowController != null)
         {
-            Destroy(_battleManager.gameObject);
+            _flowController.StopAndDispose(OnBattleEnded);
+            _flowController = null;
         }
 
         base.Close();
