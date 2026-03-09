@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
 /// <summary>
@@ -34,6 +35,14 @@ public class UIManager : MonoBehaviour
             scaler.referenceResolution = new Vector2(1920, 1080);
 
             canvasGo.AddComponent<GraphicRaycaster>();
+        }
+
+        // Drag and drop requires an EventSystem in scene.
+        if (FindObjectOfType<EventSystem>() == null)
+        {
+            GameObject eventSystemGo = new GameObject("EventSystem");
+            eventSystemGo.AddComponent<EventSystem>();
+            eventSystemGo.AddComponent<StandaloneInputModule>();
         }
 
         Debug.Log("[UIManager] Initialized");

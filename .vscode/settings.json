@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "ProjectBro.sln"
+    "dotnet.defaultSolution": "new.sln"
 }
