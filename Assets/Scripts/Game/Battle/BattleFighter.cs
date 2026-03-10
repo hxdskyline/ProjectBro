@@ -4,9 +4,9 @@ public class BattleFighter
 {
     public string Name;
     public BattleCamp Camp;
-    public int HP;
-    public int Attack;
-    public int Defense;
+    public BattleUnitTypeConfig UnitType;
+    public UnitStaticAttributes StaticAttributes;
+    public UnitRuntimeAttributes RuntimeAttributes;
     public BattleAvatar Avatar;
     public Transform Transform;
     public float AttackCooldownTimer;
@@ -17,6 +17,7 @@ public class BattleFighter
     public bool IsRemoved;
     public float DeathTimer;
 
-    public bool IsDead => HP <= 0;
-    public bool IsAlive => !IsRemoved && !IsDying && HP > 0;
+    public int CurrentHp => RuntimeAttributes?.CurrentHp ?? 0;
+    public bool IsDead => CurrentHp <= 0;
+    public bool IsAlive => !IsRemoved && !IsDying && CurrentHp > 0;
 }

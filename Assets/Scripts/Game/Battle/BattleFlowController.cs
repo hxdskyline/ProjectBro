@@ -16,6 +16,8 @@ public class BattleFlowController
         GameObject fighterPrefab,
         AvatarAnimationDefinition playerDefinition,
         AvatarAnimationDefinition enemyDefinition,
+        int enemyFighterCount,
+        BattleFighterSpawnDefinition[] playerFighterDefinitions,
         Action<bool> onBattleEnded)
     {
         EnsureBattleManager();
@@ -24,6 +26,8 @@ public class BattleFlowController
         _battleManager.BattleEnded += onBattleEnded;
         _battleManager.ConfigureFighterPrefab(fighterPrefab);
         _battleManager.ConfigureDemoAvatars(playerDefinition, enemyDefinition);
+        _battleManager.ConfigureEnemyFighterCount(enemyFighterCount);
+        _battleManager.ConfigurePlayerFighters(playerFighterDefinitions);
         _battleManager.Initialize(levelId);
         _battleManager.StartBattle();
 

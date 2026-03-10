@@ -5,8 +5,12 @@ public struct BattleSpawnConfig
     public GameObject FighterPrefab;
     public AvatarAnimationDefinition PlayerAvatarDefinition;
     public AvatarAnimationDefinition EnemyAvatarDefinition;
+    public BattleFighterSpawnDefinition[] PlayerFighterDefinitions;
+    public BattleUnitTypeConfig PlayerUnitType;
+    public BattleUnitTypeConfig EnemyUnitType;
 
     public int FightersPerCamp;
+    public int EnemyFighterCount;
     public Vector2 SpawnAreaMin;
     public Vector2 SpawnAreaMax;
     public float SpawnMinDistance;
@@ -15,13 +19,6 @@ public struct BattleSpawnConfig
 
     public Color PlayerTint;
     public Color EnemyTint;
-
-    public int PlayerHp;
-    public int EnemyHp;
-    public int PlayerAttack;
-    public int EnemyAttack;
-    public int PlayerDefense;
-    public int EnemyDefense;
 }
 
 public struct BattleSpawnResult

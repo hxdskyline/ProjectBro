@@ -15,29 +15,31 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 4154e4f5e7d24474686eae011b0b00a8
+  m_GUID: 850139cb19c19c644b19be4ddb2e135a
   m_SerializeEntries:
-  - m_GUID: aea80bfc0fe90d94c98eaa9970bc06bc
-    m_Address: ui/BattlePanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8b8688504f129174bbd468848be3caac
-    m_Address: ui/CardBuildPanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
-    m_Address: ui/MainPanel
+    m_Address: ui/mainpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4101569e0fab8e343bbbf7f19e7cd604
-    m_Address: ui/VictoryPanel
+    m_Address: ui/victorypanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8b8688504f129174bbd468848be3caac
+    m_Address: ui/cardbuildpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aea80bfc0fe90d94c98eaa9970bc06bc
+    m_Address: ui/battlepanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas: []
+    m_Schemas:
+    - {fileID: 11400000, guid: d254ec9395b27b9409267a19962a44a0, type: 2}
+    - {fileID: 11400000, guid: 1daca6ef69a908b4887cb7ea30cb4c3f, type: 2}

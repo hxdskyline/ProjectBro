@@ -30,6 +30,7 @@ public class AddressableAssetsBuilder
         { "UI", "ui" },
         { "Audio/BGM", "audio_bgm" },
         { "Audio/SFX", "audio_sfx" },
+        { "AvatarTemp", "avatar_temp" },
         { "Sprites", "sprites" },
         { "Prefabs", "prefabs" },
     };
@@ -301,13 +302,28 @@ public class AddressableAssetsBuilder
 
     /// <summary>
     /// 生成 Address
-    /// 规则：组名/文件名（不含扩展名）
-    /// 例如：ui/MainPanel、audio_bgm/bgm_main
+    /// 规则：去掉前缀 Assets/Bundle/，并去掉文件扩展名
+    /// 最终统一转换为全小写
+    /// 例如：Assets/Bundle/UI/MainPanel.prefab -> ui/mainpanel
+    ///      Assets/Bundle/Audio/BGM/bgm_main.mp3 -> audio/bgm/bgm_main
     /// </summary>
     private static string GenerateAddress(string assetPath, string groupName)
     {
-        string fileName = Path.GetFileNameWithoutExtension(assetPath);
-        return $"{groupName}/{fileName}";
+        string normalizedAssetPath = assetPath.Replace('\\', '/');
+        string normalizedBundleRoot = BUNDLE_ROOT_PATH.Replace('\\', '/').TrimEnd('/');
+
+        if (normalizedAssetPath.StartsWith(normalizedBundleRoot + "/"))
+        {
+            normalizedAssetPath = normalizedAssetPath.Substring(normalizedBundleRoot.Length + 1);
+        }
+
+        string extension = Path.GetExtension(normalizedAssetPath);
+        if (!string.IsNullOrEmpty(extension))
+        {
+            normalizedAssetPath = normalizedAssetPath.Substring(0, normalizedAssetPath.Length - extension.Length);
+        }
+
+        return normalizedAssetPath.ToLowerInvariant();
     }
 
     /// <summary>

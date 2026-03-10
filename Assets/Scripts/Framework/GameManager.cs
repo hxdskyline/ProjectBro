@@ -34,6 +34,7 @@ public class GameManager : MonoBehaviour
     private DataManager _dataManager;
     private SceneManager _sceneManager;
     private TableReader _tableReader;
+    private BattleCampaignRuntime _battleCampaignRuntime;
 
     public ResourceManager ResourceManager => _resourceManager;
     public UIManager UIManager => _uiManager;
@@ -42,6 +43,7 @@ public class GameManager : MonoBehaviour
     public DataManager DataManager => _dataManager;
     public SceneManager SceneManager => _sceneManager;
     public TableReader TableReader => _tableReader;
+    public BattleCampaignRuntime BattleCampaignRuntime => _battleCampaignRuntime;
 
     private void Awake()
     {
@@ -88,6 +90,9 @@ public class GameManager : MonoBehaviour
         // 7. 初始化关卡管理器（依赖 TableReader）
         _levelManager = gameObject.AddComponent<LevelManager>();
         _levelManager.Initialize();
+
+        // 8. 初始化运行时战斗进度（仅在本次启动期间有效）
+        _battleCampaignRuntime = new BattleCampaignRuntime();
 
         Debug.Log("[GameManager] Game Framework Initialized Successfully!");
     }

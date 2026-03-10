@@ -6,31 +6,41 @@ public static class BattleSpawner
     public static BattleSpawnResult Spawn(Transform parent, BattleSpawnConfig config)
     {
         int fightersPerCamp = Mathf.Max(1, config.FightersPerCamp);
-        List<Vector3> occupiedPositions = new List<Vector3>(fightersPerCamp * 2);
+        int enemyFighterCount = Mathf.Max(1, config.EnemyFighterCount > 0 ? config.EnemyFighterCount : fightersPerCamp);
+        int playerCount = HasCustomPlayerDefinitions(config)
+            ? config.PlayerFighterDefinitions.Length
+            : fightersPerCamp;
+        List<Vector3> occupiedPositions = new List<Vector3>(Mathf.Max(1, playerCount + enemyFighterCount));
 
-        BattleFighter[] playerFighters = CreateFighterGroup(
-            parent,
-            "PlayerAvatar",
-            BattleCamp.Player,
-            config.PlayerHp,
-            config.PlayerAttack,
-            config.PlayerDefense,
-            config.PlayerAvatarDefinition,
-            fightersPerCamp,
-            occupiedPositions,
-            true,
-            config.PlayerTint,
-            config);
+        BattleFighter[] playerFighters = HasCustomPlayerDefinitions(config)
+            ? CreateFighterGroupFromDefinitions(
+                parent,
+                BattleCamp.Player,
+                config.PlayerFighterDefinitions,
+                config.PlayerAvatarDefinition,
+                occupiedPositions,
+                true,
+                config.PlayerTint,
+                config)
+            : CreateFighterGroup(
+                parent,
+                "PlayerAvatar",
+                BattleCamp.Player,
+                config.PlayerUnitType,
+                config.PlayerAvatarDefinition,
+                fightersPerCamp,
+                occupiedPositions,
+                true,
+                config.PlayerTint,
+                config);
 
         BattleFighter[] enemyFighters = CreateFighterGroup(
             parent,
             "EnemyAvatar",
             BattleCamp.Enemy,
-            config.EnemyHp,
-            config.EnemyAttack,
-            config.EnemyDefense,
+            config.EnemyUnitType,
             config.EnemyAvatarDefinition,
-            fightersPerCamp,
+            enemyFighterCount,
             occupiedPositions,
             false,
             config.EnemyTint,
@@ -46,13 +56,54 @@ public static class BattleSpawner
         };
     }
 
+    private static bool HasCustomPlayerDefinitions(BattleSpawnConfig config)
+    {
+        return config.PlayerFighterDefinitions != null && config.PlayerFighterDefinitions.Length > 0;
+    }
+
+    private static BattleFighter[] CreateFighterGroupFromDefinitions(
+        Transform parent,
+        BattleCamp camp,
+        BattleFighterSpawnDefinition[] definitions,
+        AvatarAnimationDefinition definition,
+        List<Vector3> occupiedPositions,
+        bool faceRight,
+        Color tint,
+        BattleSpawnConfig config)
+    {
+        BattleFighter[] fighters = new BattleFighter[definitions.Length];
+
+        for (int i = 0; i < definitions.Length; i++)
+        {
+            Vector3 spawnPosition = GetRandomSpawnPosition(config, occupiedPositions);
+            BattleFighterSpawnDefinition fighterDefinition = definitions[i];
+            string fighterName = string.IsNullOrEmpty(fighterDefinition.Name)
+                ? $"PlayerAvatar_{i + 1}"
+                : fighterDefinition.Name;
+
+            fighters[i] = CreateFighter(
+                parent,
+                fighterName,
+                camp,
+                null,
+                fighterDefinition.StaticAttributes,
+                definition,
+                spawnPosition,
+                faceRight,
+                tint,
+                config);
+
+            occupiedPositions.Add(spawnPosition);
+        }
+
+        return fighters;
+    }
+
     private static BattleFighter[] CreateFighterGroup(
         Transform parent,
         string baseName,
         BattleCamp camp,
-        int hp,
-        int attack,
-        int defense,
+        BattleUnitTypeConfig unitType,
         AvatarAnimationDefinition definition,
         int count,
         List<Vector3> occupiedPositions,
@@ -70,9 +121,8 @@ public static class BattleSpawner
                 parent,
                 name,
                 camp,
-                hp,
-                attack,
-                defense,
+                unitType,
+                ResolveStaticAttributes(unitType),
                 definition,
                 spawnPosition,
                 faceRight,
@@ -123,9 +173,8 @@ public static class BattleSpawner
         Transform parent,
         string objectName,
         BattleCamp camp,
-        int hp,
-        int attack,
-        int defense,
+        BattleUnitTypeConfig unitType,
+        UnitStaticAttributes staticAttributes,
         AvatarAnimationDefinition definition,
         Vector3 position,
         bool faceRight,
@@ -173,16 +222,37 @@ public static class BattleSpawner
 
         battleAvatar.SetAnimationDefinition(definition);
 
+        UnitRuntimeAttributes runtimeAttributes = unitType != null
+            ? unitType.CreateRuntimeAttributes()
+            : new UnitRuntimeAttributes(staticAttributes);
+
         return new BattleFighter
         {
             Name = objectName,
             Camp = camp,
-            HP = hp,
-            Attack = attack,
-            Defense = defense,
+            UnitType = unitType,
+            StaticAttributes = staticAttributes,
+            RuntimeAttributes = runtimeAttributes,
             Avatar = battleAvatar,
             Transform = go.transform,
             BaseScale = scale
+        };
+    }
+
+    private static UnitStaticAttributes ResolveStaticAttributes(BattleUnitTypeConfig unitType)
+    {
+        if (unitType != null)
+        {
+            return unitType.BaseAttributes;
+        }
+
+        return new UnitStaticAttributes
+        {
+            MaxHp = 60,
+            Attack = 12,
+            Defense = 3,
+            MoveSpeed = 2.2f,
+            AttackRange = 1.0f
         };
     }
 

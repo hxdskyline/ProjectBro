@@ -1,25 +1,64 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System.IO;
+using LitJson;
 
 /// <summary>
 /// 卡牌构筑界面，支持上阵区和待选区之间自由拖拽。
 /// </summary>
 public class CardBuildPanel : UIPanel
 {
+    private const string CardConfigFileName = "card_build_cards.json";
+    private const string OutingRewardConfigFileName = "outing_reward_config.json";
+    private const int AttributeBoostAttackIncrease = 2;
+    private const int AttributeBoostDefenseIncrease = 1;
+    private const int AttributeBoostHpIncrease = 12;
+    private const float AttributeBoostMoveSpeedIncrease = 0.1f;
+    private const float AttributeBoostAttackRangeIncrease = 0.1f;
+
+    private sealed class OutingRewardConfig
+    {
+        public string[] NamePrefixes;
+        public OutingRewardRange Attack;
+        public OutingRewardRange Defense;
+        public OutingRewardRange Hp;
+        public OutingRewardFloatRange MoveSpeed;
+        public OutingRewardFloatRange AttackRange;
+    }
+
+    private sealed class OutingRewardRange
+    {
+        public int Min;
+        public int Max;
+    }
+
+    private sealed class OutingRewardFloatRange
+    {
+        public float Min;
+        public float Max;
+    }
+
     [SerializeField] private Button _startBattleButton;
     [SerializeField] private Button _backButton;
     [SerializeField] private Text _levelText;
+    [SerializeField] private Text _battleProgressText;
     [SerializeField] private Text _cardInfoText;
+    [SerializeField] private Text _statusText;
     [SerializeField] private RectTransform _deployedCardsRoot;
+    [SerializeField] private RectTransform _outingCardsRoot;
+    [SerializeField] private RectTransform _attributeBoostCardsRoot;
     [SerializeField] private RectTransform _reserveCardsRoot;
     [SerializeField] private int _maxDeployedCards = 5;
 
     private int _currentLevel = 1;
     private readonly List<CardBuildCardData> _deployedCards = new List<CardBuildCardData>();
+    private readonly List<CardBuildCardData> _outingCards = new List<CardBuildCardData>();
+    private readonly List<CardBuildCardData> _attributeBoostCards = new List<CardBuildCardData>();
     private readonly List<CardBuildCardData> _reserveCards = new List<CardBuildCardData>();
     private bool _cardsInitialized;
     private Font _uiFont;
+    private OutingRewardConfig _outingRewardConfig;
 
     public override void Initialize()
     {
@@ -37,22 +76,74 @@ public class CardBuildPanel : UIPanel
             _backButton.onClick.AddListener(OnBackButtonClicked);
         }
 
-        if (GameManager.Instance.DataManager.PlayerData != null)
-        {
-            _currentLevel = GameManager.Instance.DataManager.PlayerData.currentLevel;
-        }
+        RefreshBattleProgress();
 
         _uiFont = LoadBuiltinFont();
+        EnsureInfoTexts();
         EnsureCardRoots();
         EnsureDeployedDropZone(_deployedCardsRoot);
+        EnsureOutingDropZone(_outingCardsRoot);
+        EnsureAttributeBoostDropZone(_attributeBoostCardsRoot);
         EnsureReserveDropZone(_reserveCardsRoot);
         EnsureDeployedLayout(_deployedCardsRoot);
+        EnsureOutingLayout(_outingCardsRoot);
+        EnsureAttributeBoostLayout(_attributeBoostCardsRoot);
         EnsureReserveLayout(_reserveCardsRoot);
         CreateDemoCardsIfNeeded();
         RebuildCardViews();
         UpdateUI();
 
         Debug.Log("[CardBuildPanel] Initialized");
+    }
+
+    public override void Show()
+    {
+        base.Show();
+        RefreshBattleProgress();
+        RebuildCardViews();
+        UpdateUI();
+    }
+
+    public bool HasOutingCards()
+    {
+        return _outingCards.Count > 0;
+    }
+
+    public bool HasAttributeBoostCards()
+    {
+        return _attributeBoostCards.Count > 0;
+    }
+
+    public void ResolveBattleEndZoneRewards(bool grantOutingReward, bool grantAttributeBoostReward)
+    {
+        List<string> rewardMessages = new List<string>();
+
+        if (grantOutingReward)
+        {
+            CardBuildCardData randomCard = CreateRandomOutingRewardCard();
+            _outingCards.Add(randomCard);
+            rewardMessages.Add($"外出区域带回了新卡：{randomCard.Name}");
+        }
+
+        if (grantAttributeBoostReward)
+        {
+            int boostedCardCount = ApplyAttributeBoostRewards();
+            if (boostedCardCount > 0)
+            {
+                rewardMessages.Add($"属性提升区域强化了 {boostedCardCount} 张卡，已返回待选区");
+            }
+        }
+
+        if (gameObject.activeInHierarchy)
+        {
+            RebuildCardViews();
+            UpdateUI();
+        }
+
+        if (rewardMessages.Count > 0)
+        {
+            SetStatusText(string.Join("  ", rewardMessages));
+        }
     }
 
     public void HandleCardDrop(CardDragItem dragItem, CardZoneType targetZone)
@@ -71,22 +162,16 @@ public class CardBuildPanel : UIPanel
 
         if (targetZone == CardZoneType.Deployed && _deployedCards.Count >= _maxDeployedCards)
         {
-            if (_cardInfoText != null)
-            {
-                _cardInfoText.text = $"Deployed is full ({_maxDeployedCards}). Move one card out first.";
-            }
+            SetStatusText($"Deployed is full ({_maxDeployedCards}). Move one card out first.");
 
             RebuildCardViews();
             return;
         }
 
-        if (fromZone == CardZoneType.Deployed)
+        if (!MoveCardBetweenZones(fromZone, targetZone, card.Id))
         {
-            MoveCardById(_deployedCards, _reserveCards, card.Id);
-        }
-        else
-        {
-            MoveCardById(_reserveCards, _deployedCards, card.Id);
+            RebuildCardViews();
+            return;
         }
 
         RebuildCardViews();
@@ -95,26 +180,17 @@ public class CardBuildPanel : UIPanel
 
     public void HandleCardClick(CardBuildCardData card, CardZoneType fromZone)
     {
-        CardZoneType targetZone = fromZone == CardZoneType.Deployed
-            ? CardZoneType.Reserve
-            : CardZoneType.Deployed;
+        CardZoneType targetZone = GetClickTargetZone(fromZone);
 
         if (targetZone == CardZoneType.Deployed && _deployedCards.Count >= _maxDeployedCards)
         {
-            if (_cardInfoText != null)
-            {
-                _cardInfoText.text = $"Deployed is full ({_maxDeployedCards}). Move one card out first.";
-            }
+            SetStatusText($"Deployed is full ({_maxDeployedCards}). Move one card out first.");
             return;
         }
 
-        if (fromZone == CardZoneType.Deployed)
+        if (!MoveCardBetweenZones(fromZone, targetZone, card.Id))
         {
-            MoveCardById(_deployedCards, _reserveCards, card.Id);
-        }
-        else
-        {
-            MoveCardById(_reserveCards, _deployedCards, card.Id);
+            return;
         }
 
         RebuildCardViews();
@@ -123,14 +199,56 @@ public class CardBuildPanel : UIPanel
 
     private void UpdateUI()
     {
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+
         if (_levelText != null)
         {
-            _levelText.text = $"Level: {_currentLevel}";
+            int maxBattleCount = battleCampaignRuntime != null ? battleCampaignRuntime.MaxBattleCount : 10;
+            _levelText.text = $"Battle: {_currentLevel}/{maxBattleCount}";
+        }
+
+        if (_battleProgressText != null)
+        {
+            int currentEnemyCount = battleCampaignRuntime != null
+                ? battleCampaignRuntime.GetEnemyCountForBattle(_currentLevel)
+                : 1;
+
+            string nextBattleText;
+            if (battleCampaignRuntime != null && battleCampaignRuntime.HasNextBattle)
+            {
+                int nextBattleNumber = battleCampaignRuntime.GetNextBattleNumber(_currentLevel);
+                int nextEnemyCount = battleCampaignRuntime.GetEnemyCountForBattle(nextBattleNumber);
+                nextBattleText = $"Next: Battle {nextBattleNumber}, Enemies {nextEnemyCount}";
+            }
+            else if (battleCampaignRuntime != null && battleCampaignRuntime.IsCompleted)
+            {
+                nextBattleText = "Next: Campaign completed for this run";
+            }
+            else
+            {
+                nextBattleText = "Next: Final battle ahead";
+            }
+
+            _battleProgressText.text =
+                $"Current: Battle {_currentLevel}, Enemies {currentEnemyCount}\n" +
+                nextBattleText;
         }
 
         if (_cardInfoText != null)
         {
-            _cardInfoText.text = $"Drag cards between zones. Deployed: {_deployedCards.Count}/{_maxDeployedCards}  Reserve: {_reserveCards.Count}";
+            _cardInfoText.text =
+                $"Deployed: {_deployedCards.Count}/{_maxDeployedCards}  " +
+                $"外出: {_outingCards.Count}  强化: {_attributeBoostCards.Count}  Reserve: {_reserveCards.Count}";
+        }
+
+        SetStatusText("Drag cards between deployed, outing, boost, and reserve zones to adjust your lineup.");
+    }
+
+    private void SetStatusText(string message)
+    {
+        if (_statusText != null)
+        {
+            _statusText.text = message;
         }
     }
 
@@ -138,10 +256,14 @@ public class CardBuildPanel : UIPanel
     {
         if (_deployedCards.Count == 0)
         {
-            if (_cardInfoText != null)
-            {
-                _cardInfoText.text = "Please deploy at least 1 card before starting battle.";
-            }
+            SetStatusText("Please deploy at least 1 card before starting battle.");
+            return;
+        }
+
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        if (battleCampaignRuntime != null && battleCampaignRuntime.IsCompleted)
+        {
+            SetStatusText("All 10 battles are completed for this run. Restart the game to begin again.");
             return;
         }
 
@@ -153,7 +275,7 @@ public class CardBuildPanel : UIPanel
 
         if (battlePanel != null)
         {
-            battlePanel.StartBattle(_currentLevel);
+            battlePanel.StartBattle(_currentLevel, _deployedCards.ToArray(), HasOutingCards(), HasAttributeBoostCards());
         }
     }
 
@@ -165,16 +287,256 @@ public class CardBuildPanel : UIPanel
         GameManager.Instance.UIManager.ShowPanel<MainPanel>("ui/MainPanel", UIManager.UILayer.Normal);
     }
 
+    private void RefreshBattleProgress()
+    {
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        if (battleCampaignRuntime != null)
+        {
+            _currentLevel = battleCampaignRuntime.CurrentBattleNumber;
+        }
+    }
+
+    private CardBuildCardData CreateRandomOutingRewardCard()
+    {
+        OutingRewardConfig config = GetOutingRewardConfig();
+        int nextId = GetNextCardId();
+        int attack = Random.Range(config.Attack.Min, config.Attack.Max + 1);
+        int defense = Random.Range(config.Defense.Min, config.Defense.Max + 1);
+        int hp = Random.Range(config.Hp.Min, config.Hp.Max + 1);
+        float moveSpeed = Random.Range(config.MoveSpeed.Min, config.MoveSpeed.Max + 0.01f);
+        float attackRange = Random.Range(config.AttackRange.Min, config.AttackRange.Max + 0.01f);
+
+        return new CardBuildCardData
+        {
+            Id = nextId,
+            Name = $"{GetRandomOutingRewardNamePrefix(config)}{nextId}",
+            Gender = "未知",
+            Attack = attack,
+            Defense = defense,
+            Hp = hp,
+            MoveSpeed = moveSpeed,
+            AttackRange = attackRange
+        };
+    }
+
+    private OutingRewardConfig GetOutingRewardConfig()
+    {
+        if (_outingRewardConfig != null)
+        {
+            return _outingRewardConfig;
+        }
+
+        _outingRewardConfig = LoadOutingRewardConfig();
+        return _outingRewardConfig;
+    }
+
+    private OutingRewardConfig LoadOutingRewardConfig()
+    {
+        string configPath = Path.Combine(Application.streamingAssetsPath, OutingRewardConfigFileName);
+        if (!File.Exists(configPath))
+        {
+            Debug.LogWarning($"[CardBuildPanel] Outing reward config file not found: {configPath}");
+            return CreateFallbackOutingRewardConfig();
+        }
+
+        try
+        {
+            string jsonContent = File.ReadAllText(configPath);
+            JsonData json = JsonMapper.ToObject(jsonContent);
+            OutingRewardConfig config = new OutingRewardConfig
+            {
+                NamePrefixes = ReadStringArray(json, "namePrefixes"),
+                Attack = ReadIntRange(json, "attack"),
+                Defense = ReadIntRange(json, "defense"),
+                Hp = ReadIntRange(json, "hp"),
+                MoveSpeed = ReadFloatRange(json, "moveSpeed"),
+                AttackRange = ReadFloatRange(json, "attackRange")
+            };
+
+            if (!IsValidOutingRewardConfig(config))
+            {
+                Debug.LogWarning($"[CardBuildPanel] Outing reward config format is invalid: {configPath}");
+                return CreateFallbackOutingRewardConfig();
+            }
+
+            NormalizeOutingRewardConfig(config);
+            return config;
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogWarning($"[CardBuildPanel] Failed to load outing reward config: {exception.Message}");
+            return CreateFallbackOutingRewardConfig();
+        }
+    }
+
+    private static string GetRandomOutingRewardNamePrefix(OutingRewardConfig config)
+    {
+        if (config == null || config.NamePrefixes == null || config.NamePrefixes.Length == 0)
+        {
+            return "外出援军";
+        }
+
+        int index = Random.Range(0, config.NamePrefixes.Length);
+        string prefix = config.NamePrefixes[index];
+        return string.IsNullOrEmpty(prefix) ? "外出援军" : prefix;
+    }
+
+    private static bool IsValidOutingRewardConfig(OutingRewardConfig config)
+    {
+        return config != null &&
+            config.NamePrefixes != null && config.NamePrefixes.Length > 0 &&
+            config.Attack != null &&
+            config.Defense != null &&
+            config.Hp != null &&
+            config.MoveSpeed != null &&
+            config.AttackRange != null;
+    }
+
+    private static void NormalizeOutingRewardConfig(OutingRewardConfig config)
+    {
+        NormalizeIntRange(config.Attack);
+        NormalizeIntRange(config.Defense);
+        NormalizeIntRange(config.Hp);
+        NormalizeFloatRange(config.MoveSpeed);
+        NormalizeFloatRange(config.AttackRange);
+    }
+
+    private static void NormalizeIntRange(OutingRewardRange range)
+    {
+        if (range == null)
+        {
+            return;
+        }
+
+        range.Min = Mathf.Max(1, range.Min);
+        range.Max = Mathf.Max(range.Min, range.Max);
+    }
+
+    private static void NormalizeFloatRange(OutingRewardFloatRange range)
+    {
+        if (range == null)
+        {
+            return;
+        }
+
+        range.Min = Mathf.Max(0.1f, range.Min);
+        range.Max = Mathf.Max(range.Min, range.Max);
+    }
+
+    private static OutingRewardConfig CreateFallbackOutingRewardConfig()
+    {
+        OutingRewardConfig config = new OutingRewardConfig
+        {
+            NamePrefixes = new[] { "外出援军" },
+            Attack = new OutingRewardRange { Min = 10, Max = 28 },
+            Defense = new OutingRewardRange { Min = 2, Max = 8 },
+            Hp = new OutingRewardRange { Min = 52, Max = 100 },
+            MoveSpeed = new OutingRewardFloatRange { Min = 1.7f, Max = 3.0f },
+            AttackRange = new OutingRewardFloatRange { Min = 0.9f, Max = 2.2f }
+        };
+
+        return config;
+    }
+
+    private int GetNextCardId()
+    {
+        int maxId = 0;
+        maxId = Mathf.Max(maxId, GetMaxCardId(_deployedCards));
+        maxId = Mathf.Max(maxId, GetMaxCardId(_outingCards));
+        maxId = Mathf.Max(maxId, GetMaxCardId(_attributeBoostCards));
+        maxId = Mathf.Max(maxId, GetMaxCardId(_reserveCards));
+        return maxId + 1;
+    }
+
+    private static int GetMaxCardId(List<CardBuildCardData> cards)
+    {
+        int maxId = 0;
+        for (int i = 0; i < cards.Count; i++)
+        {
+            maxId = Mathf.Max(maxId, cards[i].Id);
+        }
+
+        return maxId;
+    }
+
+    private void EnsureInfoTexts()
+    {
+        RectTransform panelRect = transform as RectTransform;
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        _battleProgressText = _battleProgressText ?? CreateRuntimeInfoText(
+            panelRect,
+            "BattleProgressText",
+            new Vector2(0.05f, 0.86f),
+            new Vector2(0.95f, 0.95f),
+            16,
+            TextAnchor.UpperLeft,
+            new Color(0.88f, 0.94f, 1f, 1f));
+
+        _cardInfoText = _cardInfoText ?? CreateRuntimeInfoText(
+            panelRect,
+            "LineupInfoText",
+            new Vector2(0.05f, 0.80f),
+            new Vector2(0.95f, 0.85f),
+            15,
+            TextAnchor.MiddleLeft,
+            Color.white);
+
+        _statusText = _statusText ?? CreateRuntimeInfoText(
+            panelRect,
+            "StatusText",
+            new Vector2(0.05f, 0.74f),
+            new Vector2(0.95f, 0.79f),
+            14,
+            TextAnchor.MiddleLeft,
+            new Color(1f, 0.88f, 0.62f, 1f));
+    }
+
+    private Text CreateRuntimeInfoText(
+        RectTransform parent,
+        string objectName,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        int fontSize,
+        TextAnchor alignment,
+        Color color)
+    {
+        GameObject textGo = new GameObject(objectName, typeof(RectTransform), typeof(Text));
+        textGo.transform.SetParent(parent, false);
+
+        RectTransform textRect = textGo.GetComponent<RectTransform>();
+        textRect.anchorMin = anchorMin;
+        textRect.anchorMax = anchorMax;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        Text text = textGo.GetComponent<Text>();
+        text.font = _uiFont;
+        text.fontSize = fontSize;
+        text.alignment = alignment;
+        text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.text = string.Empty;
+
+        return text;
+    }
+
     private void EnsureCardRoots()
     {
-        if (_deployedCardsRoot != null && _reserveCardsRoot != null)
+        if (_deployedCardsRoot != null && _outingCardsRoot != null && _attributeBoostCardsRoot != null && _reserveCardsRoot != null)
         {
             return;
         }
 
         RectTransform panelRect = transform as RectTransform;
-        _deployedCardsRoot = _deployedCardsRoot ?? CreateRuntimeZone(panelRect, "DeployedCardsRoot", "Deployed", new Vector2(0.05f, 0.13f), new Vector2(0.95f, 0.35f));
-        _reserveCardsRoot = _reserveCardsRoot ?? CreateRuntimeZone(panelRect, "ReserveCardsRoot", "Reserve", new Vector2(0.05f, 0.38f), new Vector2(0.95f, 0.62f));
+        _deployedCardsRoot = _deployedCardsRoot ?? CreateRuntimeZone(panelRect, "DeployedCardsRoot", "Deployed", new Vector2(0.05f, 0.11f), new Vector2(0.95f, 0.23f));
+        _outingCardsRoot = _outingCardsRoot ?? CreateRuntimeZone(panelRect, "OutingCardsRoot", "外出区域", new Vector2(0.05f, 0.26f), new Vector2(0.95f, 0.38f));
+        _attributeBoostCardsRoot = _attributeBoostCardsRoot ?? CreateRuntimeZone(panelRect, "AttributeBoostCardsRoot", "属性提升区域", new Vector2(0.05f, 0.41f), new Vector2(0.95f, 0.53f));
+        _reserveCardsRoot = _reserveCardsRoot ?? CreateRuntimeZone(panelRect, "ReserveCardsRoot", "Reserve", new Vector2(0.05f, 0.56f), new Vector2(0.95f, 0.68f));
     }
 
     private RectTransform CreateRuntimeZone(RectTransform parent, string rootName, string title, Vector2 anchorMin, Vector2 anchorMax)
@@ -253,6 +615,40 @@ public class CardBuildPanel : UIPanel
         }
     }
 
+    private void EnsureOutingDropZone(RectTransform zoneRoot)
+    {
+        OutingCardDropZone dropZone = zoneRoot.GetComponent<OutingCardDropZone>();
+        if (dropZone == null)
+        {
+            dropZone = zoneRoot.gameObject.AddComponent<OutingCardDropZone>();
+        }
+
+        dropZone.Initialize(this);
+
+        if (zoneRoot.GetComponent<Image>() == null)
+        {
+            Image image = zoneRoot.gameObject.AddComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0.08f);
+        }
+    }
+
+    private void EnsureAttributeBoostDropZone(RectTransform zoneRoot)
+    {
+        AttributeBoostCardDropZone dropZone = zoneRoot.GetComponent<AttributeBoostCardDropZone>();
+        if (dropZone == null)
+        {
+            dropZone = zoneRoot.gameObject.AddComponent<AttributeBoostCardDropZone>();
+        }
+
+        dropZone.Initialize(this);
+
+        if (zoneRoot.GetComponent<Image>() == null)
+        {
+            Image image = zoneRoot.gameObject.AddComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0.08f);
+        }
+    }
+
     private void EnsureDeployedLayout(RectTransform zoneRoot)
     {
         VerticalLayoutGroup oldVertical = zoneRoot.GetComponent<VerticalLayoutGroup>();
@@ -299,6 +695,52 @@ public class CardBuildPanel : UIPanel
         layout.padding = new RectOffset(8, 8, 8, 8);
     }
 
+    private void EnsureOutingLayout(RectTransform zoneRoot)
+    {
+        HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
+        if (oldHorizontal != null)
+        {
+            Destroy(oldHorizontal);
+        }
+
+        VerticalLayoutGroup layout = zoneRoot.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+        {
+            layout = zoneRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+        }
+
+        layout.spacing = 8f;
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.padding = new RectOffset(8, 8, 8, 8);
+    }
+
+    private void EnsureAttributeBoostLayout(RectTransform zoneRoot)
+    {
+        HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
+        if (oldHorizontal != null)
+        {
+            Destroy(oldHorizontal);
+        }
+
+        VerticalLayoutGroup layout = zoneRoot.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+        {
+            layout = zoneRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+        }
+
+        layout.spacing = 8f;
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.padding = new RectOffset(8, 8, 8, 8);
+    }
+
     private void CreateDemoCardsIfNeeded()
     {
         if (_cardsInitialized)
@@ -308,24 +750,169 @@ public class CardBuildPanel : UIPanel
 
         _cardsInitialized = true;
         _deployedCards.Clear();
+        _outingCards.Clear();
+        _attributeBoostCards.Clear();
         _reserveCards.Clear();
 
-        _reserveCards.Add(new CardBuildCardData { Id = 1, Name = "Guardian", Attack = 12, Hp = 95 });
-        _reserveCards.Add(new CardBuildCardData { Id = 2, Name = "Ranger", Attack = 18, Hp = 70 });
-        _reserveCards.Add(new CardBuildCardData { Id = 3, Name = "Assassin", Attack = 24, Hp = 50 });
-        _reserveCards.Add(new CardBuildCardData { Id = 4, Name = "Priest", Attack = 8, Hp = 82 });
-        _reserveCards.Add(new CardBuildCardData { Id = 5, Name = "Berserker", Attack = 22, Hp = 68 });
-        _reserveCards.Add(new CardBuildCardData { Id = 6, Name = "Mage", Attack = 20, Hp = 55 });
+        string cardConfigPath = Path.Combine(Application.streamingAssetsPath, CardConfigFileName);
+        if (!File.Exists(cardConfigPath))
+        {
+            Debug.LogError($"[CardBuildPanel] Card config file not found: {cardConfigPath}");
+            SetStatusText("Card config file is missing. Please check StreamingAssets.");
+            return;
+        }
+
+        try
+        {
+            string jsonContent = File.ReadAllText(cardConfigPath);
+            JsonData cardsJson = JsonMapper.ToObject(jsonContent);
+            if (cardsJson == null || !cardsJson.IsArray)
+            {
+                Debug.LogError($"[CardBuildPanel] Card config file format is invalid: {cardConfigPath}");
+                SetStatusText("Card config format is invalid.");
+                return;
+            }
+
+            for (int i = 0; i < cardsJson.Count; i++)
+            {
+                JsonData cardJson = cardsJson[i];
+                _reserveCards.Add(new CardBuildCardData
+                {
+                    Id = ReadInt(cardJson, "id", i + 1),
+                    Name = ReadString(cardJson, "name", $"Card_{i + 1}"),
+                    Gender = ReadString(cardJson, "gender", "未知"),
+                    Attack = ReadInt(cardJson, "attack", 1),
+                    Defense = ReadInt(cardJson, "defense", 0),
+                    Hp = ReadInt(cardJson, "hp", 1),
+                    MoveSpeed = ReadFloat(cardJson, "moveSpeed", 1f),
+                    AttackRange = ReadFloat(cardJson, "attackRange", 1f)
+                });
+            }
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"[CardBuildPanel] Failed to load card config: {exception.Message}");
+            SetStatusText("Failed to load card config.");
+        }
+    }
+
+    private static int ReadInt(JsonData json, string key, int defaultValue)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return defaultValue;
+        }
+
+        return int.TryParse(json[key].ToString(), out int value) ? value : defaultValue;
+    }
+
+    private static float ReadFloat(JsonData json, string key, float defaultValue)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return defaultValue;
+        }
+
+        return float.TryParse(json[key].ToString(), out float value) ? value : defaultValue;
+    }
+
+    private static string ReadString(JsonData json, string key, string defaultValue)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return defaultValue;
+        }
+
+        string value = json[key].ToString();
+        return string.IsNullOrEmpty(value) ? defaultValue : value;
+    }
+
+    private static string[] ReadStringArray(JsonData json, string key)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return null;
+        }
+
+        JsonData arrayJson = json[key];
+        if (arrayJson == null || !arrayJson.IsArray)
+        {
+            return null;
+        }
+
+        List<string> values = new List<string>(arrayJson.Count);
+        for (int i = 0; i < arrayJson.Count; i++)
+        {
+            string value = arrayJson[i]?.ToString();
+            if (!string.IsNullOrEmpty(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values.ToArray();
+    }
+
+    private static OutingRewardRange ReadIntRange(JsonData json, string key)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return null;
+        }
+
+        JsonData rangeJson = json[key];
+        if (rangeJson == null || !rangeJson.IsObject)
+        {
+            return null;
+        }
+
+        return new OutingRewardRange
+        {
+            Min = ReadInt(rangeJson, "min", 0),
+            Max = ReadInt(rangeJson, "max", 0)
+        };
+    }
+
+    private static OutingRewardFloatRange ReadFloatRange(JsonData json, string key)
+    {
+        if (json == null || !json.Keys.Contains(key))
+        {
+            return null;
+        }
+
+        JsonData rangeJson = json[key];
+        if (rangeJson == null || !rangeJson.IsObject)
+        {
+            return null;
+        }
+
+        return new OutingRewardFloatRange
+        {
+            Min = ReadFloat(rangeJson, "min", 0f),
+            Max = ReadFloat(rangeJson, "max", 0f)
+        };
     }
 
     private void RebuildCardViews()
     {
         ClearChildren(_deployedCardsRoot);
+        ClearChildren(_outingCardsRoot);
+        ClearChildren(_attributeBoostCardsRoot);
         ClearChildren(_reserveCardsRoot);
 
         for (int i = 0; i < _deployedCards.Count; i++)
         {
             CreateCardItem(_deployedCardsRoot, _deployedCards[i], CardZoneType.Deployed);
+        }
+
+        for (int i = 0; i < _outingCards.Count; i++)
+        {
+            CreateCardItem(_outingCardsRoot, _outingCards[i], CardZoneType.Outing);
+        }
+
+        for (int i = 0; i < _attributeBoostCards.Count; i++)
+        {
+            CreateCardItem(_attributeBoostCardsRoot, _attributeBoostCards[i], CardZoneType.AttributeBoost);
         }
 
         for (int i = 0; i < _reserveCards.Count; i++)
@@ -394,13 +981,98 @@ public class CardBuildPanel : UIPanel
 
     private void ClearChildren(RectTransform root)
     {
+        if (root == null)
+        {
+            return;
+        }
+
         for (int i = root.childCount - 1; i >= 0; i--)
         {
             Destroy(root.GetChild(i).gameObject);
         }
     }
 
-    private void MoveCardById(List<CardBuildCardData> from, List<CardBuildCardData> to, int cardId)
+    private CardZoneType GetClickTargetZone(CardZoneType fromZone)
+    {
+        if (fromZone == CardZoneType.Deployed)
+        {
+            return CardZoneType.Reserve;
+        }
+
+        if (fromZone == CardZoneType.Outing)
+        {
+            return CardZoneType.Reserve;
+        }
+
+        if (fromZone == CardZoneType.AttributeBoost)
+        {
+            return CardZoneType.Reserve;
+        }
+
+        return CardZoneType.Deployed;
+    }
+
+    private bool MoveCardBetweenZones(CardZoneType fromZone, CardZoneType targetZone, int cardId)
+    {
+        List<CardBuildCardData> fromList = GetZoneList(fromZone);
+        List<CardBuildCardData> targetList = GetZoneList(targetZone);
+        if (fromList == null || targetList == null)
+        {
+            return false;
+        }
+
+        return MoveCardById(fromList, targetList, cardId);
+    }
+
+    private List<CardBuildCardData> GetZoneList(CardZoneType zoneType)
+    {
+        if (zoneType == CardZoneType.Deployed)
+        {
+            return _deployedCards;
+        }
+
+        if (zoneType == CardZoneType.Outing)
+        {
+            return _outingCards;
+        }
+
+        if (zoneType == CardZoneType.AttributeBoost)
+        {
+            return _attributeBoostCards;
+        }
+
+        return _reserveCards;
+    }
+
+    private int ApplyAttributeBoostRewards()
+    {
+        int boostedCardCount = _attributeBoostCards.Count;
+        if (boostedCardCount == 0)
+        {
+            return 0;
+        }
+
+        for (int i = 0; i < _attributeBoostCards.Count; i++)
+        {
+            CardBuildCardData card = _attributeBoostCards[i];
+            card.Attack += AttributeBoostAttackIncrease;
+            card.Defense += AttributeBoostDefenseIncrease;
+            card.Hp += AttributeBoostHpIncrease;
+            card.MoveSpeed = RoundCardFloat(card.MoveSpeed + AttributeBoostMoveSpeedIncrease);
+            card.AttackRange = RoundCardFloat(card.AttackRange + AttributeBoostAttackRangeIncrease);
+            _reserveCards.Add(card);
+        }
+
+        _attributeBoostCards.Clear();
+        return boostedCardCount;
+    }
+
+    private static float RoundCardFloat(float value)
+    {
+        return Mathf.Round(value * 10f) / 10f;
+    }
+
+    private bool MoveCardById(List<CardBuildCardData> from, List<CardBuildCardData> to, int cardId)
     {
         for (int i = 0; i < from.Count; i++)
         {
@@ -412,8 +1084,10 @@ public class CardBuildPanel : UIPanel
             CardBuildCardData card = from[i];
             from.RemoveAt(i);
             to.Add(card);
-            return;
+            return true;
         }
+
+        return false;
     }
 
     private Font LoadBuiltinFont()

@@ -8,11 +8,14 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 /// </summary>
 public class ResourceManager : MonoBehaviour
 {
+    private const string BundleRootPrefix = "assets/bundle/";
+
     // 缓存已加载的资源
     private Dictionary<string, object> _resourceCache = new Dictionary<string, object>();
 
     // 缓存 AsyncOperationHandle，用于卸载
     private Dictionary<string, AsyncOperationHandle> _asyncHandleCache = new Dictionary<string, AsyncOperationHandle>();
+    private Dictionary<string, int> _resourceRefCounts = new Dictionary<string, int>();
 
     public void Initialize()
     {
@@ -24,36 +27,40 @@ public class ResourceManager : MonoBehaviour
     /// </summary>
     public T LoadResource<T>(string address) where T : Object
     {
+        string resolvedAddress = NormalizeAddress(address);
+
         // 检查缓存
-        if (_resourceCache.ContainsKey(address))
+        if (_resourceCache.ContainsKey(resolvedAddress))
         {
-            return _resourceCache[address] as T;
+            RetainResource(resolvedAddress);
+            return _resourceCache[resolvedAddress] as T;
         }
 
         try
         {
             // 同步加载
-            var handle = Addressables.LoadAssetAsync<T>(address);
+            var handle = Addressables.LoadAssetAsync<T>(resolvedAddress);
             handle.WaitForCompletion();
 
             if (handle.Status == AsyncOperationStatus.Succeeded)
             {
                 T resource = handle.Result;
-                _resourceCache[address] = resource;
-                _asyncHandleCache[address] = handle;
+                _resourceCache[resolvedAddress] = resource;
+                _asyncHandleCache[resolvedAddress] = handle;
+                _resourceRefCounts[resolvedAddress] = 1;
 
-                Debug.Log($"[ResourceManager] Loaded resource: {address}");
+                Debug.Log($"[ResourceManager] Loaded resource: {resolvedAddress}");
                 return resource;
             }
             else
             {
-                Debug.LogError($"[ResourceManager] Failed to load resource: {address}");
+                Debug.LogError($"[ResourceManager] Failed to load resource: {resolvedAddress}");
                 return null;
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[ResourceManager] Error loading resource {address}: {e.Message}");
+            Debug.LogError($"[ResourceManager] Error loading resource {resolvedAddress}: {e.Message}");
             return null;
         }
     }
@@ -63,37 +70,41 @@ public class ResourceManager : MonoBehaviour
     /// </summary>
     public void LoadResourceAsync<T>(string address, System.Action<T> onComplete) where T : Object
     {
+        string resolvedAddress = NormalizeAddress(address);
+
         // 检查缓存
-        if (_resourceCache.ContainsKey(address))
+        if (_resourceCache.ContainsKey(resolvedAddress))
         {
-            onComplete?.Invoke(_resourceCache[address] as T);
+            RetainResource(resolvedAddress);
+            onComplete?.Invoke(_resourceCache[resolvedAddress] as T);
             return;
         }
 
         try
         {
-            var handle = Addressables.LoadAssetAsync<T>(address);
+            var handle = Addressables.LoadAssetAsync<T>(resolvedAddress);
             handle.Completed += (asyncHandle) =>
             {
                 if (asyncHandle.Status == AsyncOperationStatus.Succeeded)
                 {
                     T resource = asyncHandle.Result;
-                    _resourceCache[address] = resource;
-                    _asyncHandleCache[address] = asyncHandle;
+                    _resourceCache[resolvedAddress] = resource;
+                    _asyncHandleCache[resolvedAddress] = asyncHandle;
+                    _resourceRefCounts[resolvedAddress] = 1;
 
-                    Debug.Log($"[ResourceManager] Loaded resource async: {address}");
+                    Debug.Log($"[ResourceManager] Loaded resource async: {resolvedAddress}");
                     onComplete?.Invoke(resource);
                 }
                 else
                 {
-                    Debug.LogError($"[ResourceManager] Failed to load resource async: {address}");
+                    Debug.LogError($"[ResourceManager] Failed to load resource async: {resolvedAddress}");
                     onComplete?.Invoke(null);
                 }
             };
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[ResourceManager] Error loading resource async {address}: {e.Message}");
+            Debug.LogError($"[ResourceManager] Error loading resource async {resolvedAddress}: {e.Message}");
             onComplete?.Invoke(null);
         }
     }
@@ -188,18 +199,25 @@ public class ResourceManager : MonoBehaviour
     /// </summary>
     public void UnloadResource(string address)
     {
-        // 从缓存移除
-        if (_resourceCache.ContainsKey(address))
+        string resolvedAddress = NormalizeAddress(address);
+
+        if (!ReleaseResourceReference(resolvedAddress))
         {
-            _resourceCache.Remove(address);
+            return;
+        }
+
+        // 从缓存移除
+        if (_resourceCache.ContainsKey(resolvedAddress))
+        {
+            _resourceCache.Remove(resolvedAddress);
         }
 
         // 释放 AsyncOperationHandle
-        if (_asyncHandleCache.ContainsKey(address))
+        if (_asyncHandleCache.ContainsKey(resolvedAddress))
         {
-            Addressables.Release(_asyncHandleCache[address]);
-            _asyncHandleCache.Remove(address);
-            Debug.Log($"[ResourceManager] Unloaded resource: {address}");
+            Addressables.Release(_asyncHandleCache[resolvedAddress]);
+            _asyncHandleCache.Remove(resolvedAddress);
+            Debug.Log($"[ResourceManager] Unloaded resource: {resolvedAddress}");
         }
     }
 
@@ -216,8 +234,71 @@ public class ResourceManager : MonoBehaviour
 
         _resourceCache.Clear();
         _asyncHandleCache.Clear();
+        _resourceRefCounts.Clear();
 
         Debug.Log("[ResourceManager] Cache cleared");
+    }
+
+    private void RetainResource(string resolvedAddress)
+    {
+        if (string.IsNullOrEmpty(resolvedAddress))
+        {
+            return;
+        }
+
+        if (_resourceRefCounts.ContainsKey(resolvedAddress))
+        {
+            _resourceRefCounts[resolvedAddress]++;
+        }
+        else
+        {
+            _resourceRefCounts[resolvedAddress] = 1;
+        }
+    }
+
+    private bool ReleaseResourceReference(string resolvedAddress)
+    {
+        if (string.IsNullOrEmpty(resolvedAddress))
+        {
+            return false;
+        }
+
+        if (!_resourceRefCounts.ContainsKey(resolvedAddress))
+        {
+            return true;
+        }
+
+        _resourceRefCounts[resolvedAddress]--;
+        if (_resourceRefCounts[resolvedAddress] > 0)
+        {
+            return false;
+        }
+
+        _resourceRefCounts.Remove(resolvedAddress);
+        return true;
+    }
+
+    private static string NormalizeAddress(string address)
+    {
+        if (string.IsNullOrEmpty(address))
+        {
+            return address;
+        }
+
+        string normalizedAddress = address.Replace('\\', '/').ToLowerInvariant();
+
+        if (normalizedAddress.StartsWith(BundleRootPrefix))
+        {
+            normalizedAddress = normalizedAddress.Substring(BundleRootPrefix.Length);
+        }
+
+        string extension = System.IO.Path.GetExtension(normalizedAddress);
+        if (!string.IsNullOrEmpty(extension))
+        {
+            normalizedAddress = normalizedAddress.Substring(0, normalizedAddress.Length - extension.Length);
+        }
+
+        return normalizedAddress;
     }
 
     /// <summary>

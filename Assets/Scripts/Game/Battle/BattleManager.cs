@@ -18,18 +18,12 @@ public class BattleManager : MonoBehaviour
     [SerializeField] private float _fighterScale = 0.6f;
     [SerializeField] private Color _playerTint = new Color(0.6f, 0.9f, 1f, 1f);
     [SerializeField] private Color _enemyTint = new Color(1f, 0.7f, 0.7f, 1f);
+    [SerializeField] private BattleUnitTypeConfig _playerUnitType;
+    [SerializeField] private BattleUnitTypeConfig _enemyUnitType;
 
     [Header("Demo Battle Stats")]
-    [SerializeField] private int _playerHp = 60;
-    [SerializeField] private int _enemyHp = 60;
-    [SerializeField] private int _playerAttack = 16;
-    [SerializeField] private int _enemyAttack = 14;
-    [SerializeField] private int _playerDefense = 4;
-    [SerializeField] private int _enemyDefense = 3;
     [SerializeField] private float _attackResolveDelay = 0.45f;
     [SerializeField] private float _attackCooldown = 0.6f;
-    [SerializeField] private float _moveSpeed = 2.2f;
-    [SerializeField] private float _attackRange = 1.0f;
     [SerializeField] private float _seekDelay = 1.0f;
     [SerializeField] private float _deathDuration = 2.0f;
 
@@ -39,6 +33,8 @@ public class BattleManager : MonoBehaviour
     private BattleFighter[] _playerFighters;
     private BattleFighter[] _enemyFighters;
     private BattleSimulation _simulation;
+    private BattleFighterSpawnDefinition[] _playerFighterDefinitions;
+    private int _enemyFighterCount;
 
     public System.Action<bool> BattleEnded;
 
@@ -62,6 +58,16 @@ public class BattleManager : MonoBehaviour
         _fighterPrefab = fighterPrefab;
     }
 
+    public void ConfigurePlayerFighters(BattleFighterSpawnDefinition[] playerFighterDefinitions)
+    {
+        _playerFighterDefinitions = playerFighterDefinitions;
+    }
+
+    public void ConfigureEnemyFighterCount(int enemyFighterCount)
+    {
+        _enemyFighterCount = Mathf.Max(1, enemyFighterCount);
+    }
+
     public void StartBattle()
     {
         if (_isInBattle)
@@ -80,8 +86,6 @@ public class BattleManager : MonoBehaviour
             {
                 AttackResolveDelay = _attackResolveDelay,
                 AttackCooldown = _attackCooldown,
-                MoveSpeed = _moveSpeed,
-                AttackRange = _attackRange,
                 SeekDelay = _seekDelay,
                 DeathDuration = _deathDuration
             });
@@ -156,6 +160,7 @@ public class BattleManager : MonoBehaviour
                 PlayerAvatarDefinition = _playerAvatarDefinition,
                 EnemyAvatarDefinition = _enemyAvatarDefinition,
                 FightersPerCamp = _fightersPerCamp,
+                EnemyFighterCount = _enemyFighterCount > 0 ? _enemyFighterCount : _fightersPerCamp,
                 SpawnAreaMin = _spawnAreaMin,
                 SpawnAreaMax = _spawnAreaMax,
                 SpawnMinDistance = _spawnMinDistance,
@@ -163,12 +168,9 @@ public class BattleManager : MonoBehaviour
                 FighterScale = _fighterScale,
                 PlayerTint = _playerTint,
                 EnemyTint = _enemyTint,
-                PlayerHp = _playerHp,
-                EnemyHp = _enemyHp,
-                PlayerAttack = _playerAttack,
-                EnemyAttack = _enemyAttack,
-                PlayerDefense = _playerDefense,
-                EnemyDefense = _enemyDefense
+                PlayerFighterDefinitions = _playerFighterDefinitions,
+                PlayerUnitType = _playerUnitType,
+                EnemyUnitType = _enemyUnitType
             });
 
         _playerFighters = result.PlayerFighters;

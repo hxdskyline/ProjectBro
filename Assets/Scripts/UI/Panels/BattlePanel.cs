@@ -16,6 +16,8 @@ public class BattlePanel : UIPanel
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
+    private bool _grantOutingRewardOnBattleEnd;
+    private bool _grantAttributeBoostOnBattleEnd;
 
     public override void Initialize()
     {
@@ -29,10 +31,16 @@ public class BattlePanel : UIPanel
         Debug.Log("[BattlePanel] Initialized");
     }
 
-    public void StartBattle(int levelId)
+    public void StartBattle(
+        int levelId,
+        CardBuildCardData[] deployedCards,
+        bool grantOutingRewardOnBattleEnd,
+        bool grantAttributeBoostOnBattleEnd)
     {
         _currentLevel = levelId;
         _isPaused = false;
+        _grantOutingRewardOnBattleEnd = grantOutingRewardOnBattleEnd;
+        _grantAttributeBoostOnBattleEnd = grantAttributeBoostOnBattleEnd;
 
         if (_flowController == null)
         {
@@ -54,9 +62,48 @@ public class BattlePanel : UIPanel
             _fighterPrefab,
             _playerAvatarDefinition,
             _enemyAvatarDefinition,
+            ResolveEnemyCount(levelId),
+            BuildPlayerSpawnDefinitions(deployedCards),
             OnBattleEnded);
 
         Debug.Log("[BattlePanel] Battle started for level: " + levelId);
+    }
+
+    private int ResolveEnemyCount(int levelId)
+    {
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        if (battleCampaignRuntime == null)
+        {
+            return 1;
+        }
+
+        return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
+    }
+
+    private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(CardBuildCardData[] deployedCards)
+    {
+        if (deployedCards == null || deployedCards.Length == 0)
+        {
+            return null;
+        }
+
+        BattleFighterSpawnDefinition[] definitions = new BattleFighterSpawnDefinition[deployedCards.Length];
+        for (int i = 0; i < deployedCards.Length; i++)
+        {
+            CardBuildCardData card = deployedCards[i];
+            definitions[i] = new BattleFighterSpawnDefinition(
+                card.Name,
+                new UnitStaticAttributes
+                {
+                    MaxHp = Mathf.Max(1, card.Hp),
+                    Attack = Mathf.Max(1, card.Attack),
+                    Defense = Mathf.Max(0, card.Defense),
+                    MoveSpeed = Mathf.Max(0.1f, card.MoveSpeed),
+                    AttackRange = Mathf.Max(0.1f, card.AttackRange)
+                });
+        }
+
+        return definitions;
     }
 
     private void OnBattleEnded(bool victory)
@@ -76,6 +123,12 @@ public class BattlePanel : UIPanel
         if (_battleInfoText != null)
         {
             _battleInfoText.text = victory ? "Victory!" : "Defeat!";
+        }
+
+        if (_grantOutingRewardOnBattleEnd || _grantAttributeBoostOnBattleEnd)
+        {
+            CardBuildPanel cardBuildPanel = GameManager.Instance.UIManager.GetPanel<CardBuildPanel>("ui/CardBuildPanel");
+            cardBuildPanel?.ResolveBattleEndZoneRewards(_grantOutingRewardOnBattleEnd, _grantAttributeBoostOnBattleEnd);
         }
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");

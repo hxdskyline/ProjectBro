@@ -179,7 +179,7 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         textRect.anchorMax = anchorMax;
         textRect.pivot = new Vector2(0f, anchorMin.y);
         textRect.anchoredPosition = anchoredPos;
-        textRect.sizeDelta = new Vector2(-12f, 26f);
+        textRect.sizeDelta = new Vector2(-12f, 44f);
 
         Text text = textGo.GetComponent<Text>();
         text.text = source.text;
@@ -187,6 +187,8 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         text.fontSize = source.fontSize;
         text.color = source.color;
         text.alignment = alignment;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
         text.raycastTarget = false;
     }
 
@@ -209,7 +211,7 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
 
         if (_statText != null)
         {
-            _statText.text = $"ATK {_cardData.Attack}  HP {_cardData.Hp}";
+            _statText.text = $"BP {_cardData.GetBattlePower()}  性别 {_cardData.Gender}\nATK {_cardData.Attack}  DEF {_cardData.Defense}  HP {_cardData.Hp}  SPD {_cardData.MoveSpeed:0.0}";
         }
     }
 }

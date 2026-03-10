@@ -1,0 +1,28 @@
+{
+  "namePrefixes": [
+    "外出援军",
+    "远行旅者",
+    "游历斗士",
+    "归队佣兵"
+  ],
+  "attack": {
+    "min": 10,
+    "max": 28
+  },
+  "defense": {
+    "min": 2,
+    "max": 8
+  },
+  "hp": {
+    "min": 52,
+    "max": 100
+  },
+  "moveSpeed": {
+    "min": 1.7,
+    "max": 3.0
+  },
+  "attackRange": {
+    "min": 0.9,
+    "max": 2.2
+  }
+}

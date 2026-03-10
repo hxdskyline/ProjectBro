@@ -1,0 +1,42 @@
+[
+  {
+    "battleNumber": 1,
+    "enemyUnitIds": [1, 1, 1]
+  },
+  {
+    "battleNumber": 2,
+    "enemyUnitIds": [1, 1, 1, 1]
+  },
+  {
+    "battleNumber": 3,
+    "enemyUnitIds": [1, 1, 2, 2, 2]
+  },
+  {
+    "battleNumber": 4,
+    "enemyUnitIds": [1, 1, 2, 2, 2, 2]
+  },
+  {
+    "battleNumber": 5,
+    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3]
+  },
+  {
+    "battleNumber": 6,
+    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3]
+  },
+  {
+    "battleNumber": 7,
+    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3]
+  },
+  {
+    "battleNumber": 8,
+    "enemyUnitIds": [1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3]
+  },
+  {
+    "battleNumber": 9,
+    "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3]
+  },
+  {
+    "battleNumber": 10,
+    "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3]
+  }
+]

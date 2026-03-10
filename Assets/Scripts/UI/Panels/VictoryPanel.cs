@@ -39,9 +39,12 @@ public class VictoryPanel : UIPanel
         int goldReward = 100 * levelId;
         int expReward = 50 * levelId;
 
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        string battleProgressText = BuildBattleProgressText(levelId, battleCampaignRuntime);
+
         if (_rewardText != null)
         {
-            _rewardText.text = $"Gold: +{goldReward}\nExp: +{expReward}";
+            _rewardText.text = $"Gold: +{goldReward}\nExp: +{expReward}\n{battleProgressText}";
         }
 
         if (_starRating != null)
@@ -53,6 +56,23 @@ public class VictoryPanel : UIPanel
         UpdatePlayerData(levelId, goldReward);
 
         Debug.Log("[VictoryPanel] Victory rewards shown for level: " + levelId);
+    }
+
+    private string BuildBattleProgressText(int levelId, BattleCampaignRuntime battleCampaignRuntime)
+    {
+        if (battleCampaignRuntime == null)
+        {
+            return $"Cleared: Battle {levelId}";
+        }
+
+        if (levelId >= battleCampaignRuntime.MaxBattleCount)
+        {
+            return $"Cleared: Battle {levelId}\nNext: Campaign completed for this run";
+        }
+
+        int nextBattleNumber = battleCampaignRuntime.GetNextBattleNumber(levelId);
+        int nextEnemyCount = battleCampaignRuntime.GetEnemyCountForBattle(nextBattleNumber);
+        return $"Cleared: Battle {levelId}\nNext: Battle {nextBattleNumber}, Enemies {nextEnemyCount}";
     }
 
     private IEnumerator PlayVictoryAnimation()
@@ -77,14 +97,15 @@ public class VictoryPanel : UIPanel
 
     private void UpdatePlayerData(int levelId, int goldReward)
     {
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        if (battleCampaignRuntime != null)
+        {
+            battleCampaignRuntime.AdvanceAfterVictory(levelId);
+        }
+
         PlayerData playerData = GameManager.Instance.DataManager.PlayerData;
         if (playerData != null)
         {
-            if (playerData.currentLevel == levelId)
-            {
-                playerData.currentLevel = levelId + 1;
-            }
-
             playerData.gold += goldReward;
             GameManager.Instance.DataManager.SavePlayerData();
 

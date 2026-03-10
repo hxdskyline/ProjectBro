@@ -4,8 +4,6 @@ public struct BattleSimulationConfig
 {
     public float AttackResolveDelay;
     public float AttackCooldown;
-    public float MoveSpeed;
-    public float AttackRange;
     public float SeekDelay;
     public float DeathDuration;
 }
@@ -147,10 +145,11 @@ public class BattleSimulation
         Vector3 toTarget = target.Transform.position - self.Transform.position;
         float distance = toTarget.magnitude;
 
-        if (distance > _config.AttackRange)
+        float attackRange = GetAttackRange(self);
+        if (distance > attackRange)
         {
             Vector3 direction = toTarget.normalized;
-            self.Transform.position += direction * (_config.MoveSpeed * deltaTime);
+            self.Transform.position += direction * (GetMoveSpeed(self) * deltaTime);
             UpdateFacing(self, direction.x);
             self.Avatar?.PlayRun();
             return;
@@ -227,14 +226,35 @@ public class BattleSimulation
             return;
         }
 
-        int damage = Mathf.Max(1, attacker.Attack - defender.Defense);
-        defender.HP = Mathf.Max(0, defender.HP - damage);
-        Debug.Log($"[BattleManager] {attacker.Camp} attacks {defender.Camp}, damage={damage}, targetHP={defender.HP}");
+        UnitRuntimeAttributes attackerRuntime = attacker.RuntimeAttributes;
+        UnitRuntimeAttributes defenderRuntime = defender.RuntimeAttributes;
+        if (attackerRuntime == null || defenderRuntime == null)
+        {
+            return;
+        }
 
-        if (defender.HP <= 0)
+        int damage = Mathf.Max(1, attackerRuntime.Attack - defenderRuntime.Defense);
+        defenderRuntime.CurrentHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
+        Debug.Log($"[BattleManager] {attacker.Camp} attacks {defender.Camp}, damage={damage}, targetHP={defenderRuntime.CurrentHp}");
+
+        if (defenderRuntime.CurrentHp <= 0)
         {
             StartDeath(defender);
         }
+    }
+
+    private float GetMoveSpeed(BattleFighter fighter)
+    {
+        return fighter?.RuntimeAttributes != null
+            ? Mathf.Max(0.1f, fighter.RuntimeAttributes.MoveSpeed)
+            : 2.2f;
+    }
+
+    private float GetAttackRange(BattleFighter fighter)
+    {
+        return fighter?.RuntimeAttributes != null
+            ? Mathf.Max(0.1f, fighter.RuntimeAttributes.AttackRange)
+            : 1.0f;
     }
 
     private void StartDeath(BattleFighter fighter)

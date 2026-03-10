@@ -16,21 +16,21 @@ MonoBehaviour:
   _actions:
   - _actionType: 2
     _frameAddresses:
-    - Assets/Bundle/AvatarTemp/Enemy/Attack/attack_01.png
-    - Assets/Bundle/AvatarTemp/Enemy/Attack/attack_02.png
+    - avatartemp/enemy/attack/attack_01
+    - avatartemp/enemy/attack/attack_02
     _fps: 10
     _loop: 0
   - _actionType: 0
     _frameAddresses:
-    - Assets/Bundle/AvatarTemp/Enemy/Idle/idle_01.png
+    - avatartemp/enemy/idle/idle_01
     _fps: 10
     _loop: 1
   - _actionType: 1
     _frameAddresses:
-    - Assets/Bundle/AvatarTemp/Enemy/Run/run_01.png
-    - Assets/Bundle/AvatarTemp/Enemy/Run/run_02.png
-    - Assets/Bundle/AvatarTemp/Enemy/Run/run_03.png
-    - Assets/Bundle/AvatarTemp/Enemy/Run/run_04.png
+    - avatartemp/enemy/run/run_01
+    - avatartemp/enemy/run/run_02
+    - avatartemp/enemy/run/run_03
+    - avatartemp/enemy/run/run_04
     _fps: 10
     _loop: 1
   - _actionType: 5
