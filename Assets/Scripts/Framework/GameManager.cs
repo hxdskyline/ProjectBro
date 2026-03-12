@@ -61,7 +61,7 @@ public class GameManager : MonoBehaviour
 
     private void InitializeManagers()
     {
-        Debug.Log("[GameManager] Initializing Game Framework...");
+        Debug.Log("by ai");
 
         // 1. 初始化资源管理器（必须首先初始化）
         _resourceManager = gameObject.AddComponent<ResourceManager>();
