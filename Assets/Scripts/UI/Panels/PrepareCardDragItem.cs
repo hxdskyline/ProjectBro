@@ -1,11 +1,11 @@
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 /// <summary>
-/// 卡牌拖拽组件，负责拖拽过程的表现。
+/// 战前准备界面的卡牌拖拽组件。
 /// </summary>
-public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+public class PrepareCardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
     [SerializeField] private Text _nameText;
     [SerializeField] private Text _statText;
@@ -14,16 +14,18 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
     private RectTransform _rectTransform;
     private Transform _originalParent;
     private int _originalSiblingIndex;
-    private CardBuildPanel _panel;
+    private BattlePreparePanel _panel;
     private CardBuildCardData _cardData;
-    private CardZoneType _zoneType;
+    private PrepareCardZoneType _zoneType;
+    private bool _isOutingCard;
+    private bool _isBlessingCard;
     private Canvas _rootCanvas;
     private GameObject _dragVisual;
     private RectTransform _dragVisualRect;
     private bool _isDragging;
 
     public CardBuildCardData CardData => _cardData;
-    public CardZoneType ZoneType => _zoneType;
+    public PrepareCardZoneType ZoneType => _zoneType;
 
     public void ForceCleanupDragVisual()
     {
@@ -36,11 +38,13 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         _statText = statText;
     }
 
-    public void Initialize(CardBuildPanel panel, CardBuildCardData cardData, CardZoneType zoneType)
+    public void Initialize(BattlePreparePanel panel, CardBuildCardData cardData, PrepareCardZoneType zoneType, bool isOutingCard, bool isBlessingCard)
     {
         _panel = panel;
         _cardData = cardData;
         _zoneType = zoneType;
+        _isOutingCard = isOutingCard;
+        _isBlessingCard = isBlessingCard;
 
         if (_rectTransform == null)
         {
@@ -134,10 +138,7 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
             return;
         }
 
-        _dragVisual = new GameObject($"{name}_DragVisual",
-            typeof(RectTransform),
-            typeof(Image),
-            typeof(CanvasGroup));
+        _dragVisual = new GameObject($"{name}_DragVisual", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
         _dragVisual.transform.SetParent(_rootCanvas.transform, false);
 
         _dragVisualRect = _dragVisual.GetComponent<RectTransform>();
@@ -164,7 +165,7 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         CreateDragText(_dragVisual.transform, _statText, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(8f, 8f), TextAnchor.LowerLeft);
     }
 
-    private void CreateDragText(Transform parent, Text source, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, TextAnchor alignment)
+    private static void CreateDragText(Transform parent, Text source, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, TextAnchor alignment)
     {
         if (source == null)
         {
@@ -206,33 +207,27 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
     {
         if (_nameText != null)
         {
-            if (_zoneType == CardZoneType.Blessing)
+            string tagText = string.Empty;
+            if (_isOutingCard)
             {
-                _nameText.text = $"{_cardData.Name}  [赐福]";
+                tagText = "  [游历中]";
             }
-            else if (_zoneType == CardZoneType.Discard)
+            else if (_isBlessingCard)
             {
-                _nameText.text = $"{_cardData.Name}  [弃置]";
+                tagText = "  [赐福]";
             }
-            else
-            {
-                _nameText.text = _cardData.Name;
-            }
+
+            _nameText.text = $"{_cardData.Name}{tagText}";
         }
 
         if (_statText != null)
         {
-            string extraText = string.Empty;
-            if (_zoneType == CardZoneType.Blessing)
-            {
-                extraText = "\n本场战斗临时强化";
-            }
-            else if (_zoneType == CardZoneType.Discard)
-            {
-                extraText = "\n关闭窗口后永久消失";
-            }
-
-            _statText.text = $"BP {_cardData.GetBattlePower()}  性别 {_cardData.Gender}\nATK {_cardData.Attack}  DEF {_cardData.Defense}  HP {_cardData.Hp}  SPD {_cardData.MoveSpeed:0.0}{extraText}";
+            string restrictionText = _isOutingCard
+                ? "\n本场不可上阵"
+                : _isBlessingCard
+                    ? "\n本场战斗临时强化"
+                    : string.Empty;
+            _statText.text = $"BP {_cardData.GetBattlePower()}  性别 {_cardData.Gender}\nATK {_cardData.Attack}  DEF {_cardData.Defense}  HP {_cardData.Hp}  SPD {_cardData.MoveSpeed:0.0}{restrictionText}";
         }
     }
 }

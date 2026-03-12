@@ -6,5 +6,7 @@ public enum CardZoneType
     Deployed,
     Reserve,
     Outing,
-    AttributeBoost
+    AttributeBoost,
+    Blessing,
+    Discard
 }

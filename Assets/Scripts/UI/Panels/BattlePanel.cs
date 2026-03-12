@@ -6,6 +6,12 @@ using UnityEngine.UI;
 /// </summary>
 public class BattlePanel : UIPanel
 {
+    private const float BlessingAttackMultiplier = 1.6f;
+    private const float BlessingDefenseMultiplier = 1.5f;
+    private const float BlessingHpMultiplier = 1.5f;
+    private const float BlessingMoveSpeedMultiplier = 1.3f;
+    private const float BlessingAttackRangeMultiplier = 1.25f;
+
     [SerializeField] private Text _battleInfoText;
     [SerializeField] private Text _levelText;
     [SerializeField] private Button _pauseButton;
@@ -16,6 +22,7 @@ public class BattlePanel : UIPanel
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
+    private bool _consumeBlessingOnBattleEnd;
     private bool _grantOutingRewardOnBattleEnd;
     private bool _grantAttributeBoostOnBattleEnd;
 
@@ -25,6 +32,7 @@ public class BattlePanel : UIPanel
 
         if (_pauseButton != null)
         {
+            _pauseButton.onClick.RemoveListener(OnPauseButtonClicked);
             _pauseButton.onClick.AddListener(OnPauseButtonClicked);
         }
 
@@ -34,11 +42,14 @@ public class BattlePanel : UIPanel
     public void StartBattle(
         int levelId,
         CardBuildCardData[] deployedCards,
+        int[] blessingCardIds,
         bool grantOutingRewardOnBattleEnd,
+        bool consumeBlessingOnBattleEnd,
         bool grantAttributeBoostOnBattleEnd)
     {
         _currentLevel = levelId;
         _isPaused = false;
+        _consumeBlessingOnBattleEnd = consumeBlessingOnBattleEnd;
         _grantOutingRewardOnBattleEnd = grantOutingRewardOnBattleEnd;
         _grantAttributeBoostOnBattleEnd = grantAttributeBoostOnBattleEnd;
 
@@ -63,7 +74,7 @@ public class BattlePanel : UIPanel
             _playerAvatarDefinition,
             _enemyAvatarDefinition,
             ResolveEnemyCount(levelId),
-            BuildPlayerSpawnDefinitions(deployedCards),
+            BuildPlayerSpawnDefinitions(deployedCards, blessingCardIds),
             OnBattleEnded);
 
         Debug.Log("[BattlePanel] Battle started for level: " + levelId);
@@ -80,30 +91,56 @@ public class BattlePanel : UIPanel
         return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
     }
 
-    private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(CardBuildCardData[] deployedCards)
+    private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(CardBuildCardData[] deployedCards, int[] blessingCardIds)
     {
         if (deployedCards == null || deployedCards.Length == 0)
         {
             return null;
         }
 
+        System.Collections.Generic.HashSet<int> blessingIdSet = new System.Collections.Generic.HashSet<int>();
+        if (blessingCardIds != null)
+        {
+            for (int i = 0; i < blessingCardIds.Length; i++)
+            {
+                blessingIdSet.Add(blessingCardIds[i]);
+            }
+        }
+
         BattleFighterSpawnDefinition[] definitions = new BattleFighterSpawnDefinition[deployedCards.Length];
         for (int i = 0; i < deployedCards.Length; i++)
         {
             CardBuildCardData card = deployedCards[i];
+            UnitStaticAttributes staticAttributes = new UnitStaticAttributes
+            {
+                MaxHp = Mathf.Max(1, card.Hp),
+                Attack = Mathf.Max(1, card.Attack),
+                Defense = Mathf.Max(0, card.Defense),
+                MoveSpeed = Mathf.Max(0.1f, card.MoveSpeed),
+                AttackRange = Mathf.Max(0.1f, card.AttackRange)
+            };
+
+            if (blessingIdSet.Contains(card.Id))
+            {
+                staticAttributes = ApplyBlessingBuff(staticAttributes);
+            }
+
             definitions[i] = new BattleFighterSpawnDefinition(
                 card.Name,
-                new UnitStaticAttributes
-                {
-                    MaxHp = Mathf.Max(1, card.Hp),
-                    Attack = Mathf.Max(1, card.Attack),
-                    Defense = Mathf.Max(0, card.Defense),
-                    MoveSpeed = Mathf.Max(0.1f, card.MoveSpeed),
-                    AttackRange = Mathf.Max(0.1f, card.AttackRange)
-                });
+                staticAttributes);
         }
 
         return definitions;
+    }
+
+    private static UnitStaticAttributes ApplyBlessingBuff(UnitStaticAttributes staticAttributes)
+    {
+        staticAttributes.MaxHp = Mathf.Max(1, Mathf.RoundToInt(staticAttributes.MaxHp * BlessingHpMultiplier));
+        staticAttributes.Attack = Mathf.Max(1, Mathf.RoundToInt(staticAttributes.Attack * BlessingAttackMultiplier));
+        staticAttributes.Defense = Mathf.Max(0, Mathf.RoundToInt(staticAttributes.Defense * BlessingDefenseMultiplier));
+        staticAttributes.MoveSpeed = Mathf.Max(0.1f, staticAttributes.MoveSpeed * BlessingMoveSpeedMultiplier);
+        staticAttributes.AttackRange = Mathf.Max(0.1f, staticAttributes.AttackRange * BlessingAttackRangeMultiplier);
+        return staticAttributes;
     }
 
     private void OnBattleEnded(bool victory)
@@ -125,10 +162,10 @@ public class BattlePanel : UIPanel
             _battleInfoText.text = victory ? "Victory!" : "Defeat!";
         }
 
-        if (_grantOutingRewardOnBattleEnd || _grantAttributeBoostOnBattleEnd)
+        if (_grantOutingRewardOnBattleEnd || _grantAttributeBoostOnBattleEnd || _consumeBlessingOnBattleEnd)
         {
             CardBuildPanel cardBuildPanel = GameManager.Instance.UIManager.GetPanel<CardBuildPanel>("ui/CardBuildPanel");
-            cardBuildPanel?.ResolveBattleEndZoneRewards(_grantOutingRewardOnBattleEnd, _grantAttributeBoostOnBattleEnd);
+            cardBuildPanel?.ResolveBattleEndZoneRewards(_grantOutingRewardOnBattleEnd, _grantAttributeBoostOnBattleEnd, _consumeBlessingOnBattleEnd);
         }
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");

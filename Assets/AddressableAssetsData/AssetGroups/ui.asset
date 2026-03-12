@@ -32,8 +32,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a6a0d06a397c4fdc8dc3dbfd3565796f
+    m_Address: ui/battlepreparepanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: aea80bfc0fe90d94c98eaa9970bc06bc
     m_Address: ui/battlepanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e800269ee798b164895818d9d00ea771
+    m_Address: ui/texture/buildbg
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
