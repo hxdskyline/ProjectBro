@@ -204,11 +204,15 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
 
     private void RefreshView()
     {
+        bool isActiveBlessing = _zoneType == CardZoneType.Blessing && _panel != null && _panel.IsBlessingCandidateSelected(_cardData.Id);
+
         if (_nameText != null)
         {
             if (_zoneType == CardZoneType.Blessing)
             {
-                _nameText.text = $"{_cardData.Name}  [赐福]";
+                _nameText.text = isActiveBlessing
+                    ? $"{_cardData.Name}  [已激活赐福]"
+                    : $"{_cardData.Name}  [赐福候选]";
             }
             else if (_zoneType == CardZoneType.Discard)
             {
@@ -225,7 +229,9 @@ public class CardDragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
             string extraText = string.Empty;
             if (_zoneType == CardZoneType.Blessing)
             {
-                extraText = "\n本场战斗临时强化";
+                extraText = isActiveBlessing
+                    ? "\n下场战斗上阵时获得强化"
+                    : "\n点击可切换为祈祷对象";
             }
             else if (_zoneType == CardZoneType.Discard)
             {

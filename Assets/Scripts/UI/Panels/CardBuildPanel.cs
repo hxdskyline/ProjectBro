@@ -16,6 +16,7 @@ public class CardBuildPanel : UIPanel
     private const string SecondaryPopupHintName = "SecondaryPopupHint";
     private const string SecondaryPopupListName = "SecondaryPopupList";
     private const string SecondaryPopupCloseButtonName = "SecondaryPopupCloseButton";
+    private const string SecondaryPopupConfirmButtonName = "SecondaryPopupConfirmButton";
     private const string OutingEntryButtonName = "OutingEntryButton";
     private const string BlessingEntryButtonName = "BlessingEntryButton";
     private const string AttributeBoostEntryButtonName = "AttributeBoostEntryButton";
@@ -55,37 +56,31 @@ public class CardBuildPanel : UIPanel
     [SerializeField] private Text _battleProgressText;
     [SerializeField] private Text _cardInfoText;
     [SerializeField] private Text _statusText;
-    [SerializeField] private RectTransform _outingCardsRoot;
-    [SerializeField] private RectTransform _blessingCardsRoot;
-    [SerializeField] private RectTransform _attributeBoostCardsRoot;
-    [SerializeField] private RectTransform _discardCardsRoot;
     [SerializeField] private RectTransform _reserveCardsRoot;
+    [SerializeField] private Button _outingEntryButton;
+    [SerializeField] private Button _blessingEntryButton;
+    [SerializeField] private Button _attributeBoostEntryButton;
+    [SerializeField] private Button _discardEntryButton;
     [SerializeField] private int _maxDeployedCards = 5;
 
     private int _currentLevel = 1;
     private readonly List<CardBuildCardData> _outingCards = new List<CardBuildCardData>();
-    private readonly List<CardBuildCardData> _blessingCards = new List<CardBuildCardData>();
+    private readonly List<CardBuildCardData> _blessingCandidates = new List<CardBuildCardData>();
     private readonly List<CardBuildCardData> _attributeBoostCards = new List<CardBuildCardData>();
     private readonly List<CardBuildCardData> _discardCards = new List<CardBuildCardData>();
     private readonly List<CardBuildCardData> _reserveCards = new List<CardBuildCardData>();
+    private int _selectedBlessingCardId = -1;
     private bool _cardsInitialized;
     private bool _hasActiveSecondaryZone;
     private CardZoneType _activeSecondaryZone;
     private Font _uiFont;
     private OutingRewardConfig _outingRewardConfig;
-    private Button _outingEntryButton;
-    private Button _blessingEntryButton;
-    private Button _attributeBoostEntryButton;
-    private Button _discardEntryButton;
-    private Text _outingEntryButtonText;
-    private Text _blessingEntryButtonText;
-    private Text _attributeBoostEntryButtonText;
-    private Text _discardEntryButtonText;
     private RectTransform _secondaryPopupRoot;
     private Text _secondaryPopupTitleText;
     private Text _secondaryPopupHintText;
     private RectTransform _secondaryPopupListRoot;
     private Button _secondaryPopupCloseButton;
+    private Button _secondaryPopupConfirmButton;
 
     public override void Initialize()
     {
@@ -108,6 +103,7 @@ public class CardBuildPanel : UIPanel
         _uiFont = LoadBuiltinFont();
         EnsureInfoTexts();
         EnsureCardRoots();
+        EnsureReserveRootPlacement();
         HideLegacySecondaryZoneTexts();
         EnsureSecondaryEntryButtons();
         EnsureSecondaryPopup();
@@ -140,7 +136,12 @@ public class CardBuildPanel : UIPanel
 
     public bool HasBlessingCards()
     {
-        return _blessingCards.Count > 0;
+        return _selectedBlessingCardId > 0;
+    }
+
+    public bool IsBlessingCandidateSelected(int cardId)
+    {
+        return _selectedBlessingCardId == cardId;
     }
 
     public void ResolveBattleEndZoneRewards(bool grantOutingReward, bool grantAttributeBoostReward, bool consumeBlessingBuff)
@@ -168,7 +169,7 @@ public class CardBuildPanel : UIPanel
             int blessingCardCount = ClearBlessingCards();
             if (blessingCardCount > 0)
             {
-                rewardMessages.Add($"赐福区域的 {blessingCardCount} 张卡结束了临时强化，已返回待选区");
+                rewardMessages.Add($"赐福效果已结束，本场祈祷区的 {blessingCardCount} 只猫恢复为未激活状态");
             }
         }
 
@@ -191,6 +192,14 @@ public class CardBuildPanel : UIPanel
 
         CardBuildCardData card = dragItem.CardData;
         CardZoneType fromZone = dragItem.ZoneType;
+
+        if (fromZone == CardZoneType.Blessing || targetZone == CardZoneType.Blessing)
+        {
+            SetStatusText("赐福候选由系统随机提供，请直接点击赐福区中的猫咪切换激活对象。再次点击已激活的猫咪可取消选择。");
+            RebuildCardViews();
+            UpdateUI();
+            return;
+        }
 
         if (fromZone == targetZone)
         {
@@ -225,6 +234,20 @@ public class CardBuildPanel : UIPanel
 
     public void HandleCardClick(CardBuildCardData card, CardZoneType fromZone)
     {
+        if (fromZone == CardZoneType.Blessing)
+        {
+            ToggleBlessingSelection(card.Id);
+            RebuildCardViews();
+            UpdateUI();
+            return;
+        }
+
+        if (fromZone == CardZoneType.Reserve && _hasActiveSecondaryZone && _activeSecondaryZone == CardZoneType.Blessing)
+        {
+            SetStatusText("赐福区不接收拖入或点入操作，请直接点击赐福候选来决定谁进入祈祷区。");
+            return;
+        }
+
         CardZoneType targetZone = GetClickTargetZone(fromZone);
 
         if (targetZone == fromZone)
@@ -287,7 +310,7 @@ public class CardBuildPanel : UIPanel
         if (_cardInfoText != null)
         {
             _cardInfoText.text =
-                $"待选: {_reserveCards.Count}  外出: {_outingCards.Count}  赐福: {_blessingCards.Count}  强化: {_attributeBoostCards.Count}  弃猫: {_discardCards.Count}";
+                $"待选: {GetVisibleReserveCardCount()}  外出: {_outingCards.Count}  赐福: {(HasBlessingCards() ? 1 : 0)}  强化: {_attributeBoostCards.Count}  弃猫: {_discardCards.Count}";
         }
 
         UpdateSecondaryEntryButtons();
@@ -300,16 +323,28 @@ public class CardBuildPanel : UIPanel
 
         if (_hasActiveSecondaryZone)
         {
-            _statusText.text = $"{GetZoneDisplayName(_activeSecondaryZone)}已打开。待选区单击会自动移入当前二级界面。";
+            if (_activeSecondaryZone == CardZoneType.Blessing)
+            {
+                _statusText.text = "赐福区已打开。系统会随机展示 3 只候选猫，点击可激活或切换祈祷对象；再次点击当前激活猫可取消选择。";
+            }
+            else if (_activeSecondaryZone == CardZoneType.Discard)
+            {
+                _statusText.text = "弃猫区已打开。拖入这里只是暂存，点击确认按钮后才会永久删除；在确认前仍可拖回或点回待选区。";
+            }
+            else
+            {
+                _statusText.text = $"{GetZoneDisplayName(_activeSecondaryZone)}已打开。待选区单击会自动移入当前二级界面。";
+            }
+
             return;
         }
 
         _statusText.text = _outingCards.Count == 1
             ? "外出区域需要恰好 2 只猫咪才会生效；当前数量不足，不会触发游历效果。"
             : HasBlessingCards()
-                ? "赐福区的猫会在下一场战斗获得一次性强化，战斗结束后返回待选区。"
+                ? "祈祷区当前已激活 1 只猫；该猫在下一场战斗上阵时会获得一次性强化，并暂时从待选区隐藏。"
                 : _discardCards.Count > 0
-                    ? "弃猫区中的猫会在窗口关闭时立刻消失。"
+                    ? $"弃猫区里还有 {_discardCards.Count} 只待确认删除的猫；重新打开弃猫区后可继续处理，未确认前不会消失。"
                     : "主界面默认只显示待选区，点击入口按钮打开游历、赐福、强化或弃猫二级界面。";
     }
 
@@ -526,7 +561,6 @@ public class CardBuildPanel : UIPanel
     {
         int maxId = 0;
         maxId = Mathf.Max(maxId, GetMaxCardId(_outingCards));
-        maxId = Mathf.Max(maxId, GetMaxCardId(_blessingCards));
         maxId = Mathf.Max(maxId, GetMaxCardId(_attributeBoostCards));
         maxId = Mathf.Max(maxId, GetMaxCardId(_reserveCards));
         return maxId + 1;
@@ -611,17 +645,42 @@ public class CardBuildPanel : UIPanel
 
     private void EnsureCardRoots()
     {
-        if (_outingCardsRoot != null && _blessingCardsRoot != null && _attributeBoostCardsRoot != null && _discardCardsRoot != null && _reserveCardsRoot != null)
+        if (_reserveCardsRoot != null)
         {
             return;
         }
 
         RectTransform panelRect = transform as RectTransform;
-        _outingCardsRoot = _outingCardsRoot ?? CreateRuntimeZone(panelRect, "OutingCardsRoot", "外出区域", new Vector2(0.05f, 0.18f), new Vector2(0.95f, 0.32f));
-        _blessingCardsRoot = _blessingCardsRoot ?? CreateRuntimeZone(panelRect, "BlessingCardsRoot", "赐福区域", new Vector2(0.05f, 0.18f), new Vector2(0.95f, 0.32f));
-        _attributeBoostCardsRoot = _attributeBoostCardsRoot ?? CreateRuntimeZone(panelRect, "AttributeBoostCardsRoot", "属性提升区域", new Vector2(0.05f, 0.38f), new Vector2(0.95f, 0.52f));
-        _discardCardsRoot = _discardCardsRoot ?? CreateRuntimeZone(panelRect, "DiscardCardsRoot", "弃猫区域", new Vector2(0.05f, 0.24f), new Vector2(0.28f, 0.34f));
-        _reserveCardsRoot = _reserveCardsRoot ?? CreateRuntimeZone(panelRect, "ReserveCardsRoot", "待选区", new Vector2(0.05f, 0.58f), new Vector2(0.95f, 0.76f));
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        _reserveCardsRoot = CreateRuntimeZone(panelRect, "ReserveCardsRoot", "待选区", new Vector2(0.05f, 0.02f), new Vector2(0.95f, 0.22f));
+    }
+
+    private void EnsureReserveRootPlacement()
+    {
+        if (_reserveCardsRoot == null)
+        {
+            return;
+        }
+
+        RectTransform currentParent = _reserveCardsRoot.parent as RectTransform;
+        if (currentParent != null && (currentParent.name == "Left" || currentParent.name == "Right"))
+        {
+            RectTransform desiredParent = currentParent.parent as RectTransform;
+            if (desiredParent != null)
+            {
+                _reserveCardsRoot.SetParent(desiredParent, false);
+            }
+        }
+
+        _reserveCardsRoot.anchorMin = new Vector2(0.05f, 0.02f);
+        _reserveCardsRoot.anchorMax = new Vector2(0.95f, 0.22f);
+        _reserveCardsRoot.anchoredPosition = Vector2.zero;
+        _reserveCardsRoot.sizeDelta = Vector2.zero;
+        _reserveCardsRoot.SetAsLastSibling();
     }
 
     private void HideLegacySecondaryZoneTexts()
@@ -639,71 +698,22 @@ public class CardBuildPanel : UIPanel
 
     private void EnsureSecondaryEntryButtons()
     {
-        _outingEntryButton = EnsureSecondaryEntryButton(_outingCardsRoot, OutingEntryButtonName, out _outingEntryButtonText, new Color(0.45f, 0.31f, 0.12f, 0.96f));
-        _blessingEntryButton = EnsureSecondaryEntryButton(_blessingCardsRoot, BlessingEntryButtonName, out _blessingEntryButtonText, new Color(0.64f, 0.52f, 0.14f, 0.96f));
-        _attributeBoostEntryButton = EnsureSecondaryEntryButton(_attributeBoostCardsRoot, AttributeBoostEntryButtonName, out _attributeBoostEntryButtonText, new Color(0.2f, 0.35f, 0.6f, 0.96f));
-        _discardEntryButton = EnsureSecondaryEntryButton(_discardCardsRoot, DiscardEntryButtonName, out _discardEntryButtonText, new Color(0.45f, 0.18f, 0.18f, 0.96f));
-
-        if (_outingEntryButton != null)
-        {
-            _outingEntryButton.onClick.RemoveAllListeners();
-            _outingEntryButton.onClick.AddListener(() => OnSecondaryEntryButtonClicked(CardZoneType.Outing));
-        }
-
-        if (_blessingEntryButton != null)
-        {
-            _blessingEntryButton.onClick.RemoveAllListeners();
-            _blessingEntryButton.onClick.AddListener(() => OnSecondaryEntryButtonClicked(CardZoneType.Blessing));
-        }
-
-        if (_attributeBoostEntryButton != null)
-        {
-            _attributeBoostEntryButton.onClick.RemoveAllListeners();
-            _attributeBoostEntryButton.onClick.AddListener(() => OnSecondaryEntryButtonClicked(CardZoneType.AttributeBoost));
-        }
-
-        if (_discardEntryButton != null)
-        {
-            _discardEntryButton.onClick.RemoveAllListeners();
-            _discardEntryButton.onClick.AddListener(() => OnSecondaryEntryButtonClicked(CardZoneType.Discard));
-        }
+        SetupSecondaryButton(_outingEntryButton, CardZoneType.Outing, OutingEntryButtonName);
+        SetupSecondaryButton(_blessingEntryButton, CardZoneType.Blessing, BlessingEntryButtonName);
+        SetupSecondaryButton(_attributeBoostEntryButton, CardZoneType.AttributeBoost, AttributeBoostEntryButtonName);
+        SetupSecondaryButton(_discardEntryButton, CardZoneType.Discard, DiscardEntryButtonName);
     }
 
-    private Button EnsureSecondaryEntryButton(RectTransform root, string buttonName, out Text labelText, Color backgroundColor)
+    private void SetupSecondaryButton(Button button, CardZoneType zoneType, string buttonName)
     {
-        labelText = null;
-        if (root == null)
+        if (button == null)
         {
-            return null;
+            Debug.LogWarning($"[CardBuildPanel] {buttonName} 未在 Inspector 中绑定。请把预制体中的按钮拖到脚本字段上。");
+            return;
         }
 
-        Transform child = root.Find(buttonName);
-        RectTransform buttonRect;
-        if (child == null)
-        {
-            GameObject buttonGo = new GameObject(buttonName, typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonGo.transform.SetParent(root, false);
-            buttonRect = buttonGo.GetComponent<RectTransform>();
-        }
-        else
-        {
-            buttonRect = child as RectTransform;
-        }
-
-        buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
-        buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
-        buttonRect.pivot = new Vector2(0.5f, 0.5f);
-        buttonRect.anchoredPosition = Vector2.zero;
-        buttonRect.sizeDelta = new Vector2(220f, 84f);
-
-        Image image = GetOrAddComponent<Image>(buttonRect.gameObject);
-        image.color = backgroundColor;
-
-        Button button = GetOrAddComponent<Button>(buttonRect.gameObject);
-        button.targetGraphic = image;
-
-        labelText = GetOrCreateButtonLabel(buttonRect, _uiFont, 22);
-        return button;
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(() => OnSecondaryEntryButtonClicked(zoneType));
     }
 
     private void EnsureSecondaryPopup()
@@ -729,6 +739,10 @@ public class CardBuildPanel : UIPanel
         dropZone.Initialize(this);
 
         ConfigurePopupLayout(_secondaryPopupListRoot);
+
+        _secondaryPopupConfirmButton = GetOrCreateButton(_secondaryPopupRoot, SecondaryPopupConfirmButtonName, "确认弃猫", _uiFont, new Vector2(0.52f, 0.86f), new Vector2(0.74f, 0.96f), new Color(0.55f, 0.18f, 0.18f, 1f));
+        _secondaryPopupConfirmButton.onClick.RemoveAllListeners();
+        _secondaryPopupConfirmButton.onClick.AddListener(OnSecondaryPopupConfirmButtonClicked);
 
         _secondaryPopupCloseButton = GetOrCreateButton(_secondaryPopupRoot, SecondaryPopupCloseButtonName, "关闭", _uiFont, new Vector2(0.76f, 0.86f), new Vector2(0.96f, 0.96f), new Color(0.42f, 0.2f, 0.18f, 1f));
         _secondaryPopupCloseButton.onClick.RemoveAllListeners();
@@ -851,25 +865,25 @@ public class CardBuildPanel : UIPanel
 
     private void EnsureReserveLayout(RectTransform zoneRoot)
     {
-        HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
-        if (oldHorizontal != null)
+        VerticalLayoutGroup oldVertical = zoneRoot.GetComponent<VerticalLayoutGroup>();
+        if (oldVertical != null)
         {
-            Destroy(oldHorizontal);
+            Destroy(oldVertical);
         }
 
-        VerticalLayoutGroup layout = zoneRoot.GetComponent<VerticalLayoutGroup>();
+        HorizontalLayoutGroup layout = zoneRoot.GetComponent<HorizontalLayoutGroup>();
         if (layout == null)
         {
-            layout = zoneRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout = zoneRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
         }
 
-        layout.spacing = 8f;
-        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.spacing = 12f;
+        layout.childAlignment = TextAnchor.MiddleLeft;
         layout.childControlHeight = true;
         layout.childControlWidth = true;
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = false;
-        layout.padding = new RectOffset(8, 8, 8, 8);
+        layout.padding = new RectOffset(12, 12, 12, 12);
     }
 
     private void EnsureOutingLayout(RectTransform zoneRoot)
@@ -950,10 +964,11 @@ public class CardBuildPanel : UIPanel
 
         _cardsInitialized = true;
         _outingCards.Clear();
-        _blessingCards.Clear();
+        _blessingCandidates.Clear();
         _attributeBoostCards.Clear();
         _discardCards.Clear();
         _reserveCards.Clear();
+        _selectedBlessingCardId = -1;
 
         string cardConfigPath = Path.Combine(Application.streamingAssetsPath, CardConfigFileName);
         if (!File.Exists(cardConfigPath))
@@ -1121,12 +1136,17 @@ public class CardBuildPanel : UIPanel
 
         for (int i = 0; i < _reserveCards.Count; i++)
         {
+            if (ShouldHideReserveCard(_reserveCards[i].Id))
+            {
+                continue;
+            }
+
             CreateCardItem(_reserveCardsRoot, _reserveCards[i], CardZoneType.Reserve);
         }
 
         if (_hasActiveSecondaryZone)
         {
-            List<CardBuildCardData> activeList = GetZoneList(_activeSecondaryZone);
+            List<CardBuildCardData> activeList = GetActiveDisplayList(_activeSecondaryZone);
             for (int i = 0; i < activeList.Count; i++)
             {
                 CreateCardItem(_secondaryPopupListRoot, activeList[i], _activeSecondaryZone);
@@ -1150,8 +1170,8 @@ public class CardBuildPanel : UIPanel
         cardRect.pivot = new Vector2(0f, 1f);
 
         LayoutElement layoutElement = cardGo.GetComponent<LayoutElement>();
-        const float cardHeight = 90f;
-        const float cardWidth = cardHeight * 2f;
+        float cardWidth = zoneType == CardZoneType.Reserve ? 120f : 180f;
+        float cardHeight = zoneType == CardZoneType.Reserve ? 120f : 90f;
         layoutElement.minWidth = cardWidth;
         layoutElement.minHeight = cardHeight;
         layoutElement.preferredWidth = cardWidth;
@@ -1159,7 +1179,7 @@ public class CardBuildPanel : UIPanel
         cardRect.sizeDelta = new Vector2(cardWidth, cardHeight);
 
         Image cardBg = cardGo.GetComponent<Image>();
-        cardBg.color = ResolveZoneCardColor(zoneType);
+        cardBg.color = ResolveZoneCardColor(zoneType, cardData.Id);
 
         Text nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f), 16);
         nameText.alignment = TextAnchor.UpperLeft;
@@ -1209,6 +1229,11 @@ public class CardBuildPanel : UIPanel
     {
         if (fromZone == CardZoneType.Reserve)
         {
+            if (_hasActiveSecondaryZone && _activeSecondaryZone == CardZoneType.Blessing)
+            {
+                return CardZoneType.Reserve;
+            }
+
             return _hasActiveSecondaryZone ? _activeSecondaryZone : CardZoneType.Reserve;
         }
 
@@ -1219,7 +1244,7 @@ public class CardBuildPanel : UIPanel
 
         if (fromZone == CardZoneType.Blessing)
         {
-            return CardZoneType.Reserve;
+            return CardZoneType.Blessing;
         }
 
         if (fromZone == CardZoneType.Discard)
@@ -1262,7 +1287,7 @@ public class CardBuildPanel : UIPanel
 
         if (zoneType == CardZoneType.Blessing)
         {
-            return _blessingCards;
+            return _blessingCandidates;
         }
 
         if (zoneType == CardZoneType.Discard)
@@ -1303,18 +1328,18 @@ public class CardBuildPanel : UIPanel
 
     private int ClearBlessingCards()
     {
-        int blessingCardCount = _blessingCards.Count;
-        if (blessingCardCount == 0)
+        int blessingCardCount = HasBlessingCards() ? 1 : 0;
+        if (blessingCardCount == 0 && _blessingCandidates.Count == 0)
         {
             return 0;
         }
 
-        _reserveCards.AddRange(_blessingCards);
-        _blessingCards.Clear();
+        _selectedBlessingCardId = -1;
+        _blessingCandidates.Clear();
         return blessingCardCount;
     }
 
-    private int ClearDiscardCards()
+    private int ConfirmDiscardCards()
     {
         int discardCardCount = _discardCards.Count;
         if (discardCardCount == 0)
@@ -1322,6 +1347,19 @@ public class CardBuildPanel : UIPanel
             return 0;
         }
 
+        _discardCards.Clear();
+        return discardCardCount;
+    }
+
+    private int ReturnDiscardCardsToReserve()
+    {
+        int discardCardCount = _discardCards.Count;
+        if (discardCardCount == 0)
+        {
+            return 0;
+        }
+
+        _reserveCards.AddRange(_discardCards);
         _discardCards.Clear();
         return discardCardCount;
     }
@@ -1372,10 +1410,9 @@ public class CardBuildPanel : UIPanel
     private CardBuildCardData[] BuildOwnedCardsSnapshot()
     {
         List<CardBuildCardData> ownedCards = new List<CardBuildCardData>(
-            _outingCards.Count + _blessingCards.Count + _attributeBoostCards.Count + _reserveCards.Count);
+            _outingCards.Count + _attributeBoostCards.Count + _reserveCards.Count);
 
         ownedCards.AddRange(_outingCards);
-        ownedCards.AddRange(_blessingCards);
         ownedCards.AddRange(_attributeBoostCards);
         ownedCards.AddRange(_reserveCards);
 
@@ -1395,16 +1432,15 @@ public class CardBuildPanel : UIPanel
 
     private int[] BuildBlessingCardIdSnapshot()
     {
-        int[] blessingCardIds = new int[_blessingCards.Count];
-        for (int i = 0; i < _blessingCards.Count; i++)
+        if (!HasBlessingCards())
         {
-            blessingCardIds[i] = _blessingCards[i].Id;
+            return new int[0];
         }
 
-        return blessingCardIds;
+        return new[] { _selectedBlessingCardId };
     }
 
-    private static Color ResolveZoneCardColor(CardZoneType zoneType)
+    private Color ResolveZoneCardColor(CardZoneType zoneType, int cardId)
     {
         if (zoneType == CardZoneType.Outing)
         {
@@ -1413,7 +1449,14 @@ public class CardBuildPanel : UIPanel
 
         if (zoneType == CardZoneType.Blessing)
         {
-            return new Color(0.7f, 0.56f, 0.15f, 0.94f);
+            if (cardId < 0)
+            {
+                return new Color(0.7f, 0.56f, 0.15f, 0.94f);
+            }
+
+            return _selectedBlessingCardId == cardId
+                ? new Color(0.84f, 0.67f, 0.18f, 0.96f)
+                : new Color(0.29f, 0.22f, 0.08f, 0.94f);
         }
 
         if (zoneType == CardZoneType.AttributeBoost)
@@ -1448,6 +1491,11 @@ public class CardBuildPanel : UIPanel
 
     private void OpenSecondaryZone(CardZoneType zoneType)
     {
+        if (zoneType == CardZoneType.Blessing)
+        {
+            EnsureBlessingCandidates();
+        }
+
         _activeSecondaryZone = zoneType;
         _hasActiveSecondaryZone = true;
         RebuildCardViews();
@@ -1456,34 +1504,56 @@ public class CardBuildPanel : UIPanel
 
     private void CloseActiveSecondaryZone()
     {
-        int removedCardCount = 0;
         bool wasDiscardZone = _hasActiveSecondaryZone && _activeSecondaryZone == CardZoneType.Discard;
-        if (wasDiscardZone)
-        {
-            removedCardCount = ClearDiscardCards();
-        }
+        int returnedCardCount = wasDiscardZone ? ReturnDiscardCardsToReserve() : 0;
 
         _hasActiveSecondaryZone = false;
         RebuildCardViews();
         UpdateUI();
 
-        if (wasDiscardZone && removedCardCount > 0)
+        if (wasDiscardZone && returnedCardCount > 0)
         {
-            SetStatusText($"弃猫区已关闭，{removedCardCount} 只猫已消失。");
+            SetStatusText($"弃猫区已关闭，未确认删除的 {returnedCardCount} 只猫已全部返回待选区。");
         }
+    }
+
+    private void OnSecondaryPopupConfirmButtonClicked()
+    {
+        if (!_hasActiveSecondaryZone || _activeSecondaryZone != CardZoneType.Discard)
+        {
+            return;
+        }
+
+        int removedCardCount = ConfirmDiscardCards();
+        RebuildCardViews();
+        UpdateUI();
+
+        if (removedCardCount > 0)
+        {
+            SetStatusText($"已确认弃猫，{removedCardCount} 只猫被永久删除。");
+            return;
+        }
+
+        SetStatusText("弃猫区里没有待确认删除的猫。拖入后仍可在确认前拖回待选区。");
     }
 
     private void UpdateSecondaryEntryButtons()
     {
-        UpdateSecondaryEntryButton(_outingEntryButton, _outingEntryButtonText, CardZoneType.Outing, _outingCards.Count, $"{RequiredOutingCardCount} 只生效");
-        UpdateSecondaryEntryButton(_blessingEntryButton, _blessingEntryButtonText, CardZoneType.Blessing, _blessingCards.Count, "本场临时强化");
-        UpdateSecondaryEntryButton(_attributeBoostEntryButton, _attributeBoostEntryButtonText, CardZoneType.AttributeBoost, _attributeBoostCards.Count, "战后永久强化");
-        UpdateSecondaryEntryButton(_discardEntryButton, _discardEntryButtonText, CardZoneType.Discard, _discardCards.Count, "关闭时立刻消失");
+        UpdateSecondaryEntryButton(_outingEntryButton, CardZoneType.Outing, _outingCards.Count, $"限 {RequiredOutingCardCount} 只，不限公母");
+        UpdateSecondaryEntryButton(_blessingEntryButton, CardZoneType.Blessing, HasBlessingCards() ? 1 : 0, "随机 3 选 1，点击切换");
+        UpdateSecondaryEntryButton(_attributeBoostEntryButton, CardZoneType.AttributeBoost, _attributeBoostCards.Count, "战后永久强化");
+        UpdateSecondaryEntryButton(_discardEntryButton, CardZoneType.Discard, _discardCards.Count, "确认后永久删除");
     }
 
-    private void UpdateSecondaryEntryButton(Button button, Text text, CardZoneType zoneType, int count, string detailText)
+    private void UpdateSecondaryEntryButton(Button button, CardZoneType zoneType, int count, string detailText)
     {
-        if (button == null || text == null)
+        if (button == null)
+        {
+            return;
+        }
+
+        Text text = button.GetComponentInChildren<Text>(true);
+        if (text == null)
         {
             return;
         }
@@ -1497,8 +1567,8 @@ public class CardBuildPanel : UIPanel
         if (image != null)
         {
             image.color = isActive
-                ? ResolveZoneCardColor(zoneType)
-                : ResolveZoneCardColor(zoneType) * new Color(1f, 1f, 1f, 0.9f);
+                ? ResolveZoneCardColor(zoneType, -1)
+                : ResolveZoneCardColor(zoneType, -1) * new Color(1f, 1f, 1f, 0.9f);
         }
     }
 
@@ -1523,6 +1593,21 @@ public class CardBuildPanel : UIPanel
         if (_secondaryPopupHintText != null)
         {
             _secondaryPopupHintText.text = GetZoneHintText(_activeSecondaryZone);
+        }
+
+        if (_secondaryPopupConfirmButton != null)
+        {
+            bool showConfirmButton = _activeSecondaryZone == CardZoneType.Discard;
+            _secondaryPopupConfirmButton.gameObject.SetActive(showConfirmButton);
+            _secondaryPopupConfirmButton.interactable = showConfirmButton && _discardCards.Count > 0;
+
+            Text confirmButtonText = _secondaryPopupConfirmButton.GetComponentInChildren<Text>(true);
+            if (confirmButtonText != null)
+            {
+                confirmButtonText.text = _discardCards.Count > 0
+                    ? $"确认弃猫\n当前 {_discardCards.Count} 只"
+                    : "确认弃猫\n当前 0 只";
+            }
         }
     }
 
@@ -1560,7 +1645,7 @@ public class CardBuildPanel : UIPanel
 
         if (zoneType == CardZoneType.Blessing)
         {
-            return "与待选区双向拖拽。赐福区中的猫如果本场被上阵，会获得一次性强力 buff。";
+            return "打开时会随机展示 3 只候选猫。点击候选可切换祈祷对象，再次点击当前激活猫可取消选择；激活后该猫会暂时从待选区隐藏。";
         }
 
         if (zoneType == CardZoneType.AttributeBoost)
@@ -1570,7 +1655,7 @@ public class CardBuildPanel : UIPanel
 
         if (zoneType == CardZoneType.Discard)
         {
-            return "与待选区双向拖拽。拖入弃猫区的猫会在关闭这个窗口时立即永久消失。";
+            return "与待选区双向拖拽。拖入弃猫区后只是暂存，确认按钮点击后才会永久删除；在确认前仍可把猫拖回或点回待选区。";
         }
 
         return string.Empty;
@@ -1582,6 +1667,101 @@ public class CardBuildPanel : UIPanel
             zoneType == CardZoneType.Blessing ||
             zoneType == CardZoneType.AttributeBoost ||
             zoneType == CardZoneType.Discard;
+    }
+
+    private List<CardBuildCardData> GetActiveDisplayList(CardZoneType zoneType)
+    {
+        if (zoneType == CardZoneType.Blessing)
+        {
+            return _blessingCandidates;
+        }
+
+        return GetZoneList(zoneType);
+    }
+
+    private void EnsureBlessingCandidates()
+    {
+        if (_blessingCandidates.Count > 0)
+        {
+            return;
+        }
+
+        List<CardBuildCardData> candidatePool = new List<CardBuildCardData>(_reserveCards);
+        ShuffleCards(candidatePool);
+
+        int candidateCount = Mathf.Min(3, candidatePool.Count);
+        for (int i = 0; i < candidateCount; i++)
+        {
+            _blessingCandidates.Add(candidatePool[i]);
+        }
+    }
+
+    private void ToggleBlessingSelection(int cardId)
+    {
+        bool candidateExists = false;
+        for (int i = 0; i < _blessingCandidates.Count; i++)
+        {
+            if (_blessingCandidates[i].Id == cardId)
+            {
+                candidateExists = true;
+                break;
+            }
+        }
+
+        if (!candidateExists)
+        {
+            SetStatusText("这只猫不在当前赐福候选中。请先打开赐福区刷新候选。");
+            return;
+        }
+
+        if (_selectedBlessingCardId == cardId)
+        {
+            _selectedBlessingCardId = -1;
+            SetStatusText("已取消当前祈祷对象，待选区恢复完整显示。");
+            return;
+        }
+
+        _selectedBlessingCardId = cardId;
+        if (TryFindCardById(_blessingCandidates, cardId, out CardBuildCardData selectedCard))
+        {
+            SetStatusText($"当前祈祷对象已切换为 {selectedCard.Name}。这只猫会暂时从待选区隐藏，并在下场战斗上阵时获得赐福强化。");
+        }
+    }
+
+    private bool ShouldHideReserveCard(int cardId)
+    {
+        return _selectedBlessingCardId == cardId;
+    }
+
+    private int GetVisibleReserveCardCount()
+    {
+        return _reserveCards.Count - (HasBlessingCards() ? 1 : 0);
+    }
+
+    private static void ShuffleCards(List<CardBuildCardData> cards)
+    {
+        for (int i = cards.Count - 1; i > 0; i--)
+        {
+            int swapIndex = Random.Range(0, i + 1);
+            CardBuildCardData temp = cards[i];
+            cards[i] = cards[swapIndex];
+            cards[swapIndex] = temp;
+        }
+    }
+
+    private static bool TryFindCardById(List<CardBuildCardData> cards, int cardId, out CardBuildCardData result)
+    {
+        for (int i = 0; i < cards.Count; i++)
+        {
+            if (cards[i].Id == cardId)
+            {
+                result = cards[i];
+                return true;
+            }
+        }
+
+        result = default;
+        return false;
     }
 
     private static T GetOrAddComponent<T>(GameObject gameObject) where T : Component

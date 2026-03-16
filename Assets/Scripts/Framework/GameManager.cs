@@ -32,6 +32,7 @@ public class GameManager : MonoBehaviour
     private LevelManager _levelManager;
     private AudioManager _audioManager;
     private DataManager _dataManager;
+    private CurrencyManager _currencyManager;
     private SceneManager _sceneManager;
     private TableReader _tableReader;
     private BattleCampaignRuntime _battleCampaignRuntime;
@@ -41,6 +42,7 @@ public class GameManager : MonoBehaviour
     public LevelManager LevelManager => _levelManager;
     public AudioManager AudioManager => _audioManager;
     public DataManager DataManager => _dataManager;
+    public CurrencyManager CurrencyManager => _currencyManager;
     public SceneManager SceneManager => _sceneManager;
     public TableReader TableReader => _tableReader;
     public BattleCampaignRuntime BattleCampaignRuntime => _battleCampaignRuntime;
@@ -74,6 +76,7 @@ public class GameManager : MonoBehaviour
         // 3. 初始化数据管理器
         _dataManager = gameObject.AddComponent<DataManager>();
         _dataManager.Initialize();
+        _currencyManager = new CurrencyManager(_dataManager);
 
         // 4. 初始化音频管理器（依赖 ResourceManager）
         _audioManager = gameObject.AddComponent<AudioManager>();
@@ -109,6 +112,7 @@ public class GameManager : MonoBehaviour
     public void SaveGame()
     {
         Debug.Log("[GameManager] Saving Game...");
+        _currencyManager?.Save();
         _dataManager.SavePlayerData();
     }
 

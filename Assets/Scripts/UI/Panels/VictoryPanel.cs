@@ -103,11 +103,10 @@ public class VictoryPanel : UIPanel
             battleCampaignRuntime.AdvanceAfterVictory(levelId);
         }
 
-        PlayerData playerData = GameManager.Instance.DataManager.PlayerData;
-        if (playerData != null)
+        CurrencyManager currencyManager = GameManager.Instance.CurrencyManager;
+        if (currencyManager != null)
         {
-            playerData.gold += goldReward;
-            GameManager.Instance.DataManager.SavePlayerData();
+            currencyManager.AddCurrency(CurrencyType.Gold, goldReward);
 
             Debug.Log("[VictoryPanel] Player data updated");
         }
