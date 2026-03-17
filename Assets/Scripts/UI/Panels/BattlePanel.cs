@@ -25,6 +25,8 @@ public class BattlePanel : UIPanel
     private bool _consumeBlessingOnBattleEnd;
     private bool _grantOutingRewardOnBattleEnd;
     private bool _grantAttributeBoostOnBattleEnd;
+    private readonly System.Collections.Generic.Dictionary<string, AvatarAnimationDefinition> _playerAvatarDefinitionsByAddress
+        = new System.Collections.Generic.Dictionary<string, AvatarAnimationDefinition>();
 
     public override void Initialize()
     {
@@ -127,10 +129,34 @@ public class BattlePanel : UIPanel
 
             definitions[i] = new BattleFighterSpawnDefinition(
                 card.Name,
-                staticAttributes);
+                staticAttributes,
+                ResolveAvatarDefinition(card.AvatarDefinitionAddress));
         }
 
         return definitions;
+    }
+
+    private AvatarAnimationDefinition ResolveAvatarDefinition(string address)
+    {
+        if (string.IsNullOrEmpty(address))
+        {
+            return _playerAvatarDefinition;
+        }
+
+        if (_playerAvatarDefinitionsByAddress.TryGetValue(address, out AvatarAnimationDefinition cachedDefinition))
+        {
+            return cachedDefinition != null ? cachedDefinition : _playerAvatarDefinition;
+        }
+
+        AvatarAnimationDefinition loadedDefinition = GameManager.Instance.ResourceManager.LoadResource<AvatarAnimationDefinition>(address);
+        if (loadedDefinition == null)
+        {
+            Debug.LogWarning($"[BattlePanel] Failed to load avatar definition: {address}");
+            return _playerAvatarDefinition;
+        }
+
+        _playerAvatarDefinitionsByAddress[address] = loadedDefinition;
+        return loadedDefinition;
     }
 
     private static UnitStaticAttributes ApplyBlessingBuff(UnitStaticAttributes staticAttributes)

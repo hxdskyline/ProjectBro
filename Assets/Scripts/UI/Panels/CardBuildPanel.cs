@@ -429,6 +429,7 @@ public class CardBuildPanel : UIPanel
         {
             Id = nextId,
             Name = $"{GetRandomOutingRewardNamePrefix(config)}{nextId}",
+            AvatarDefinitionAddress = GetInheritedAvatarDefinitionAddress(firstCat, secondCat),
             Gender = gender,
             Attack = Mathf.Max(1, Mathf.RoundToInt(averageAttack * multiplier)),
             Defense = Mathf.Max(0, Mathf.RoundToInt(averageDefense * multiplier)),
@@ -996,6 +997,7 @@ public class CardBuildPanel : UIPanel
                 {
                     Id = ReadInt(cardJson, "id", i + 1),
                     Name = ReadString(cardJson, "name", $"Card_{i + 1}"),
+                    AvatarDefinitionAddress = ReadString(cardJson, "avatarDefinitionAddress", string.Empty),
                     Gender = NormalizeGender(ReadString(cardJson, "gender", string.Empty)),
                     Attack = ReadInt(cardJson, "attack", 1),
                     Defense = ReadInt(cardJson, "defense", 0),
@@ -1181,6 +1183,12 @@ public class CardBuildPanel : UIPanel
         Image cardBg = cardGo.GetComponent<Image>();
         cardBg.color = ResolveZoneCardColor(zoneType, cardData.Id);
 
+        Sprite portraitSprite = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
+        if (portraitSprite != null)
+        {
+            CreateCardPortrait(cardGo.transform, portraitSprite);
+        }
+
         Text nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f), 16);
         nameText.alignment = TextAnchor.UpperLeft;
 
@@ -1190,6 +1198,25 @@ public class CardBuildPanel : UIPanel
         CardDragItem dragItem = cardGo.GetComponent<CardDragItem>();
         dragItem.BindTextRefs(nameText, statText);
         dragItem.Initialize(this, cardData, zoneType);
+    }
+
+    private static void CreateCardPortrait(Transform parent, Sprite portraitSprite)
+    {
+        GameObject portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+        portraitGo.transform.SetParent(parent, false);
+        portraitGo.transform.SetAsFirstSibling();
+
+        RectTransform portraitRect = portraitGo.GetComponent<RectTransform>();
+        portraitRect.anchorMin = Vector2.zero;
+        portraitRect.anchorMax = Vector2.one;
+        portraitRect.offsetMin = new Vector2(6f, 6f);
+        portraitRect.offsetMax = new Vector2(-6f, -6f);
+
+        Image portraitImage = portraitGo.GetComponent<Image>();
+        portraitImage.sprite = portraitSprite;
+        portraitImage.preserveAspect = true;
+        portraitImage.color = new Color(1f, 1f, 1f, 0.42f);
+        portraitImage.raycastTarget = false;
     }
 
     private Text CreateCardText(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, int fontSize)
@@ -1762,6 +1789,29 @@ public class CardBuildPanel : UIPanel
 
         result = default;
         return false;
+    }
+
+    private static string GetInheritedAvatarDefinitionAddress(CardBuildCardData firstCard, CardBuildCardData secondCard)
+    {
+        bool firstHasAddress = !string.IsNullOrEmpty(firstCard.AvatarDefinitionAddress);
+        bool secondHasAddress = !string.IsNullOrEmpty(secondCard.AvatarDefinitionAddress);
+
+        if (firstHasAddress && secondHasAddress)
+        {
+            return Random.value < 0.5f ? firstCard.AvatarDefinitionAddress : secondCard.AvatarDefinitionAddress;
+        }
+
+        if (firstHasAddress)
+        {
+            return firstCard.AvatarDefinitionAddress;
+        }
+
+        if (secondHasAddress)
+        {
+            return secondCard.AvatarDefinitionAddress;
+        }
+
+        return string.Empty;
     }
 
     private static T GetOrAddComponent<T>(GameObject gameObject) where T : Component

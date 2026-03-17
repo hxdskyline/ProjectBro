@@ -275,7 +275,13 @@ public class BattlePreparePanel : UIPanel
         layoutElement.flexibleWidth = 1f;
 
         Image cardBg = cardGo.GetComponent<Image>();
-    cardBg.color = ResolveCardBackgroundColor(zoneType, isOutingCard, isBlessingCard);
+        cardBg.color = ResolveCardBackgroundColor(zoneType, isOutingCard, isBlessingCard);
+
+        Sprite portraitSprite = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
+        if (portraitSprite != null)
+        {
+            CreateCardPortrait(cardGo.transform, portraitSprite);
+        }
 
         Text nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 18);
         nameText.alignment = TextAnchor.UpperLeft;
@@ -286,6 +292,25 @@ public class BattlePreparePanel : UIPanel
         PrepareCardDragItem dragItem = cardGo.GetComponent<PrepareCardDragItem>();
         dragItem.BindTextRefs(nameText, statText);
         dragItem.Initialize(this, cardData, zoneType, isOutingCard, isBlessingCard);
+    }
+
+    private static void CreateCardPortrait(Transform parent, Sprite portraitSprite)
+    {
+        GameObject portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+        portraitGo.transform.SetParent(parent, false);
+        portraitGo.transform.SetAsFirstSibling();
+
+        RectTransform portraitRect = portraitGo.GetComponent<RectTransform>();
+        portraitRect.anchorMin = Vector2.zero;
+        portraitRect.anchorMax = Vector2.one;
+        portraitRect.offsetMin = new Vector2(8f, 8f);
+        portraitRect.offsetMax = new Vector2(-8f, -8f);
+
+        Image portraitImage = portraitGo.GetComponent<Image>();
+        portraitImage.sprite = portraitSprite;
+        portraitImage.preserveAspect = true;
+        portraitImage.color = new Color(1f, 1f, 1f, 0.38f);
+        portraitImage.raycastTarget = false;
     }
 
     private void CreateEnemyItem(RectTransform parent, int displayIndex, int enemyUnitId)

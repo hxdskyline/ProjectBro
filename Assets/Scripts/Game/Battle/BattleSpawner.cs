@@ -65,7 +65,7 @@ public static class BattleSpawner
         Transform parent,
         BattleCamp camp,
         BattleFighterSpawnDefinition[] definitions,
-        AvatarAnimationDefinition definition,
+        AvatarAnimationDefinition defaultDefinition,
         List<Vector3> occupiedPositions,
         bool faceRight,
         Color tint,
@@ -80,6 +80,9 @@ public static class BattleSpawner
             string fighterName = string.IsNullOrEmpty(fighterDefinition.Name)
                 ? $"PlayerAvatar_{i + 1}"
                 : fighterDefinition.Name;
+            AvatarAnimationDefinition fighterAvatarDefinition = fighterDefinition.AvatarDefinition != null
+                ? fighterDefinition.AvatarDefinition
+                : defaultDefinition;
 
             fighters[i] = CreateFighter(
                 parent,
@@ -87,7 +90,7 @@ public static class BattleSpawner
                 camp,
                 null,
                 fighterDefinition.StaticAttributes,
-                definition,
+                fighterAvatarDefinition,
                 spawnPosition,
                 faceRight,
                 tint,

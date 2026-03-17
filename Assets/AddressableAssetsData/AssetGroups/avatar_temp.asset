@@ -15,8 +15,23 @@ MonoBehaviour:
   m_GroupName: avatar_temp
   m_Data:
     m_SerializedData: []
-  m_GUID: c715b7f222957e246a651548884fd808
+  m_GUID: 28f3a23f27901e047a33bbafcdcb9d07
   m_SerializeEntries:
+  - m_GUID: 19110bee0eafc944980ebfa255305510
+    m_Address: avatartemp/nainiu1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 193dd2e2f61590941b2805ddff66606c
+    m_Address: avatartemp/lihua1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c4a6e935b50ef94e9d8c62d6e0aca26
+    m_Address: avatartemp/xianluo1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1d9f10d3774260c4c97b69999c8553dd
     m_Address: avatartemp/enemy/attack/attack_01
     m_ReadOnly: 0
@@ -29,6 +44,21 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3d32cee8f30bd2141b1fe0888c57c2e8
     m_Address: avatartemp/enemy/idle/idle_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3d934c1b1d857cd4b8b7fe788298eb95
+    m_Address: avatartemp/laoshu2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3de3e487e27d4fe4790203aa7e67e727
+    m_Address: avatartemp/lihua2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4d595b2f9c3e2c64a9e729c4f9e9eadb
+    m_Address: avatartemp/xianluo2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -49,6 +79,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8e76742ae39edc044b1c69c74c5e5003
     m_Address: avatartemp/enemy/attack/attack_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9331074e57e79af47b1db01513a3995a
+    m_Address: avatartemp/dajv2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96d6322e3c5d71e4483f53ec5b73b300
+    m_Address: avatartemp/dajv1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -77,6 +117,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c611de919042bee4fa083e1079f1a28b
+    m_Address: avatartemp/nainiu2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d604e4fe50ce2ae4d89f4b95e360354f
     m_Address: avatartemp/hero/idle/idle_04
     m_ReadOnly: 0
@@ -89,6 +134,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dbffda96902c65c49ba696b9e0d0ee3b
     m_Address: avatartemp/enemy/run/run_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1fe29c39f04edb479616a4ff958fe59
+    m_Address: avatartemp/laoshu1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -110,6 +160,4 @@ MonoBehaviour:
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas:
-    - {fileID: 11400000, guid: 623597683b5197e49b5fc21e45be9f3b, type: 2}
-    - {fileID: 11400000, guid: 441b6d5689f72c142a18f5600fb0e3a6, type: 2}
+    m_Schemas: []

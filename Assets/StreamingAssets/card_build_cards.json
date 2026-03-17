@@ -1,17 +1,8 @@
 [
   {
     "id": 1,
-    "name": "缅因-战士",
-    "gender": "公",
-    "attack": 16,
-    "defense": 6,
-    "hp": 88,
-    "moveSpeed": 2.1,
-    "attackRange": 1.1
-  },
-  {
-    "id": 2,
-    "name": "狸花-刺客",
+    "name": "狸花-法师",
+    "avatarDefinitionAddress": "data/avatar/definitions/Lihua_AvatarAnimDef",
     "gender": "公",
     "attack": 24,
     "defense": 2,
@@ -20,8 +11,9 @@
     "attackRange": 0.9
   },
   {
-    "id": 3,
+    "id": 2,
     "name": "大橘-坦克",
+    "avatarDefinitionAddress": "data/avatar/definitions/Dajv_AvatarAnimDef",
     "gender": "公",
     "attack": 10,
     "defense": 10,
@@ -30,8 +22,9 @@
     "attackRange": 1.0
   },
   {
-    "id": 4,
-    "name": "奶牛-法师",
+    "id": 3,
+    "name": "奶牛-奶爸",
+    "avatarDefinitionAddress": "data/avatar/definitions/Nainiu_AvatarAnimDef",
     "gender": "母",
     "attack": 22,
     "defense": 2,
@@ -40,23 +33,14 @@
     "attackRange": 2.3
   },
   {
-    "id": 5,
-    "name": "暹罗-奶爸",
+    "id": 4,
+    "name": "暹罗-刺客",
+    "avatarDefinitionAddress": "data/avatar/definitions/Xianluo_AvatarAnimDef",
     "gender": "公",
     "attack": 8,
     "defense": 4,
     "hp": 82,
     "moveSpeed": 2.0,
     "attackRange": 1.6
-  },
-  {
-    "id": 6,
-    "name": "布偶-增益",
-    "gender": "母",
-    "attack": 11,
-    "defense": 5,
-    "hp": 76,
-    "moveSpeed": 2.2,
-    "attackRange": 1.8
   }
 ]

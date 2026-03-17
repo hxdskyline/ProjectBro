@@ -31,6 +31,7 @@ public class AddressableAssetsBuilder
         { "Audio/BGM", "audio_bgm" },
         { "Audio/SFX", "audio_sfx" },
         { "AvatarTemp", "avatar_temp" },
+        { "Data", "data" },
         { "Sprites", "sprites" },
         { "Prefabs", "prefabs" },
     };

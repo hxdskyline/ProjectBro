@@ -10,45 +10,45 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
-  m_Name: ui
+  m_Name: data
   m_EditorClassIdentifier: 
-  m_GroupName: ui
+  m_GroupName: data
   m_Data:
     m_SerializedData: []
-  m_GUID: 681c1c331fd237f4a92cd6c1975ba497
+  m_GUID: 6cf3d621f6361c84ab38a48b0b79bcba
   m_SerializeEntries:
-  - m_GUID: 02fb47c0f45986a43a4cec830348cf81
-    m_Address: ui/mainpanel
+  - m_GUID: 31d080bbf47946a99e67db72dd8e9f0d
+    m_Address: data/avatar/definitions/xianluo_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4101569e0fab8e343bbbf7f19e7cd604
-    m_Address: ui/victorypanel
+  - m_GUID: 47ac81f44b87fd74b87a7df731ce985f
+    m_Address: data/avatar/definitions/hero_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8b8688504f129174bbd468848be3caac
-    m_Address: ui/cardbuildpanel
+  - m_GUID: 8f7d6efb6d4a4a90a0d65f62c2b0e4e1
+    m_Address: data/avatar/definitions/dajv_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a6a0d06a397c4fdc8dc3dbfd3565796f
-    m_Address: ui/battlepreparepanel
+  - m_GUID: aa96527464494264882972de01326c10
+    m_Address: data/avatar/definitions/lihua_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: aea80bfc0fe90d94c98eaa9970bc06bc
-    m_Address: ui/battlepanel
+  - m_GUID: b376febd7a8e9884395b17ee63085149
+    m_Address: data/avatar/definitions/enemy_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c9ae4ee05daf3b543bf304794b6a01e4
-    m_Address: ui/texture/mainmenubg
+  - m_GUID: c5b7082f42154cf7bfb90efcc37f7cd1
+    m_Address: data/avatar/definitions/laoshu_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e800269ee798b164895818d9d00ea771
-    m_Address: ui/texture/buildbg
+  - m_GUID: f90ff5971dbf4393850376119d241d4b
+    m_Address: data/avatar/definitions/nainiu_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

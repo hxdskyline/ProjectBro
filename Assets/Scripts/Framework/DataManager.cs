@@ -119,6 +119,11 @@ public class DataManager : MonoBehaviour
         }
 
         EnsurePlayerDataDefaults();
+        return GetCurrencyAmountInternal(currencyId);
+    }
+
+    private long GetCurrencyAmountInternal(string currencyId)
+    {
         for (int i = 0; i < _playerData.currencies.Count; i++)
         {
             CurrencyData currency = _playerData.currencies[i];
@@ -224,8 +229,8 @@ public class DataManager : MonoBehaviour
 
     private void SyncLegacyCurrencyFields()
     {
-        _playerData.gold = GetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Gold));
-        _playerData.diamond = GetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond));
+        _playerData.gold = GetCurrencyAmountInternal(CurrencyManager.GetCurrencyKey(CurrencyType.Gold));
+        _playerData.diamond = GetCurrencyAmountInternal(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond));
         _playerData.lastSaveTime = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 }

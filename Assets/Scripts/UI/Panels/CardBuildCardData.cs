@@ -8,6 +8,7 @@ public struct CardBuildCardData
 {
     public int Id;
     public string Name;
+    public string AvatarDefinitionAddress;
     public string Gender;
     public int Attack;
     public int Defense;
