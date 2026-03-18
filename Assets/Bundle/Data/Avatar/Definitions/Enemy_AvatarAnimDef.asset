@@ -12,29 +12,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ae7c7f810433614b86aebeaee55ec11, type: 3}
   m_Name: Enemy_AvatarAnimDef
   m_EditorClassIdentifier: 
-  _avatarId: 
+  _avatarId: laoshu
   _actions:
-  - _actionType: 2
-    _frameAddresses:
-    - avatartemp/enemy/attack/attack_01
-    - avatartemp/enemy/attack/attack_02
-    _fps: 10
-    _loop: 0
   - _actionType: 0
     _frameAddresses:
-    - avatartemp/enemy/idle/idle_01
+    - avatartemp/laoshu1
     _fps: 10
     _loop: 1
   - _actionType: 1
     _frameAddresses:
-    - avatartemp/enemy/run/run_01
-    - avatartemp/enemy/run/run_02
-    - avatartemp/enemy/run/run_03
-    - avatartemp/enemy/run/run_04
+    - avatartemp/laoshu1
     _fps: 10
     _loop: 1
+  - _actionType: 2
+    _frameAddresses:
+    - avatartemp/laoshu2
+    _fps: 10
+    _loop: 0
   - _actionType: 5
     _frameAddresses:
-    - Assets/Bundle/AvatarTemp/Enemy/Die/die_01.png
+    - avatartemp/laoshu1
     _fps: 10
-    _loop: 1
+    _loop: 0

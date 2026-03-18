@@ -233,9 +233,21 @@ public class BattleSimulation
             return;
         }
 
-        int damage = Mathf.Max(1, attackerRuntime.Attack - defenderRuntime.Defense);
-        defenderRuntime.CurrentHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
-        Debug.Log($"[BattleManager] {attacker.Camp} attacks {defender.Camp}, damage={damage}, targetHP={defenderRuntime.CurrentHp}");
+            int damage = Mathf.Max(1, attackerRuntime.Attack - defenderRuntime.Defense);
+            int newHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
+            defenderRuntime.CurrentHp = newHp;
+            Debug.Log($"[BattleManager] {attacker.Camp} attacks {defender.Camp}, damage={damage}, targetHP={defenderRuntime.CurrentHp}");
+
+            // Show damage popup and update HUD if present
+            if (defender != null && defender.Transform != null)
+            {
+                var hud = defender.Transform.GetComponent<FighterHUD>();
+                if (hud != null)
+                {
+                    hud.ShowDamage(damage);
+                    hud.UpdateHp(defenderRuntime.CurrentHp);
+                }
+            }
 
         if (defenderRuntime.CurrentHp <= 0)
         {

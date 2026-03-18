@@ -1158,46 +1158,150 @@ public class CardBuildPanel : UIPanel
 
     private void CreateCardItem(RectTransform parent, CardBuildCardData cardData, CardZoneType zoneType)
     {
-        GameObject cardGo = new GameObject($"Card_{cardData.Id}",
+        // card sizing and fonts (used by both prefab and fallback paths)
+        float cardWidth = zoneType == CardZoneType.Reserve ? 160f : 240f;
+        float cardHeight = zoneType == CardZoneType.Reserve ? 160f : 140f;
+        int nameFont = zoneType == CardZoneType.Reserve ? 18 : 24;
+        int statsFont = zoneType == CardZoneType.Reserve ? 16 : 18;
+
+        // Try to instantiate from editable prefab first (address: ui/carditem)
+        GameObject cardGo = null;
+        try
+        {
+            var rm = GameManager.Instance != null ? GameManager.Instance.ResourceManager : null;
+            if (rm != null)
+            {
+                cardGo = rm.InstantiatePrefab("ui/carditem", parent);
+            }
+        }
+        catch { }
+
+        if (cardGo == null)
+        {
+            var prefab = Resources.Load<GameObject>("ui/carditem");
+            if (prefab != null)
+            {
+                cardGo = Object.Instantiate(prefab, parent);
+            }
+        }
+
+        if (cardGo != null)
+        {
+            cardGo.name = $"Card_{cardData.Id}";
+
+            RectTransform cardRect = cardGo.GetComponent<RectTransform>();
+            if (cardRect != null)
+            {
+                cardRect.anchorMin = new Vector2(0f, 1f);
+                cardRect.anchorMax = new Vector2(0f, 1f);
+                cardRect.pivot = new Vector2(0f, 1f);
+            }
+
+            LayoutElement layoutElement = cardGo.GetComponent<LayoutElement>();
+            if (layoutElement != null)
+            {
+                layoutElement.minWidth = cardWidth;
+                layoutElement.minHeight = cardHeight;
+                layoutElement.preferredWidth = cardWidth;
+                layoutElement.preferredHeight = cardHeight;
+            }
+
+            if (cardRect != null)
+            {
+                cardRect.sizeDelta = new Vector2(cardWidth, cardHeight);
+            }
+
+            Image cardBg = cardGo.GetComponent<Image>();
+            if (cardBg != null)
+            {
+                cardBg.color = ResolveZoneCardColor(zoneType, cardData.Id);
+            }
+
+            // Portrait handling: try to find child named "Portrait" else create one
+            Sprite portraitSprite = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
+            Transform portraitTf = cardGo.transform.Find("Portrait");
+            if (portraitTf != null && portraitSprite != null)
+            {
+                var img = portraitTf.GetComponent<UnityEngine.UI.Image>();
+                if (img != null)
+                {
+                    img.sprite = portraitSprite;
+                    img.preserveAspect = true;
+                    img.color = Color.white;
+                    img.raycastTarget = false;
+                }
+            }
+            else if (portraitSprite != null)
+            {
+                CreateCardPortrait(cardGo.transform, portraitSprite);
+            }
+
+            // Name / Stats text: try to find existing children
+            Text nameText = null;
+            Text statText = null;
+            var nameTf = cardGo.transform.Find("Name");
+            if (nameTf != null) nameText = nameTf.GetComponent<Text>();
+            var statsTf = cardGo.transform.Find("Stats");
+            if (statsTf != null) statText = statsTf.GetComponent<Text>();
+
+            
+            if (nameText == null) { nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f), nameFont); }
+            else { nameText.fontSize = nameFont; }
+            if (statText == null) { statText = CreateCardText(cardGo.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(8f, 8f), statsFont); }
+            else { statText.fontSize = statsFont; }
+
+            nameText.alignment = TextAnchor.UpperLeft;
+            statText.alignment = TextAnchor.LowerLeft;
+
+            CardDragItem dragItem = cardGo.GetComponent<CardDragItem>();
+            if (dragItem != null)
+            {
+                dragItem.BindTextRefs(nameText, statText);
+                dragItem.Initialize(this, cardData, zoneType);
+            }
+
+            return;
+        }
+
+        // Fallback to previous runtime construction if prefab not available
+        GameObject fallback = new GameObject($"Card_{cardData.Id}",
             typeof(RectTransform),
             typeof(Image),
             typeof(LayoutElement),
             typeof(CanvasGroup),
             typeof(CardDragItem));
-        cardGo.transform.SetParent(parent, false);
+        fallback.transform.SetParent(parent, false);
 
-        RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-        cardRect.anchorMin = new Vector2(0f, 1f);
-        cardRect.anchorMax = new Vector2(0f, 1f);
-        cardRect.pivot = new Vector2(0f, 1f);
+        RectTransform fbRect = fallback.GetComponent<RectTransform>();
+        fbRect.anchorMin = new Vector2(0f, 1f);
+        fbRect.anchorMax = new Vector2(0f, 1f);
+        fbRect.pivot = new Vector2(0f, 1f);
 
-        LayoutElement layoutElement = cardGo.GetComponent<LayoutElement>();
-        float cardWidth = zoneType == CardZoneType.Reserve ? 120f : 180f;
-        float cardHeight = zoneType == CardZoneType.Reserve ? 120f : 90f;
-        layoutElement.minWidth = cardWidth;
-        layoutElement.minHeight = cardHeight;
-        layoutElement.preferredWidth = cardWidth;
-        layoutElement.preferredHeight = cardHeight;
-        cardRect.sizeDelta = new Vector2(cardWidth, cardHeight);
+        LayoutElement fbLayout = fallback.GetComponent<LayoutElement>();
+        fbLayout.minWidth = cardWidth;
+        fbLayout.minHeight = cardHeight;
+        fbLayout.preferredWidth = cardWidth;
+        fbLayout.preferredHeight = cardHeight;
+        fbRect.sizeDelta = new Vector2(cardWidth, cardHeight);
 
-        Image cardBg = cardGo.GetComponent<Image>();
-        cardBg.color = ResolveZoneCardColor(zoneType, cardData.Id);
+        Image fbBg = fallback.GetComponent<Image>();
+        fbBg.color = ResolveZoneCardColor(zoneType, cardData.Id);
 
-        Sprite portraitSprite = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
-        if (portraitSprite != null)
+        Sprite fbPortrait = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
+        if (fbPortrait != null)
         {
-            CreateCardPortrait(cardGo.transform, portraitSprite);
+            CreateCardPortrait(fallback.transform, fbPortrait);
         }
 
-        Text nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f), 16);
-        nameText.alignment = TextAnchor.UpperLeft;
+        Text fbNameText = CreateCardText(fallback.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f), nameFont);
+        fbNameText.alignment = TextAnchor.UpperLeft;
 
-        Text statText = CreateCardText(cardGo.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(8f, 8f), 14);
-        statText.alignment = TextAnchor.LowerLeft;
+        Text fbStatText = CreateCardText(fallback.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(8f, 8f), statsFont);
+        fbStatText.alignment = TextAnchor.LowerLeft;
 
-        CardDragItem dragItem = cardGo.GetComponent<CardDragItem>();
-        dragItem.BindTextRefs(nameText, statText);
-        dragItem.Initialize(this, cardData, zoneType);
+        CardDragItem fbDragItem = fallback.GetComponent<CardDragItem>();
+        fbDragItem.BindTextRefs(fbNameText, fbStatText);
+        fbDragItem.Initialize(this, cardData, zoneType);
     }
 
     private static void CreateCardPortrait(Transform parent, Sprite portraitSprite)
@@ -1209,13 +1313,14 @@ public class CardBuildPanel : UIPanel
         RectTransform portraitRect = portraitGo.GetComponent<RectTransform>();
         portraitRect.anchorMin = Vector2.zero;
         portraitRect.anchorMax = Vector2.one;
-        portraitRect.offsetMin = new Vector2(6f, 6f);
-        portraitRect.offsetMax = new Vector2(-6f, -6f);
+        // reduce padding so portrait fills more of the card
+        portraitRect.offsetMin = new Vector2(4f, 4f);
+        portraitRect.offsetMax = new Vector2(-4f, -4f);
 
         Image portraitImage = portraitGo.GetComponent<Image>();
         portraitImage.sprite = portraitSprite;
         portraitImage.preserveAspect = true;
-        portraitImage.color = new Color(1f, 1f, 1f, 0.42f);
+        portraitImage.color = new Color(1f, 1f, 1f, 1f);
         portraitImage.raycastTarget = false;
     }
 
@@ -1229,7 +1334,8 @@ public class CardBuildPanel : UIPanel
         textRect.anchorMax = anchorMax;
         textRect.pivot = new Vector2(0f, anchorMin.y);
         textRect.anchoredPosition = anchoredPos;
-        textRect.sizeDelta = new Vector2(-12f, 26f);
+        // increase text area height for larger cards
+        textRect.sizeDelta = new Vector2(-12f, 40f);
 
         Text text = textGo.GetComponent<Text>();
         text.font = _uiFont;

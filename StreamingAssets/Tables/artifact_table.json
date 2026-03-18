@@ -1,0 +1,32 @@
+[
+  {
+    "id": 101,
+    "key": "lucky_charm",
+    "name": "幸运符",
+    "quality": "rare",
+    "effectType": "outing_artifact_chance",
+    "effectValue": 0.15,
+    "durability": null,
+    "description": "提高外出带回奇物概率 15%"
+  },
+  {
+    "id": 102,
+    "key": "stamina_band",
+    "name": "耐力腕带",
+    "quality": "common",
+    "effectType": "energy_max_add",
+    "effectValue": 20,
+    "durability": null,
+    "description": "增加最大精力 20"
+  },
+  {
+    "id": 103,
+    "key": "battle_amulet",
+    "name": "战斗护符",
+    "quality": "epic",
+    "effectType": "battle_attack_pct",
+    "effectValue": 0.12,
+    "durability": 10,
+    "description": "战斗中攻击力提高 12%，耐久 10 次"
+  }
+]

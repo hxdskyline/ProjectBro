@@ -23,14 +23,14 @@ public class BattlePreparePanel : UIPanel
     private readonly HashSet<int> _outingCardIds = new HashSet<int>();
     private readonly HashSet<int> _blessingCardIds = new HashSet<int>();
 
-    private Text _titleText;
-    private Text _summaryText;
-    private Text _statusText;
-    private Button _startBattleButton;
-    private Button _backButton;
-    private RectTransform _ownedCardsRoot;
-    private RectTransform _deployedCardsRoot;
-    private RectTransform _enemyCardsRoot;
+    [SerializeField] private Text _titleText;
+    [SerializeField] private Text _summaryText;
+    [SerializeField] private Text _statusText;
+    [SerializeField] private Button _startBattleButton;
+    [SerializeField] private Button _backButton;
+    [SerializeField] private RectTransform _ownedCardsRoot;
+    [SerializeField] private RectTransform _deployedCardsRoot;
+    [SerializeField] private RectTransform _enemyCardsRoot;
     private Font _uiFont;
 
     private int _currentLevel;
@@ -401,24 +401,106 @@ public class BattlePreparePanel : UIPanel
         {
             return;
         }
-
         Image backgroundImage = GetOrAddComponent<Image>(gameObject);
         backgroundImage.color = new Color(0.06f, 0.09f, 0.14f, 0.96f);
 
-        RectTransform contentRoot = GetOrCreateChildRect(panelRect, RootName, new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.95f));
-        Image contentBackground = GetOrAddComponent<Image>(contentRoot.gameObject);
-        contentBackground.color = new Color(0.87f, 0.91f, 0.96f, 0.98f);
+        // Prefer prefab-provided root (set via inspector). If missing, try to find child by name; if still missing, create fallback but log a warning.
+        RectTransform contentRoot = panelRect.Find(RootName) as RectTransform;
+        if (contentRoot == null)
+        {
+            contentRoot = GetOrCreateChildRect(panelRect, RootName, new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.95f));
+            Image contentBackgroundFallback = GetOrAddComponent<Image>(contentRoot.gameObject);
+            contentBackgroundFallback.color = new Color(0.87f, 0.91f, 0.96f, 0.98f);
+            Debug.LogWarning("[BattlePreparePanel] Content root not found on prefab; created runtime fallback. Prefer placing UI in prefab.");
+        }
 
-        _titleText = GetOrCreateText(contentRoot, TitleName, _uiFont, 42, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.9f), new Vector2(0.5f, 0.98f), new Color(0.1f, 0.15f, 0.25f, 1f));
-        _summaryText = GetOrCreateText(contentRoot, SummaryName, _uiFont, 20, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.84f), new Vector2(0.97f, 0.9f), new Color(0.15f, 0.19f, 0.26f, 1f));
-        _statusText = GetOrCreateText(contentRoot, StatusName, _uiFont, 18, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.78f), new Vector2(0.97f, 0.84f), new Color(0.55f, 0.29f, 0.08f, 1f));
+        // Title / summary / status: prefer serialized fields or find existing children
+        if (_titleText == null)
+        {
+            var tf = contentRoot.Find(TitleName);
+            if (tf != null) _titleText = tf.GetComponent<Text>();
+        }
+        if (_titleText == null)
+        {
+            _titleText = GetOrCreateText(contentRoot, TitleName, _uiFont, 42, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.9f), new Vector2(0.5f, 0.98f), new Color(0.1f, 0.15f, 0.25f, 1f));
+            Debug.LogWarning("[BattlePreparePanel] Title text not found on prefab; created runtime fallback.");
+        }
 
-        _ownedCardsRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有猫咪", new Vector2(0.03f, 0.16f), new Vector2(0.32f, 0.75f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
-        _deployedCardsRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.16f), new Vector2(0.645f, 0.75f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
-        _enemyCardsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "敌人列表", new Vector2(0.68f, 0.16f), new Vector2(0.97f, 0.75f), new Color(0.42f, 0.18f, 0.18f, 0.72f));
+        if (_summaryText == null)
+        {
+            var tf = contentRoot.Find(SummaryName);
+            if (tf != null) _summaryText = tf.GetComponent<Text>();
+        }
+        if (_summaryText == null)
+        {
+            _summaryText = GetOrCreateText(contentRoot, SummaryName, _uiFont, 20, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.84f), new Vector2(0.97f, 0.9f), new Color(0.15f, 0.19f, 0.26f, 1f));
+            Debug.LogWarning("[BattlePreparePanel] Summary text not found on prefab; created runtime fallback.");
+        }
 
-        _backButton = GetOrCreateButton(contentRoot, BackButtonName, "返回构筑", _uiFont, new Vector2(0.03f, 0.04f), new Vector2(0.2f, 0.11f), new Color(0.35f, 0.36f, 0.4f, 1f));
-        _startBattleButton = GetOrCreateButton(contentRoot, StartButtonName, "进入战斗", _uiFont, new Vector2(0.79f, 0.04f), new Vector2(0.97f, 0.11f), new Color(0.16f, 0.43f, 0.29f, 1f));
+        if (_statusText == null)
+        {
+            var tf = contentRoot.Find(StatusName);
+            if (tf != null) _statusText = tf.GetComponent<Text>();
+        }
+        if (_statusText == null)
+        {
+            _statusText = GetOrCreateText(contentRoot, StatusName, _uiFont, 18, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.78f), new Vector2(0.97f, 0.84f), new Color(0.55f, 0.29f, 0.08f, 1f));
+            Debug.LogWarning("[BattlePreparePanel] Status text not found on prefab; created runtime fallback.");
+        }
+
+        // Card list roots: prefer serialized fields or find existing children
+        if (_ownedCardsRoot == null)
+        {
+            _ownedCardsRoot = contentRoot.Find(OwnedRootName) as RectTransform;
+            if (_ownedCardsRoot == null)
+            {
+                _ownedCardsRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有猫咪", new Vector2(0.03f, 0.16f), new Vector2(0.32f, 0.75f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
+                Debug.LogWarning("[BattlePreparePanel] OwnedCardsRoot not found on prefab; created runtime fallback.");
+            }
+        }
+
+        if (_deployedCardsRoot == null)
+        {
+            _deployedCardsRoot = contentRoot.Find(DeployedRootName) as RectTransform;
+            if (_deployedCardsRoot == null)
+            {
+                _deployedCardsRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.16f), new Vector2(0.645f, 0.75f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
+                Debug.LogWarning("[BattlePreparePanel] DeployedCardsRoot not found on prefab; created runtime fallback.");
+            }
+        }
+
+        if (_enemyCardsRoot == null)
+        {
+            _enemyCardsRoot = contentRoot.Find(EnemyRootName) as RectTransform;
+            if (_enemyCardsRoot == null)
+            {
+                _enemyCardsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "敌人列表", new Vector2(0.68f, 0.16f), new Vector2(0.97f, 0.75f), new Color(0.42f, 0.18f, 0.18f, 0.72f));
+                Debug.LogWarning("[BattlePreparePanel] EnemyCardsRoot not found on prefab; created runtime fallback.");
+            }
+        }
+
+        // Buttons: prefer serialized fields or find existing children
+        if (_backButton == null)
+        {
+            var btTf = contentRoot.Find(BackButtonName);
+            if (btTf != null) _backButton = btTf.GetComponent<Button>();
+        }
+        if (_backButton == null)
+        {
+            _backButton = GetOrCreateButton(contentRoot, BackButtonName, "返回构筑", _uiFont, new Vector2(0.03f, 0.04f), new Vector2(0.2f, 0.11f), new Color(0.35f, 0.36f, 0.4f, 1f));
+            Debug.LogWarning("[BattlePreparePanel] BackButton not found on prefab; created runtime fallback.");
+        }
+
+        if (_startBattleButton == null)
+        {
+            var btTf = contentRoot.Find(StartButtonName);
+            if (btTf != null) _startBattleButton = btTf.GetComponent<Button>();
+        }
+        if (_startBattleButton == null)
+        {
+            _startBattleButton = GetOrCreateButton(contentRoot, StartButtonName, "进入战斗", _uiFont, new Vector2(0.79f, 0.04f), new Vector2(0.97f, 0.11f), new Color(0.16f, 0.43f, 0.29f, 1f));
+            Debug.LogWarning("[BattlePreparePanel] StartButton not found on prefab; created runtime fallback.");
+        }
     }
 
     private void EnsureDropZones()

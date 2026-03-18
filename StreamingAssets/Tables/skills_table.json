@@ -1,0 +1,18 @@
+[
+  {
+    "id": 301,
+    "key": "quick_strike",
+    "name": "疾风一击",
+    "description": "立即对目标造成小量物理伤害并短暂加速",
+    "cooldownSec": 6,
+    "effect": { "type": "damage_and_speed", "damage": 15, "speedPct": 0.2, "durationSec": 2 }
+  },
+  {
+    "id": 302,
+    "key": "guard",
+    "name": "守护",
+    "description": "为自身或一个友军施加护盾，抵挡固定伤害",
+    "cooldownSec": 12,
+    "effect": { "type": "shield", "value": 30, "durationSec": 5 }
+  }
+]

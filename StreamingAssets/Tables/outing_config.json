@@ -1,0 +1,10 @@
+{
+  "maxPairs": 3,
+  "energyCostPerPair": 20,
+  "childCountProb": { "0": 0.40, "1": 0.45, "2": 0.15 },
+  "childMultiplierRange": [1.2, 1.5],
+  "artifactProbByQuality": { "common": 0.6, "rare": 0.3, "epic": 0.1 },
+  "guaranteeArtifactOnZeroChildren": true,
+  "minReturnDelayCycles": 1,
+  "maxReturnDelayCycles": 3
+}

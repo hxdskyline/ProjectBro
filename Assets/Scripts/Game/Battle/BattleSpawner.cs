@@ -209,7 +209,14 @@ public static class BattleSpawner
         }
 
         renderer.color = tint;
-        renderer.sortingOrder = 10;
+        // Add dynamic Y-based sorting so characters lower on screen render above
+        SortByY sortBy = go.GetComponent<SortByY>();
+        if (sortBy == null)
+        {
+            sortBy = go.AddComponent<SortByY>();
+        }
+        sortBy.BaseOrder = 10;
+        sortBy.Multiplier = 100;
 
         AvatarSequencePlayer sequencePlayer = go.GetComponent<AvatarSequencePlayer>();
         if (sequencePlayer == null)
@@ -224,6 +231,23 @@ public static class BattleSpawner
         }
 
         battleAvatar.SetAnimationDefinition(definition);
+
+        // Attach a simple HUD that shows HP bar and damage popups
+        FighterHUD hud = go.GetComponent<FighterHUD>();
+        if (hud == null)
+        {
+            hud = go.AddComponent<FighterHUD>();
+        }
+        int maxHp = 60;
+        if (unitType != null)
+        {
+            maxHp = Mathf.Max(1, unitType.BaseAttributes.MaxHp);
+        }
+        else
+        {
+            maxHp = Mathf.Max(1, staticAttributes.MaxHp);
+        }
+        hud.Initialize(maxHp);
 
         UnitRuntimeAttributes runtimeAttributes = unitType != null
             ? unitType.CreateRuntimeAttributes()

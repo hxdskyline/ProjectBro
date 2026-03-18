@@ -1,0 +1,10 @@
+{
+  "allowedRounds": [5, 10, 15],
+  "options": [
+    { "id": "food", "label": "献祭猫粮", "minCost": 100, "rewardPool": "ritual_food_rewards" },
+    { "id": "artifact", "label": "献祭奇物", "minQuality": "rare", "rewardPool": "ritual_artifact_rewards" },
+    { "id": "cat", "label": "献祭一只猫", "minRarity": "common", "rewardPool": "ritual_cat_rewards" }
+  ],
+  "blessingPool": "ritual_blessings",
+  "guaranteedBlessingChance": 0.5
+}

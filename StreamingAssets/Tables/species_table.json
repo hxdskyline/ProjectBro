@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "key": "tabby",
+    "name": "Tabby",
+    "baseLimits": { "attack": 10, "defense": 8, "hp": 100, "moveSpeed": 1.0 },
+    "tendencyModifiers": { "attack": 1.0, "defense": 1.0, "hp": 1.0, "moveSpeed": 1.0 },
+    "energyMax": 100,
+    "rarity": "common",
+    "avatarAddress": "assets/bundle/avatars/tabby.prefab"
+  },
+  {
+    "id": 2,
+    "key": "siamese",
+    "name": "Siamese",
+    "baseLimits": { "attack": 12, "defense": 7, "hp": 90, "moveSpeed": 1.1 },
+    "tendencyModifiers": { "attack": 1.1, "defense": 0.95, "hp": 0.95, "moveSpeed": 1.1 },
+    "energyMax": 90,
+    "rarity": "uncommon",
+    "avatarAddress": "assets/bundle/avatars/siamese.prefab"
+  },
+  {
+    "id": 3,
+    "key": "maine",
+    "name": "Maine Coon",
+    "baseLimits": { "attack": 9, "defense": 12, "hp": 140, "moveSpeed": 0.9 },
+    "tendencyModifiers": { "attack": 0.95, "defense": 1.2, "hp": 1.25, "moveSpeed": 0.9 },
+    "energyMax": 110,
+    "rarity": "rare",
+    "avatarAddress": "assets/bundle/avatars/maine.prefab"
+  }
+]

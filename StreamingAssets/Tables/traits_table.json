@@ -1,0 +1,18 @@
+[
+  {
+    "id": 201,
+    "key": "brave",
+    "name": "勇敢",
+    "description": "受到伤害时有 8% 概率短时间增加攻击力",
+    "effect": { "type": "on_hit_buff", "attackPct": 0.08, "durationSec": 3 },
+    "rarity": "common"
+  },
+  {
+    "id": 202,
+    "key": "careful",
+    "name": "谨慎",
+    "description": "受到致命伤害时有概率保留 1 点生命（避免一次死亡）",
+    "effect": { "type": "survive_once", "chance": 0.05 },
+    "rarity": "rare"
+  }
+]
