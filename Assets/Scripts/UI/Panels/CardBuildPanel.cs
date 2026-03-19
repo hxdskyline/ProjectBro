@@ -11,12 +11,7 @@ public class CardBuildPanel : UIPanel
 {
     private const string CardConfigFileName = "card_build_cards.json";
     private const string OutingRewardConfigFileName = "outing_reward_config.json";
-    private const string SecondaryPopupRootName = "SecondaryPopupRoot";
-    private const string SecondaryPopupTitleName = "SecondaryPopupTitle";
-    private const string SecondaryPopupHintName = "SecondaryPopupHint";
-    private const string SecondaryPopupListName = "SecondaryPopupList";
-    private const string SecondaryPopupCloseButtonName = "SecondaryPopupCloseButton";
-    private const string SecondaryPopupConfirmButtonName = "SecondaryPopupConfirmButton";
+    
     private const string OutingEntryButtonName = "OutingEntryButton";
     private const string BlessingEntryButtonName = "BlessingEntryButton";
     private const string AttributeBoostEntryButtonName = "AttributeBoostEntryButton";
@@ -75,12 +70,19 @@ public class CardBuildPanel : UIPanel
     private CardZoneType _activeSecondaryZone;
     private Font _uiFont;
     private OutingRewardConfig _outingRewardConfig;
-    private RectTransform _secondaryPopupRoot;
-    private Text _secondaryPopupTitleText;
-    private Text _secondaryPopupHintText;
-    private RectTransform _secondaryPopupListRoot;
-    private Button _secondaryPopupCloseButton;
-    private Button _secondaryPopupConfirmButton;
+    
+    // 独立的强制赐福弹窗根节点，避免与其他二级界面共用导致的时序/排版冲突
+    private RectTransform _forcedBlessingPopupRoot;
+    private Text _forcedBlessingTitleText;
+    private RectTransform _forcedBlessingListRoot;
+    private Button _forcedBlessingCloseButton;
+    private bool _forceBlessingSelectionActive = false;
+    private bool _blessingReadonlyMode = false;
+    // 新拆分的面板实例
+    private OutingPanel _outingPanel;
+    private BlessingPanel _blessingPanel;
+    private AttributeBoostPanel _attributeBoostPanel;
+    private DiscardPanel _discardPanel;
 
     public override void Initialize()
     {
@@ -106,7 +108,49 @@ public class CardBuildPanel : UIPanel
         EnsureReserveRootPlacement();
         HideLegacySecondaryZoneTexts();
         EnsureSecondaryEntryButtons();
-        EnsureSecondaryPopup();
+        // 已拆分各二级面板为独立根，不再创建共享 SecondaryPopupRoot
+        EnsureForcedBlessingPopup();
+
+        // 初始化拆分出来的面板（Reserve 保持在 CardBuildPanel 内）
+        _outingPanel = new OutingPanel();
+        _outingPanel.Initialize(transform as RectTransform, _uiFont);
+
+        // 绑定游历面板的确认与关闭回调
+        _outingPanel.SetConfirmCallback(() =>
+        {
+            if (!HasOutingCards())
+            {
+                SetStatusText($"外出区域需要恰好 {RequiredOutingCardCount} 只猫咪才能确认游历。");
+                return;
+            }
+
+            SetStatusText("已确认游历请求；结果将在战斗结算时处理。");
+            RebuildCardViews();
+            UpdateUI();
+            CloseActiveSecondaryZone();
+        });
+        _outingPanel.SetCloseCallback(CloseActiveSecondaryZone);
+
+        _blessingPanel = new BlessingPanel();
+        _blessingPanel.Initialize(transform as RectTransform, _uiFont);
+        _blessingPanel.SetCloseCallback(CloseActiveSecondaryZone);
+
+        _attributeBoostPanel = new AttributeBoostPanel();
+        _attributeBoostPanel.Initialize(transform as RectTransform, _uiFont);
+        _attributeBoostPanel.SetConfirmCallback(() =>
+        {
+            int boosted = ApplyAttributeBoostRewards();
+            RebuildCardViews();
+            UpdateUI();
+            if (boosted > 0) SetStatusText($"属性提升区强化了 {boosted} 张卡，已返回待选区");
+            CloseActiveSecondaryZone();
+        });
+        _attributeBoostPanel.SetCloseCallback(CloseActiveSecondaryZone);
+
+        _discardPanel = new DiscardPanel();
+        _discardPanel.Initialize(transform as RectTransform, _uiFont);
+        _discardPanel.SetConfirmCallback(OnSecondaryPopupConfirmButtonClicked);
+        _discardPanel.SetCloseCallback(CloseActiveSecondaryZone);
         EnsureReserveDropZone(_reserveCardsRoot);
         EnsureReserveLayout(_reserveCardsRoot);
         CreateDemoCardsIfNeeded();
@@ -122,6 +166,7 @@ public class CardBuildPanel : UIPanel
         RefreshBattleProgress();
         RebuildCardViews();
         UpdateUI();
+        TryForceOpenBlessingForLevel();
     }
 
     public bool HasOutingCards()
@@ -314,7 +359,6 @@ public class CardBuildPanel : UIPanel
         }
 
         UpdateSecondaryEntryButtons();
-        UpdateSecondaryPopupState();
 
         if (_statusText == null)
         {
@@ -717,40 +761,7 @@ public class CardBuildPanel : UIPanel
         button.onClick.AddListener(() => OnSecondaryEntryButtonClicked(zoneType));
     }
 
-    private void EnsureSecondaryPopup()
-    {
-        RectTransform panelRect = transform as RectTransform;
-        if (panelRect == null)
-        {
-            return;
-        }
-
-        _secondaryPopupRoot = GetOrCreateChildRect(panelRect, SecondaryPopupRootName, new Vector2(0.53f, 0.08f), new Vector2(0.96f, 0.72f));
-        Image popupBg = GetOrAddComponent<Image>(_secondaryPopupRoot.gameObject);
-        popupBg.color = new Color(0.08f, 0.12f, 0.17f, 0.97f);
-
-        _secondaryPopupTitleText = GetOrCreateText(_secondaryPopupRoot, SecondaryPopupTitleName, _uiFont, 26, TextAnchor.MiddleLeft, new Vector2(0.04f, 0.88f), new Vector2(0.68f, 0.97f), Color.white);
-        _secondaryPopupHintText = GetOrCreateText(_secondaryPopupRoot, SecondaryPopupHintName, _uiFont, 16, TextAnchor.UpperLeft, new Vector2(0.04f, 0.77f), new Vector2(0.96f, 0.87f), new Color(0.92f, 0.88f, 0.72f, 1f));
-        _secondaryPopupListRoot = GetOrCreateChildRect(_secondaryPopupRoot, SecondaryPopupListName, new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.72f));
-
-        Image listBg = GetOrAddComponent<Image>(_secondaryPopupListRoot.gameObject);
-        listBg.color = new Color(0f, 0f, 0f, 0.12f);
-
-        SecondaryZoneCardDropZone dropZone = GetOrAddComponent<SecondaryZoneCardDropZone>(_secondaryPopupListRoot.gameObject);
-        dropZone.Initialize(this);
-
-        ConfigurePopupLayout(_secondaryPopupListRoot);
-
-        _secondaryPopupConfirmButton = GetOrCreateButton(_secondaryPopupRoot, SecondaryPopupConfirmButtonName, "确认弃猫", _uiFont, new Vector2(0.52f, 0.86f), new Vector2(0.74f, 0.96f), new Color(0.55f, 0.18f, 0.18f, 1f));
-        _secondaryPopupConfirmButton.onClick.RemoveAllListeners();
-        _secondaryPopupConfirmButton.onClick.AddListener(OnSecondaryPopupConfirmButtonClicked);
-
-        _secondaryPopupCloseButton = GetOrCreateButton(_secondaryPopupRoot, SecondaryPopupCloseButtonName, "关闭", _uiFont, new Vector2(0.76f, 0.86f), new Vector2(0.96f, 0.96f), new Color(0.42f, 0.2f, 0.18f, 1f));
-        _secondaryPopupCloseButton.onClick.RemoveAllListeners();
-        _secondaryPopupCloseButton.onClick.AddListener(CloseActiveSecondaryZone);
-
-        _secondaryPopupRoot.gameObject.SetActive(false);
-    }
+    // 共享二级弹窗已移除，使用各自面板的根节点。
 
     private RectTransform CreateRuntimeZone(RectTransform parent, string rootName, string title, Vector2 anchorMin, Vector2 anchorMax)
     {
@@ -1128,13 +1139,45 @@ public class CardBuildPanel : UIPanel
 
     private void RebuildCardViews()
     {
-        ClearChildren(_reserveCardsRoot);
-        ClearChildren(_secondaryPopupListRoot);
-
-        if (_secondaryPopupRoot != null)
+        // 防御性保证：在 Rebuild 前确保运行时根节点已创建，避免初始化顺序导致的 NullReference
+        if (_reserveCardsRoot == null)
         {
-            _secondaryPopupRoot.gameObject.SetActive(_hasActiveSecondaryZone);
+            EnsureCardRoots();
         }
+
+
+        if (_reserveCardsRoot != null)
+        {
+            ClearChildren(_reserveCardsRoot);
+        }
+
+        // 清理各面板列表根（如果存在）以便重新填充
+        if (_forcedBlessingListRoot != null)
+        {
+            ClearChildren(_forcedBlessingListRoot);
+        }
+
+        if (_blessingPanel != null && _blessingPanel.ListRoot != null)
+        {
+            ClearChildren(_blessingPanel.ListRoot);
+        }
+
+        if (_outingPanel != null && _outingPanel.ListRoot != null)
+        {
+            ClearChildren(_outingPanel.ListRoot);
+        }
+
+        if (_attributeBoostPanel != null && _attributeBoostPanel.ListRoot != null)
+        {
+            ClearChildren(_attributeBoostPanel.ListRoot);
+        }
+
+        if (_discardPanel != null && _discardPanel.ListRoot != null)
+        {
+            ClearChildren(_discardPanel.ListRoot);
+        }
+
+        // 不再使用共享的 secondary popup root，渲染由各自面板接管
 
         for (int i = 0; i < _reserveCards.Count; i++)
         {
@@ -1148,10 +1191,85 @@ public class CardBuildPanel : UIPanel
 
         if (_hasActiveSecondaryZone)
         {
-            List<CardBuildCardData> activeList = GetActiveDisplayList(_activeSecondaryZone);
-            for (int i = 0; i < activeList.Count; i++)
+            if (_activeSecondaryZone == CardZoneType.Blessing)
             {
-                CreateCardItem(_secondaryPopupListRoot, activeList[i], _activeSecondaryZone);
+                // 渲染赐福候选到 BlessingPanel 或 forced 列表
+                if (_forceBlessingSelectionActive)
+                {
+                    // 优先把强制候选渲染到 BlessingPanel 的 ListRoot（如果已初始化并指向外部根）
+                    if (_blessingPanel != null && _blessingPanel.ListRoot != null)
+                    {
+                        _blessingPanel.SetForceMode(true);
+                        for (int i = 0; i < _blessingCandidates.Count; i++)
+                        {
+                            CreateCardItem(_blessingPanel.ListRoot, _blessingCandidates[i], CardZoneType.Blessing);
+                        }
+                    }
+                    else if (_forcedBlessingListRoot != null)
+                    {
+                        for (int i = 0; i < _blessingCandidates.Count; i++)
+                        {
+                            CreateCardItem(_forcedBlessingListRoot, _blessingCandidates[i], CardZoneType.Blessing);
+                        }
+                    }
+                }
+                else
+                {
+                    if (_blessingPanel != null && _blessingPanel.ListRoot != null)
+                    {
+                        for (int i = 0; i < _blessingCandidates.Count; i++)
+                        {
+                            CreateCardItem(_blessingPanel.ListRoot, _blessingCandidates[i], CardZoneType.Blessing);
+                        }
+                    }
+                    else
+                    {
+                        // BlessingPanel 未初始化，无法渲染赐福候选
+                        SetStatusText("赐福面板未初始化，无法显示候选卡牌。");
+                    }
+                }
+            }
+            else if (_activeSecondaryZone == CardZoneType.Outing)
+            {
+                if (_outingPanel != null && _outingPanel.ListRoot != null)
+                {
+                    for (int i = 0; i < _outingCards.Count; i++)
+                    {
+                        CreateCardItem(_outingPanel.ListRoot, _outingCards[i], CardZoneType.Outing);
+                    }
+                }
+                else
+                {
+                    // OutingPanel 未初始化，跳过渲染
+                }
+            }
+            else if (_activeSecondaryZone == CardZoneType.AttributeBoost)
+            {
+                if (_attributeBoostPanel != null && _attributeBoostPanel.ListRoot != null)
+                {
+                    for (int i = 0; i < _attributeBoostCards.Count; i++)
+                    {
+                        CreateCardItem(_attributeBoostPanel.ListRoot, _attributeBoostCards[i], CardZoneType.AttributeBoost);
+                    }
+                }
+                else
+                {
+                    // AttributeBoostPanel 未初始化，跳过渲染
+                }
+            }
+            else if (_activeSecondaryZone == CardZoneType.Discard)
+            {
+                if (_discardPanel != null && _discardPanel.ListRoot != null)
+                {
+                    for (int i = 0; i < _discardCards.Count; i++)
+                    {
+                        CreateCardItem(_discardPanel.ListRoot, _discardCards[i], CardZoneType.Discard);
+                    }
+                }
+                else
+                {
+                    // DiscardPanel 未初始化，跳过渲染
+                }
             }
         }
     }
@@ -1607,6 +1725,11 @@ public class CardBuildPanel : UIPanel
 
     private void OnSecondaryEntryButtonClicked(CardZoneType zoneType)
     {
+        if (_forceBlessingSelectionActive)
+        {
+            SetStatusText("当前正在进行强制祈福选择，请先完成该操作。");
+            return;
+        }
         if (_hasActiveSecondaryZone)
         {
             if (_activeSecondaryZone == zoneType)
@@ -1624,23 +1747,103 @@ public class CardBuildPanel : UIPanel
 
     private void OpenSecondaryZone(CardZoneType zoneType)
     {
+        // 打开对应功能面板（优先使用新拆分的面板）
+        _activeSecondaryZone = zoneType;
+        _hasActiveSecondaryZone = true;
+
         if (zoneType == CardZoneType.Blessing)
         {
             EnsureBlessingCandidates();
+            if (_forceBlessingSelectionActive)
+            {
+                if (_blessingPanel != null)
+                {
+                    _blessingPanel.SetExternalRoot(_forcedBlessingPopupRoot);
+                    _blessingPanel.SetForceMode(true);
+                    _blessingPanel.Show(false);
+                }
+                else if (_forcedBlessingPopupRoot != null)
+                {
+                    _forcedBlessingPopupRoot.pivot = new Vector2(0.5f, 0.5f);
+                    _forcedBlessingPopupRoot.anchorMin = new Vector2(0.5f, 0.5f);
+                    _forcedBlessingPopupRoot.anchorMax = new Vector2(0.5f, 0.5f);
+                    _forcedBlessingPopupRoot.sizeDelta = new Vector2(800f, 480f);
+                    _forcedBlessingPopupRoot.anchoredPosition = Vector2.zero;
+                    _forcedBlessingPopupRoot.gameObject.SetActive(true);
+                }
+            }
+            else
+            {
+                if (_blessingPanel != null)
+                {
+                    // 使用 BlessingPanel 自身根显示（不再使用共享二级弹窗）
+                    _blessingPanel.SetExternalRoot(null);
+                    _blessingPanel.SetForceMode(false);
+                    _blessingPanel.Show(_blessingReadonlyMode);
+                }
+                else
+                {
+                    SetStatusText("赐福面板未初始化，无法打开赐福界面。");
+                    _hasActiveSecondaryZone = false;
+                    return;
+                }
+            }
+        }
+        else if (zoneType == CardZoneType.Outing)
+        {
+            if (_outingPanel != null) _outingPanel.Show();
+            else { SetStatusText("游历面板未初始化，无法打开游历界面。"); _hasActiveSecondaryZone = false; return; }
+        }
+        else if (zoneType == CardZoneType.AttributeBoost)
+        {
+            if (_attributeBoostPanel != null) _attributeBoostPanel.Show();
+            else { SetStatusText("属性提升面板未初始化，无法打开属性提升界面。"); _hasActiveSecondaryZone = false; return; }
+        }
+        else if (zoneType == CardZoneType.Discard)
+        {
+            if (_discardPanel != null) _discardPanel.Show();
+            else { SetStatusText("弃猫面板未初始化，无法打开弃猫界面。"); _hasActiveSecondaryZone = false; return; }
         }
 
-        _activeSecondaryZone = zoneType;
-        _hasActiveSecondaryZone = true;
         RebuildCardViews();
         UpdateUI();
     }
 
     private void CloseActiveSecondaryZone()
     {
+        if (_forceBlessingSelectionActive)
+        {
+            // 强制祈福选择时不允许关闭界面
+            SetStatusText("请先从候选中选择一只猫作为本次祈福对象。此操作不可跳过。");
+            return;
+        }
         bool wasDiscardZone = _hasActiveSecondaryZone && _activeSecondaryZone == CardZoneType.Discard;
         int returnedCardCount = wasDiscardZone ? ReturnDiscardCardsToReserve() : 0;
 
+        // 隐藏对应面板并恢复状态
+        if (_hasActiveSecondaryZone)
+        {
+            if (_activeSecondaryZone == CardZoneType.Blessing)
+            {
+                if (_blessingPanel != null) _blessingPanel.Hide();
+                if (_forcedBlessingPopupRoot != null) _forcedBlessingPopupRoot.gameObject.SetActive(false);
+            }
+            else if (_activeSecondaryZone == CardZoneType.Outing)
+            {
+                if (_outingPanel != null) _outingPanel.Hide();
+            }
+            else if (_activeSecondaryZone == CardZoneType.AttributeBoost)
+            {
+                if (_attributeBoostPanel != null) _attributeBoostPanel.Hide();
+            }
+            else if (_activeSecondaryZone == CardZoneType.Discard)
+            {
+                if (_discardPanel != null) _discardPanel.Hide();
+            }
+        }
+
         _hasActiveSecondaryZone = false;
+        _blessingReadonlyMode = false;
         RebuildCardViews();
         UpdateUI();
 
@@ -1705,44 +1908,7 @@ public class CardBuildPanel : UIPanel
         }
     }
 
-    private void UpdateSecondaryPopupState()
-    {
-        if (_secondaryPopupRoot == null)
-        {
-            return;
-        }
-
-        _secondaryPopupRoot.gameObject.SetActive(_hasActiveSecondaryZone);
-        if (!_hasActiveSecondaryZone)
-        {
-            return;
-        }
-
-        if (_secondaryPopupTitleText != null)
-        {
-            _secondaryPopupTitleText.text = $"{GetZoneDisplayName(_activeSecondaryZone)}管理";
-        }
-
-        if (_secondaryPopupHintText != null)
-        {
-            _secondaryPopupHintText.text = GetZoneHintText(_activeSecondaryZone);
-        }
-
-        if (_secondaryPopupConfirmButton != null)
-        {
-            bool showConfirmButton = _activeSecondaryZone == CardZoneType.Discard;
-            _secondaryPopupConfirmButton.gameObject.SetActive(showConfirmButton);
-            _secondaryPopupConfirmButton.interactable = showConfirmButton && _discardCards.Count > 0;
-
-            Text confirmButtonText = _secondaryPopupConfirmButton.GetComponentInChildren<Text>(true);
-            if (confirmButtonText != null)
-            {
-                confirmButtonText.text = _discardCards.Count > 0
-                    ? $"确认弃猫\n当前 {_discardCards.Count} 只"
-                    : "确认弃猫\n当前 0 只";
-            }
-        }
-    }
+    
 
     private static string GetZoneDisplayName(CardZoneType zoneType)
     {
@@ -1831,6 +1997,12 @@ public class CardBuildPanel : UIPanel
 
     private void ToggleBlessingSelection(int cardId)
     {
+        if (_blessingReadonlyMode)
+        {
+            SetStatusText("赐福已锁定：当前为观察模式，选中的猫不可切换。");
+            return;
+        }
+
         bool candidateExists = false;
         for (int i = 0; i < _blessingCandidates.Count; i++)
         {
@@ -1849,6 +2021,13 @@ public class CardBuildPanel : UIPanel
 
         if (_selectedBlessingCardId == cardId)
         {
+            if (_forceBlessingSelectionActive)
+            {
+                // 强制选择期间不能取消
+                SetStatusText("当前为强制祈福选择，无法取消选择，请选择其他猫或确认当前选择。完成选择后界面将自动关闭。");
+                return;
+            }
+
             _selectedBlessingCardId = -1;
             SetStatusText("已取消当前祈祷对象，待选区恢复完整显示。");
             return;
@@ -1859,6 +2038,88 @@ public class CardBuildPanel : UIPanel
         {
             SetStatusText($"当前祈祷对象已切换为 {selectedCard.Name}。这只猫会暂时从待选区隐藏，并在下场战斗上阵时获得赐福强化。");
         }
+
+        if (_forceBlessingSelectionActive)
+        {
+            // 在强制模式下，玩家选择后立即结束该流程
+            _forceBlessingSelectionActive = false;
+            // 关闭强制模式的 UI（优先使用 BlessingPanel）并进入只读管理
+            if (_blessingPanel != null)
+            {
+                _blessingPanel.SetForceMode(false);
+                _blessingPanel.Hide();
+            }
+            else
+            {
+                if (_forcedBlessingCloseButton != null)
+                {
+                    _forcedBlessingCloseButton.interactable = true;
+                }
+                CloseForcedBlessingPopup();
+            }
+            _blessingReadonlyMode = true;
+            RebuildCardViews();
+            UpdateUI();
+        }
+    }
+
+    private void TryForceOpenBlessingForLevel()
+    {
+        BattleCampaignRuntime runtime = GameManager.Instance != null ? GameManager.Instance.BattleCampaignRuntime : null;
+        if (runtime == null)
+        {
+            return;
+        }
+
+        if (!runtime.IsBlessingEnabledForBattle(_currentLevel))
+        {
+            return;
+        }
+
+        // 如果已经有选中的赐福，则不重复弹出
+        if (HasBlessingCards())
+        {
+            return;
+        }
+        // 准备候选并强制打开独立弹窗（不使用共享的二级弹窗 root）
+        _blessingCandidates.Clear();
+        EnsureBlessingCandidates();
+        _selectedBlessingCardId = -1;
+        _forceBlessingSelectionActive = true;
+        // 确保二级面板状态反映为赐福区已打开，以便 RebuildCardViews 在弹窗里填充候选卡牌
+        _activeSecondaryZone = CardZoneType.Blessing;
+        _hasActiveSecondaryZone = true;
+
+        EnsureForcedBlessingPopup();
+
+        if (_forcedBlessingPopupRoot != null)
+        {
+            _forcedBlessingPopupRoot.pivot = new Vector2(0.5f, 0.5f);
+            _forcedBlessingPopupRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _forcedBlessingPopupRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _forcedBlessingPopupRoot.sizeDelta = new Vector2(800f, 480f);
+            _forcedBlessingPopupRoot.anchoredPosition = Vector2.zero;
+
+            // 禁用关闭以防止跳过
+            if (_forcedBlessingCloseButton != null)
+            {
+                _forcedBlessingCloseButton.interactable = false;
+            }
+
+            _forcedBlessingPopupRoot.gameObject.SetActive(true);
+        }
+
+        // 优先使用 BlessingPanel 来展示强制选择
+        if (_blessingPanel != null)
+        {
+            _blessingPanel.SetExternalRoot(_forcedBlessingPopupRoot);
+            _blessingPanel.SetForceMode(true);
+            _blessingPanel.Show(false);
+        }
+
+        RebuildCardViews();
+
+        SetStatusText("本关开启了祈福：请从下面三只候选猫中选择一只进行祈福（此操作不可跳过）。");
     }
 
     private bool ShouldHideReserveCard(int cardId)
@@ -1997,19 +2258,94 @@ public class CardBuildPanel : UIPanel
 
     private static void ConfigurePopupLayout(RectTransform zoneRoot)
     {
+        // Do not add a specific layout group here to avoid race conditions.
+        // Clear existing layout groups so OpenSecondaryZone can set the appropriate one (horizontal for Blessing, vertical otherwise).
         HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
         if (oldHorizontal != null)
         {
             Object.Destroy(oldHorizontal);
         }
 
-        VerticalLayoutGroup layout = GetOrAddComponent<VerticalLayoutGroup>(zoneRoot.gameObject);
-        layout.spacing = 8f;
-        layout.childAlignment = TextAnchor.UpperLeft;
-        layout.childControlHeight = true;
-        layout.childControlWidth = true;
-        layout.childForceExpandHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.padding = new RectOffset(10, 10, 10, 10);
+        VerticalLayoutGroup oldVertical = zoneRoot.GetComponent<VerticalLayoutGroup>();
+        if (oldVertical != null)
+        {
+            Object.Destroy(oldVertical);
+        }
+    }
+
+    private void EnsureForcedBlessingPopup()
+    {
+        if (_forcedBlessingPopupRoot != null)
+        {
+            return;
+        }
+
+        RectTransform panelRect = transform as RectTransform;
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        _forcedBlessingPopupRoot = GetOrCreateChildRect(panelRect, "ForcedBlessingPopupRoot", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        Image popupBg = GetOrAddComponent<Image>(_forcedBlessingPopupRoot.gameObject);
+        popupBg.color = new Color(0.06f, 0.08f, 0.12f, 0.98f);
+
+        _forcedBlessingTitleText = GetOrCreateText(_forcedBlessingPopupRoot, "Title", _uiFont, 28, TextAnchor.UpperCenter, new Vector2(0.02f, 0.86f), new Vector2(0.98f, 0.97f), Color.white);
+        Text hint = GetOrCreateText(_forcedBlessingPopupRoot, "Hint", _uiFont, 16, TextAnchor.UpperCenter, new Vector2(0.02f, 0.74f), new Vector2(0.98f, 0.84f), new Color(0.94f, 0.9f, 0.72f, 1f));
+        hint.text = "请选择一只猫作为本次祈祷对象（不可跳过）";
+
+        _forcedBlessingListRoot = GetOrCreateChildRect(_forcedBlessingPopupRoot, "List", new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.72f));
+        Image listBg = GetOrAddComponent<Image>(_forcedBlessingListRoot.gameObject);
+        listBg.color = new Color(0f, 0f, 0f, 0.12f);
+
+        SecondaryZoneCardDropZone dropZone = GetOrAddComponent<SecondaryZoneCardDropZone>(_forcedBlessingListRoot.gameObject);
+        dropZone.Initialize(this);
+
+        // 强制弹窗始终使用横向布局（3 选 1）
+        HorizontalLayoutGroup horiz = _forcedBlessingListRoot.GetComponent<HorizontalLayoutGroup>();
+        if (horiz == null)
+        {
+            horiz = _forcedBlessingListRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+        }
+        horiz.spacing = 24f;
+        horiz.childAlignment = TextAnchor.MiddleCenter;
+        horiz.childControlHeight = true;
+        horiz.childControlWidth = false;
+        horiz.childForceExpandHeight = false;
+        horiz.childForceExpandWidth = false;
+        horiz.padding = new RectOffset(10, 10, 10, 10);
+
+        _forcedBlessingCloseButton = GetOrCreateButton(_forcedBlessingPopupRoot, "Close", "关闭", _uiFont, new Vector2(0.88f, 0.86f), new Vector2(0.98f, 0.96f), new Color(0.42f, 0.2f, 0.18f, 1f));
+        _forcedBlessingCloseButton.onClick.RemoveAllListeners();
+        _forcedBlessingCloseButton.onClick.AddListener(CloseForcedBlessingPopup);
+
+        _forcedBlessingPopupRoot.gameObject.SetActive(false);
+    }
+
+    private void CloseForcedBlessingPopup()
+    {
+        if (_forceBlessingSelectionActive)
+        {
+            // 强制选择期间不允许关闭
+            SetStatusText("请先从候选中选择一只猫作为本次祈福对象。此操作不可跳过。");
+            return;
+        }
+
+        if (_forcedBlessingPopupRoot != null)
+        {
+            _forcedBlessingPopupRoot.gameObject.SetActive(false);
+        }
+
+        if (_blessingPanel != null)
+        {
+            _blessingPanel.SetForceMode(false);
+            _blessingPanel.Hide();
+            _blessingPanel.SetExternalRoot(null);
+        }
+
+        // 强制选择完成后，赐福区在后续被打开时应为只读观察模式
+        _blessingReadonlyMode = true;
+        RebuildCardViews();
+        UpdateUI();
     }
 }
