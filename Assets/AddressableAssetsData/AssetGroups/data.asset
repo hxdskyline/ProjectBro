@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: data
   m_Data:
     m_SerializedData: []
-  m_GUID: 6cf3d621f6361c84ab38a48b0b79bcba
+  m_GUID: 7eb8944ac0a900741922a7ebc3802af3
   m_SerializeEntries:
   - m_GUID: 31d080bbf47946a99e67db72dd8e9f0d
     m_Address: data/avatar/definitions/xianluo_avataranimdef

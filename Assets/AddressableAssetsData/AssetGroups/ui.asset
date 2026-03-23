@@ -15,10 +15,15 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 681c1c331fd237f4a92cd6c1975ba497
+  m_GUID: 60c1c6ef663cf5e44a6ff840e887aa09
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3e8df68d086f9ff4fb35bb78bad38dcc
+    m_Address: ui/cardbuild/discardpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -27,8 +32,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 723ba7015db41744a8d572f7d44525bd
+    m_Address: ui/sprite/kaishijiemian_btn_guanbi
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76cec11c98c41cb45a09469fde834ef9
+    m_Address: ui/sprite/kaishijiemian_bg_beijing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 87a913d856eb00b47afa3504280980e5
     m_Address: ui/carditem
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87dac4e33fe5e884e985acdc77cd1bb4
+    m_Address: ui/sprite/kaishijiemian_btn_xuanze
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -47,6 +67,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: af288c72fff1f7f41bc6502b6fe0136a
+    m_Address: ui/cardbuild/blessingpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c8248391f2842d448aafe87fcf662fae
+    m_Address: "ui/sprite/\u6807\u6CE8-k-\u5F00\u59CB\u754C\u9762"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c9ae4ee05daf3b543bf304794b6a01e4
     m_Address: ui/texture/mainmenubg
     m_ReadOnly: 0
@@ -57,8 +87,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9733a5d97164ff45b501f2b586a662f
+    m_Address: ui/cardbuild/attributeboostpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e68d587aeaf7c2a44ac2f03a8933ae50
+    m_Address: ui/cardbuild/outingpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e800269ee798b164895818d9d00ea771
     m_Address: ui/texture/buildbg
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eb8b42ba21d8f07489b3284b4ee60d60
+    m_Address: ui/cardbuild/readme
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

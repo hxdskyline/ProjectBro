@@ -45,6 +45,7 @@ public class CardBuildPanel : UIPanel
         public float Max;
     }
 
+    [Header("主界面 UI 组件")]
     [SerializeField] private Button _startBattleButton;
     [SerializeField] private Button _backButton;
     [SerializeField] private Text _levelText;
@@ -57,6 +58,12 @@ public class CardBuildPanel : UIPanel
     [SerializeField] private Button _attributeBoostEntryButton;
     [SerializeField] private Button _discardEntryButton;
     [SerializeField] private int _maxDeployedCards = 5;
+
+    [Header("子面板预制体（可选，留空则运行时创建）")]
+    [SerializeField] private OutingPanel _outingPanelPrefab;
+    [SerializeField] private BlessingPanel _blessingPanelPrefab;
+    [SerializeField] private AttributeBoostPanel _attributeBoostPanelPrefab;
+    [SerializeField] private DiscardPanel _discardPanelPrefab;
 
     private int _currentLevel = 1;
     private readonly List<CardBuildCardData> _outingCards = new List<CardBuildCardData>();
@@ -112,45 +119,10 @@ public class CardBuildPanel : UIPanel
         EnsureForcedBlessingPopup();
 
         // 初始化拆分出来的面板（Reserve 保持在 CardBuildPanel 内）
-        _outingPanel = new OutingPanel();
-        _outingPanel.Initialize(transform as RectTransform, _uiFont);
-
-        // 绑定游历面板的确认与关闭回调
-        _outingPanel.SetConfirmCallback(() =>
-        {
-            if (!HasOutingCards())
-            {
-                SetStatusText($"外出区域需要恰好 {RequiredOutingCardCount} 只猫咪才能确认游历。");
-                return;
-            }
-
-            SetStatusText("已确认游历请求；结果将在战斗结算时处理。");
-            RebuildCardViews();
-            UpdateUI();
-            CloseActiveSecondaryZone();
-        });
-        _outingPanel.SetCloseCallback(CloseActiveSecondaryZone);
-
-        _blessingPanel = new BlessingPanel();
-        _blessingPanel.Initialize(transform as RectTransform, _uiFont);
-        _blessingPanel.SetCloseCallback(CloseActiveSecondaryZone);
-
-        _attributeBoostPanel = new AttributeBoostPanel();
-        _attributeBoostPanel.Initialize(transform as RectTransform, _uiFont);
-        _attributeBoostPanel.SetConfirmCallback(() =>
-        {
-            int boosted = ApplyAttributeBoostRewards();
-            RebuildCardViews();
-            UpdateUI();
-            if (boosted > 0) SetStatusText($"属性提升区强化了 {boosted} 张卡，已返回待选区");
-            CloseActiveSecondaryZone();
-        });
-        _attributeBoostPanel.SetCloseCallback(CloseActiveSecondaryZone);
-
-        _discardPanel = new DiscardPanel();
-        _discardPanel.Initialize(transform as RectTransform, _uiFont);
-        _discardPanel.SetConfirmCallback(OnSecondaryPopupConfirmButtonClicked);
-        _discardPanel.SetCloseCallback(CloseActiveSecondaryZone);
+        InitializeOutingPanel();
+        InitializeBlessingPanel();
+        InitializeAttributeBoostPanel();
+        InitializeDiscardPanel();
         EnsureReserveDropZone(_reserveCardsRoot);
         EnsureReserveLayout(_reserveCardsRoot);
         CreateDemoCardsIfNeeded();
@@ -1851,6 +1823,175 @@ public class CardBuildPanel : UIPanel
         {
             SetStatusText($"弃猫区已关闭，未确认删除的 {returnedCardCount} 只猫已全部返回待选区。");
         }
+    }
+
+    private void InitializeOutingPanel()
+    {
+        RectTransform parentRect = transform as RectTransform;
+
+        // 尝试从预制体实例化
+        if (_outingPanelPrefab != null)
+        {
+            _outingPanel = Instantiate(_outingPanelPrefab, parentRect, false);
+        }
+        else
+        {
+            // 尝试从 ResourceManager 加载
+            GameObject prefabGo = TryLoadPrefab("ui/CardBuild/OutingPanel");
+            if (prefabGo != null)
+            {
+                _outingPanel = Instantiate(prefabGo, parentRect, false).GetComponent<OutingPanel>();
+            }
+        }
+
+        // 回退：运行时创建
+        if (_outingPanel == null)
+        {
+            GameObject panelGo = new GameObject("OutingPanel", typeof(RectTransform));
+            panelGo.transform.SetParent(parentRect, false);
+            _outingPanel = panelGo.AddComponent<OutingPanel>();
+        }
+
+        _outingPanel.Initialize(parentRect, _uiFont);
+        _outingPanel.SetConfirmCallback(() =>
+        {
+            if (!HasOutingCards())
+            {
+                SetStatusText($"外出区域需要恰好 {RequiredOutingCardCount} 只猫咪才能确认游历。");
+                return;
+            }
+
+            SetStatusText("已确认游历请求；结果将在战斗结算时处理。");
+            RebuildCardViews();
+            UpdateUI();
+            CloseActiveSecondaryZone();
+        });
+        _outingPanel.SetCloseCallback(CloseActiveSecondaryZone);
+        _outingPanel.Hide();
+    }
+
+    private void InitializeBlessingPanel()
+    {
+        RectTransform parentRect = transform as RectTransform;
+
+        // 尝试从预制体实例化
+        if (_blessingPanelPrefab != null)
+        {
+            _blessingPanel = Instantiate(_blessingPanelPrefab, parentRect, false);
+        }
+        else
+        {
+            // 尝试从 ResourceManager 加载
+            GameObject prefabGo = TryLoadPrefab("ui/CardBuild/BlessingPanel");
+            if (prefabGo != null)
+            {
+                _blessingPanel = Instantiate(prefabGo, parentRect, false).GetComponent<BlessingPanel>();
+            }
+        }
+
+        // 回退：运行时创建
+        if (_blessingPanel == null)
+        {
+            GameObject panelGo = new GameObject("BlessingPanel", typeof(RectTransform));
+            panelGo.transform.SetParent(parentRect, false);
+            _blessingPanel = panelGo.AddComponent<BlessingPanel>();
+        }
+
+        _blessingPanel.Initialize(parentRect, _uiFont);
+        _blessingPanel.SetCloseCallback(CloseActiveSecondaryZone);
+        _blessingPanel.Hide();
+    }
+
+    private void InitializeAttributeBoostPanel()
+    {
+        RectTransform parentRect = transform as RectTransform;
+
+        // 尝试从预制体实例化
+        if (_attributeBoostPanelPrefab != null)
+        {
+            _attributeBoostPanel = Instantiate(_attributeBoostPanelPrefab, parentRect, false);
+        }
+        else
+        {
+            // 尝试从 ResourceManager 加载
+            GameObject prefabGo = TryLoadPrefab("ui/CardBuild/AttributeBoostPanel");
+            if (prefabGo != null)
+            {
+                _attributeBoostPanel = Instantiate(prefabGo, parentRect, false).GetComponent<AttributeBoostPanel>();
+            }
+        }
+
+        // 回退：运行时创建
+        if (_attributeBoostPanel == null)
+        {
+            GameObject panelGo = new GameObject("AttributeBoostPanel", typeof(RectTransform));
+            panelGo.transform.SetParent(parentRect, false);
+            _attributeBoostPanel = panelGo.AddComponent<AttributeBoostPanel>();
+        }
+
+        _attributeBoostPanel.Initialize(parentRect, _uiFont);
+        _attributeBoostPanel.SetConfirmCallback(() =>
+        {
+            int boosted = ApplyAttributeBoostRewards();
+            RebuildCardViews();
+            UpdateUI();
+            if (boosted > 0) SetStatusText($"属性提升区强化了 {boosted} 张卡，已返回待选区");
+            CloseActiveSecondaryZone();
+        });
+        _attributeBoostPanel.SetCloseCallback(CloseActiveSecondaryZone);
+        _attributeBoostPanel.Hide();
+    }
+
+    private void InitializeDiscardPanel()
+    {
+        RectTransform parentRect = transform as RectTransform;
+
+        // 尝试从预制体实例化
+        if (_discardPanelPrefab != null)
+        {
+            _discardPanel = Instantiate(_discardPanelPrefab, parentRect, false);
+        }
+        else
+        {
+            // 尝试从 ResourceManager 加载
+            GameObject prefabGo = TryLoadPrefab("ui/CardBuild/DiscardPanel");
+            if (prefabGo != null)
+            {
+                _discardPanel = Instantiate(prefabGo, parentRect, false).GetComponent<DiscardPanel>();
+            }
+        }
+
+        // 回退：运行时创建
+        if (_discardPanel == null)
+        {
+            GameObject panelGo = new GameObject("DiscardPanel", typeof(RectTransform));
+            panelGo.transform.SetParent(parentRect, false);
+            _discardPanel = panelGo.AddComponent<DiscardPanel>();
+        }
+
+        _discardPanel.Initialize(parentRect, _uiFont);
+        _discardPanel.SetConfirmCallback(OnSecondaryPopupConfirmButtonClicked);
+        _discardPanel.SetCloseCallback(CloseActiveSecondaryZone);
+        _discardPanel.Hide();
+    }
+
+    private GameObject TryLoadPrefab(string address)
+    {
+        try
+        {
+            var rm = GameManager.Instance?.ResourceManager;
+            if (rm != null)
+            {
+                // 尝试通过 ResourceManager 加载预制体
+                // 注意：这里返回 null 是预期的，如果预制体不存在
+                return rm.LoadResource<GameObject>(address);
+            }
+        }
+        catch
+        {
+            // 预制体不存在或加载失败，返回 null 使用运行时创建
+        }
+        return null;
     }
 
     private void OnSecondaryPopupConfirmButtonClicked()
