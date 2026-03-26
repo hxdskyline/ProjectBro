@@ -1,0 +1,520 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace TribeSystem
+{
+    /// <summary>
+    /// 六大族群类型
+    /// </summary>
+    public enum TribeType
+    {
+        Maine = 0,      // 缅因猫族 - 均衡型
+        Tabby = 1,      // 狸花猫族 - 攻击型
+        Orange = 2,     // 大橘猫族 - 坦克型
+        Cow = 3,        // 奶牛猫族 - 防御型
+        Siamese = 4,    // 暹罗猫族 - 敏捷型
+        Ragdoll = 5     // 布偶猫族 - 特殊型
+    }
+
+    /// <summary>
+    /// 小猫品质等级
+    /// </summary>
+    public enum CatQuality
+    {
+        White = 0,      // 菜鸟 - 10%~20%
+        Blue = 1,       // 老手 - 20%~30%
+        Purple = 2,     // 精英 - 30%~40%
+        Gold = 3        // 大师 - 40%~50%
+    }
+
+    /// <summary>
+    /// 属性类型
+    /// </summary>
+    public enum StatType
+    {
+        Attack,
+        Defense,
+        Hp,
+        Speed,
+        Command
+    }
+
+    /// <summary>
+    /// 族群记录
+    /// </summary>
+    [Serializable]
+    public class TribeRecord
+    {
+        public int tribeId;
+        public TribeType tribeType;
+        public LeaderData leader;
+        public List<CatData> cats;
+        public string moodId;
+        public bool isActive;
+
+        public TribeRecord()
+        {
+            tribeId = -1;
+            tribeType = TribeType.Maine;
+            leader = new LeaderData();
+            cats = new List<CatData>();
+            moodId = null;
+            isActive = true;
+        }
+
+        /// <summary>
+        /// 获取小猫总数
+        /// </summary>
+        public int GetCatCount()
+        {
+            return cats != null ? cats.Count : 0;
+        }
+
+        /// <summary>
+        /// 检查族长是否在休息
+        /// </summary>
+        public bool IsLeaderResting()
+        {
+            return leader != null && leader.restTurns > 0;
+        }
+    }
+
+    /// <summary>
+    /// 族长数据
+    /// </summary>
+    [Serializable]
+    public class LeaderData
+    {
+        public int leaderId;
+        public string name;
+        public int baseAttack;
+        public int baseDefense;
+        public int baseHp;
+        public int baseSpeed;
+        public int command;
+        public List<int> skillIds;
+        public PermanentBuffs permanentBuffs;
+        public TemporaryBuff temporaryBuff;
+        public int restTurns;
+
+        public LeaderData()
+        {
+            leaderId = -1;
+            name = "族长";
+            baseAttack = 100;
+            baseDefense = 80;
+            baseHp = 1000;
+            baseSpeed = 1000;
+            command = 10;
+            skillIds = new List<int>();
+            permanentBuffs = new PermanentBuffs();
+            temporaryBuff = null;
+            restTurns = 0;
+        }
+    }
+
+    /// <summary>
+    /// 小猫数据
+    /// </summary>
+    [Serializable]
+    public class CatData
+    {
+        public long catId;
+        public CatQuality quality;
+        public float attackMultiplier;
+        public float defenseMultiplier;
+        public float hpMultiplier;
+        public float speedMultiplier;
+
+        public CatData()
+        {
+            catId = -1;
+            quality = CatQuality.White;
+            attackMultiplier = 0.15f;
+            defenseMultiplier = 0.15f;
+            hpMultiplier = 0.15f;
+            speedMultiplier = 0.15f;
+        }
+
+        /// <summary>
+        /// 创建指定品质的小猫
+        /// </summary>
+        public static CatData CreateWithQuality(CatQuality quality)
+        {
+            var cat = new CatData
+            {
+                catId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                quality = quality
+            };
+
+            // 根据品质设置属性比例范围
+            float minRatio, maxRatio;
+            switch (quality)
+            {
+                case CatQuality.White:
+                    minRatio = 0.1f;
+                    maxRatio = 0.2f;
+                    break;
+                case CatQuality.Blue:
+                    minRatio = 0.2f;
+                    maxRatio = 0.3f;
+                    break;
+                case CatQuality.Purple:
+                    minRatio = 0.3f;
+                    maxRatio = 0.4f;
+                    break;
+                case CatQuality.Gold:
+                    minRatio = 0.4f;
+                    maxRatio = 0.5f;
+                    break;
+                default:
+                    minRatio = 0.1f;
+                    maxRatio = 0.2f;
+                    break;
+            }
+
+            // 在范围内随机生成
+            float ratio = UnityEngine.Random.Range(minRatio, maxRatio);
+            cat.attackMultiplier = ratio;
+            cat.defenseMultiplier = ratio;
+            cat.hpMultiplier = ratio;
+            cat.speedMultiplier = ratio;
+
+            return cat;
+        }
+
+        /// <summary>
+        /// 尝试进化到下一品质（50%概率）
+        /// </summary>
+        public bool TryEvolve()
+        {
+            if (UnityEngine.Random.value < 0.5f)
+            {
+                // 进化成功
+                if (quality < CatQuality.Gold)
+                {
+                    quality++;
+                    // 重新生成属性比例
+                    var newCat = CreateWithQuality(quality);
+                    attackMultiplier = newCat.attackMultiplier;
+                    defenseMultiplier = newCat.defenseMultiplier;
+                    hpMultiplier = newCat.hpMultiplier;
+                    speedMultiplier = newCat.speedMultiplier;
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 永久加成
+    /// </summary>
+    [Serializable]
+    public class PermanentBuffs
+    {
+        public int attackBonus;
+        public float attackPercent;
+        public int defenseBonus;
+        public float defensePercent;
+        public int hpBonus;
+        public float hpPercent;
+        public int speedBonus;
+        public float speedPercent;
+        public int commandBonus;
+        public float commandPercent;
+
+        public PermanentBuffs()
+        {
+            attackBonus = 0;
+            attackPercent = 0f;
+            defenseBonus = 0;
+            defensePercent = 0f;
+            hpBonus = 0;
+            hpPercent = 0f;
+            speedBonus = 0;
+            speedPercent = 0f;
+            commandBonus = 0;
+            commandPercent = 0f;
+        }
+    }
+
+    /// <summary>
+    /// 限时加成
+    /// </summary>
+    [Serializable]
+    public class TemporaryBuff
+    {
+        public float attackPercent;
+        public float defensePercent;
+        public float hpPercent;
+        public float speedPercent;
+        public int duration; // 剩余回合数
+
+        public TemporaryBuff()
+        {
+            attackPercent = 0f;
+            defensePercent = 0f;
+            hpPercent = 0f;
+            speedPercent = 0f;
+            duration = 0;
+        }
+
+        public bool IsActive()
+        {
+            return duration > 0;
+        }
+
+        public void DecreaseDuration()
+        {
+            if (duration > 0)
+            {
+                duration--;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 招募选项类型
+    /// </summary>
+    public enum RecruitmentOptionType
+    {
+        NewTribe,           // 新增族群
+        AddCats,            // 增加小猫
+        QualityEvolution,   // 品质进化
+        LeaderBoost         // 族长强化
+    }
+
+    /// <summary>
+    /// 招募选项
+    /// </summary>
+    [Serializable]
+    public class RecruitmentOption
+    {
+        public RecruitmentOptionType optionType;
+        public int cost;
+        public TribeType? targetTribeType; // 目标族群类型（新增族群时）
+        public int targetTribeId;          // 目标族群ID（已有族群操作时）
+        public string description;
+
+        public RecruitmentOption()
+        {
+            optionType = RecruitmentOptionType.NewTribe;
+            cost = 0;
+            targetTribeType = null;
+            targetTribeId = -1;
+            description = "";
+        }
+    }
+
+    /// <summary>
+    /// 祭祀奖励类型
+    /// </summary>
+    public enum RitualRewardType
+    {
+        LeaderStatBoostTemporary,   // 族长属性临时提升
+        LeaderStatBoostPermanent,   // 族长属性永久提升
+        LeaderStatBoostPercent,     // 族长属性百分比提升
+        Cats,                       // 小猫
+        Consumable,                 // 一次性道具
+        CatFood,                    // 猫粮
+        Accessory                   // 饰品
+    }
+
+    /// <summary>
+    /// 祭祀奖励
+    /// </summary>
+    [Serializable]
+    public class RitualReward
+    {
+        public List<RitualRewardItem> rewards;
+
+        public RitualReward()
+        {
+            rewards = new List<RitualRewardItem>();
+        }
+    }
+
+    /// <summary>
+    /// 祭祀奖励项
+    /// </summary>
+    [Serializable]
+    public class RitualRewardItem
+    {
+        public RitualRewardType rewardType;
+        public StatType? statType; // 属性类型
+        public int amount;         // 数值
+        public int catCount;       // 小猫数量
+        public TribeType catTribeType; // 小猫族群
+        public CatQuality? catQuality; // 小猫品质（可选）
+        public int consumableId;   // 道具ID
+        public int accessoryId;    // 饰品ID
+
+        public RitualRewardItem()
+        {
+            rewardType = RitualRewardType.CatFood;
+            statType = null;
+            amount = 0;
+            catCount = 0;
+            catTribeType = TribeType.Maine;
+            catQuality = null;
+            consumableId = -1;
+            accessoryId = -1;
+        }
+    }
+
+    /// <summary>
+    /// 商店物品类型
+    /// </summary>
+    public enum ShopItemType
+    {
+        Artifact,       // 奇物
+        Consumable,     // 一次性道具
+        Cat             // 小猫
+    }
+
+    /// <summary>
+    /// 商店物品
+    /// </summary>
+    [Serializable]
+    public class ShopItem
+    {
+        public int itemId;
+        public ShopItemType itemType;
+        public TribeType? catTribeType; // 猫的族群类型
+        public CatQuality? catQuality;  // 猫的品质
+        public int basePrice;
+        public string name;
+        public string description;
+
+        public ShopItem()
+        {
+            itemId = -1;
+            itemType = ShopItemType.Consumable;
+            catTribeType = null;
+            catQuality = null;
+            basePrice = 0;
+            name = "";
+            description = "";
+        }
+
+        /// <summary>
+        /// 获取实际价格（有随机浮动）
+        /// </summary>
+        public int GetActualPrice()
+        {
+            if (itemType == ShopItemType.Cat)
+            {
+                // 猫咪价格在基础价格上随机*50%~150%
+                float multiplier = UnityEngine.Random.Range(0.5f, 1.5f);
+                return Mathf.RoundToInt(basePrice * multiplier);
+            }
+            return basePrice;
+        }
+    }
+
+    /// <summary>
+    /// 族群配置
+    /// </summary>
+    [Serializable]
+    public class TribeConfig
+    {
+        public TribeType tribeType;
+        public string tribeName;
+        public int initialCatCount;
+        public LeaderBaseStats leaderBaseStats;
+
+        public TribeConfig()
+        {
+            tribeType = TribeType.Maine;
+            tribeName = "";
+            initialCatCount = 3;
+            leaderBaseStats = new LeaderBaseStats();
+        }
+    }
+
+    /// <summary>
+    /// 族长基础属性配置
+    /// </summary>
+    [Serializable]
+    public class LeaderBaseStats
+    {
+        public int attack;
+        public int defense;
+        public int hp;
+        public int speed;
+        public int command;
+
+        public LeaderBaseStats()
+        {
+            attack = 100;
+            defense = 80;
+            hp = 1000;
+            speed = 1000;
+            command = 10;
+        }
+    }
+
+    /// <summary>
+    /// 品质配置
+    /// </summary>
+    [Serializable]
+    public class QualityConfig
+    {
+        public CatQuality quality;
+        public string qualityName;
+        public float minRatio;
+        public float maxRatio;
+        public float baseProbability;
+
+        public QualityConfig()
+        {
+            quality = CatQuality.White;
+            qualityName = "菜鸟";
+            minRatio = 0.1f;
+            maxRatio = 0.2f;
+            baseProbability = 0.4f;
+        }
+    }
+
+    /// <summary>
+    /// 计算后的族长属性
+    /// </summary>
+    public struct LeaderStats
+    {
+        public int attack;
+        public int defense;
+        public int hp;
+        public int speed;
+        public int command;
+
+        public LeaderStats(int atk, int def, int hp, int spd, int cmd)
+        {
+            attack = atk;
+            defense = def;
+            this.hp = hp;
+            speed = spd;
+            command = cmd;
+        }
+    }
+
+    /// <summary>
+    /// 计算后的小猫属性
+    /// </summary>
+    public struct CatStats
+    {
+        public int attack;
+        public int defense;
+        public int hp;
+        public int speed;
+
+        public CatStats(int atk, int def, int hp, int spd)
+        {
+            attack = atk;
+            defense = def;
+            this.hp = hp;
+            speed = spd;
+        }
+    }
+}

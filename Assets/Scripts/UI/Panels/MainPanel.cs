@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System;
+using TribeSystem.UI;
 
 /// <summary>
 /// ������ - ��Ϸ������ĵ�һ������
@@ -90,7 +91,7 @@ public class MainPanel : UIPanel
         Debug.Log("[MainPanel] Start button clicked");
 
         GameManager.Instance.UIManager.HidePanel("ui/MainPanel");
-        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("ui/CardBuildPanel", UIManager.UILayer.Normal);
+        GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel", UIManager.UILayer.Normal);
     }
 
     private void OnSettingsButtonClicked()

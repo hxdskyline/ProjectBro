@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"Assets/Scripts/UI/CardBuild\")",
+      "Bash(mkdir -p \"Assets/Bundle/UI/CardBuild\")"
+    ]
+  }
+}

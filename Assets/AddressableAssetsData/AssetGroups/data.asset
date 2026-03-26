@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: data
   m_Data:
     m_SerializedData: []
-  m_GUID: 7eb8944ac0a900741922a7ebc3802af3
+  m_GUID: 0959310570c66a84cb950d3a1db2738f
   m_SerializeEntries:
   - m_GUID: 31d080bbf47946a99e67db72dd8e9f0d
     m_Address: data/avatar/definitions/xianluo_avataranimdef
@@ -28,7 +28,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8f7d6efb6d4a4a90a0d65f62c2b0e4e1
-    m_Address: data/avatar/definitions/dajv_avataranimdef
+    m_Address: data/avatar/definitions/daju_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

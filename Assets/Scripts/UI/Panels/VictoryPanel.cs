@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using TribeSystem.UI;
 
 /// <summary>
 /// 胜利界面 - 显示战斗胜利和奖励
@@ -117,6 +118,6 @@ public class VictoryPanel : UIPanel
         Debug.Log("[VictoryPanel] Continue button clicked");
 
         GameManager.Instance.UIManager.ClosePanel("ui/VictoryPanel");
-        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("ui/CardBuildPanel", UIManager.UILayer.Normal);
+        GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/TribeBuildPanel", UIManager.UILayer.Normal);
     }
 }

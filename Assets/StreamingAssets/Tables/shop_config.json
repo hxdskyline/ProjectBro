@@ -1,0 +1,38 @@
+{
+  "baseRefreshCost": 50,
+  "refreshIncrement": 50,
+  "slotCount": 5,
+  "shopInterval": 5,
+  "startRound": 5,
+  "items": {
+    "artifact": {
+      "basePrice": 500,
+      "priceVariation": 0.0
+    },
+    "consumable": {
+      "basePriceMin": 50,
+      "basePriceMax": 100,
+      "priceVariation": 0.0
+    },
+    "cat": {
+      "basePrices": {
+        "0": 100,
+        "1": 80,
+        "2": 120,
+        "3": 100,
+        "4": 90,
+        "5": 110
+      },
+      "qualityBonusMultipliers": {
+        "0": 1.0,
+        "1": 2.0,
+        "2": 4.0,
+        "3": 8.0
+      },
+      "priceVariation": 0.5
+    }
+  },
+  "sellPrices": {
+    "consumable": 0.5
+  }
+}

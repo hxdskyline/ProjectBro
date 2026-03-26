@@ -91,7 +91,15 @@ public class DataManager : MonoBehaviour
         _playerData.currencies = new System.Collections.Generic.List<CurrencyData>();
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Gold), 0, false);
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond), 0, false);
-        
+
+        // Initialize TribeSystem fields
+        _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
+        _playerData.currentRound = 1;
+        _playerData.catFood = 1000; // Initial cat food
+        _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
+        _playerData.shopRefreshCount = 0;
+        _playerData.lastShopRound = 0;
+
         SavePlayerData();
         Debug.Log("[DataManager] New player data created");
     }
@@ -263,6 +271,146 @@ public class DataManager : MonoBehaviour
         return blessing;
     }
 
+    // --- TribeSystem persistence helpers ---
+    public TribeSystem.TribeRecord AddTribe(TribeSystem.TribeRecord tribe, bool saveImmediately = true)
+    {
+        if (_playerData == null || tribe == null) return null;
+        EnsurePlayerDataDefaults();
+        if (tribe.tribeId < 0) tribe.tribeId = _playerData.tribes.Count;
+        _playerData.tribes.Add(tribe);
+        if (saveImmediately) SavePlayerData();
+        return tribe;
+    }
+
+    public System.Collections.Generic.List<TribeSystem.TribeRecord> GetTribes()
+    {
+        if (_playerData == null) return null;
+        EnsurePlayerDataDefaults();
+        return _playerData.tribes;
+    }
+
+    public TribeSystem.TribeRecord GetTribe(int tribeId)
+    {
+        if (_playerData == null) return null;
+        EnsurePlayerDataDefaults();
+        return _playerData.tribes.Find(t => t != null && t.tribeId == tribeId);
+    }
+
+    public bool RemoveTribe(int tribeId, bool saveImmediately = true)
+    {
+        if (_playerData == null) return false;
+        EnsurePlayerDataDefaults();
+        var tribe = _playerData.tribes.Find(t => t != null && t.tribeId == tribeId);
+        if (tribe == null) return false;
+        _playerData.tribes.Remove(tribe);
+        if (saveImmediately) SavePlayerData();
+        return true;
+    }
+
+    public int GetCurrentRound()
+    {
+        if (_playerData == null) return 1;
+        EnsurePlayerDataDefaults();
+        return _playerData.currentRound;
+    }
+
+    public void SetCurrentRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.currentRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public long GetCatFood()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.catFood;
+    }
+
+    public void SetCatFood(long amount, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.catFood = amount;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public void AddCatFood(long amount, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.catFood += amount;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public bool TrySpendCatFood(long amount, bool saveImmediately = true)
+    {
+        if (_playerData == null) return false;
+        EnsurePlayerDataDefaults();
+        if (_playerData.catFood < amount) return false;
+        _playerData.catFood -= amount;
+        if (saveImmediately) SavePlayerData();
+        return true;
+    }
+
+    public void UnlockAccessory(string accessoryId, bool saveImmediately = true)
+    {
+        if (_playerData == null || string.IsNullOrEmpty(accessoryId)) return;
+        EnsurePlayerDataDefaults();
+        if (!_playerData.unlockedAccessories.Contains(accessoryId))
+        {
+            _playerData.unlockedAccessories.Add(accessoryId);
+            if (saveImmediately) SavePlayerData();
+        }
+    }
+
+    public bool IsAccessoryUnlocked(string accessoryId)
+    {
+        if (_playerData == null || string.IsNullOrEmpty(accessoryId)) return false;
+        EnsurePlayerDataDefaults();
+        return _playerData.unlockedAccessories.Contains(accessoryId);
+    }
+
+    public int GetShopRefreshCount()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.shopRefreshCount;
+    }
+
+    public void SetShopRefreshCount(int count, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.shopRefreshCount = count;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public void IncrementShopRefreshCount(bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.shopRefreshCount++;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public int GetLastShopRound()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.lastShopRound;
+    }
+
+    public void SetLastShopRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.lastShopRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
     public int GetLastStandCount()
     {
         if (_playerData == null) return 0;
@@ -295,7 +443,18 @@ public class DataManager : MonoBehaviour
             _playerData.currencies = new System.Collections.Generic.List<CurrencyData>();
         }
 
-        // Ensure new persistent collections exist for CatSystem integration
+        // Ensure TribeSystem collections exist
+        if (_playerData.tribes == null)
+        {
+            _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
+        }
+
+        if (_playerData.unlockedAccessories == null)
+        {
+            _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
+        }
+
+        // Ensure new persistent collections exist for CatSystem integration (legacy)
         if (_playerData.catRoster == null)
         {
             _playerData.catRoster = new System.Collections.Generic.List<CatRecord>();
@@ -376,12 +535,27 @@ public class PlayerData
     public long diamond;
     public long lastSaveTime;
     public System.Collections.Generic.List<CurrencyData> currencies;
-    // Cat system persistent fields
+
+    // TribeSystem persistent fields (NEW)
+    public System.Collections.Generic.List<TribeSystem.TribeRecord> tribes;
+    public int currentRound;
+    public long catFood;
+    public System.Collections.Generic.List<string> unlockedAccessories;
+    public int shopRefreshCount;
+    public int lastShopRound;
+
+    // Legacy Cat system persistent fields (kept for compatibility, marked obsolete)
+    [System.Obsolete("Use TribeSystem instead")]
     public System.Collections.Generic.List<CatRecord> catRoster;
+    [System.Obsolete("Use TribeSystem instead")]
     public System.Collections.Generic.List<OutingRequestRecord> outingRequests;
+    [System.Obsolete("Use TribeSystem instead")]
     public System.Collections.Generic.List<PlayerArtifactInstance> playerArtifacts;
+    [System.Obsolete("Use TribeSystem instead")]
     public System.Collections.Generic.List<RitualResultRecord> ritualHistory;
+    [System.Obsolete("Use TribeSystem instead")]
     public System.Collections.Generic.List<BlessingRecord> blessings;
+    [System.Obsolete("Use TribeSystem instead")]
     public ShopSessionRecord shopSession;
     public int lastStandCount;
 }

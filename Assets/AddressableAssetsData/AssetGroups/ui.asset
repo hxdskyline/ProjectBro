@@ -15,15 +15,20 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 60c1c6ef663cf5e44a6ff840e887aa09
+  m_GUID: 43f94bcf0924f7341a83071fe3eb3275
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3e8df68d086f9ff4fb35bb78bad38dcc
-    m_Address: ui/cardbuild/discardpanel
+  - m_GUID: 36d55bbd7dd148b47a136c28a9a9e69a
+    m_Address: ui/tribebuild/shoppanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3d550a5e6840fd74eadd04e286e72bb4
+    m_Address: ui/tribebuild/recruitmentpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -42,8 +47,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 87a913d856eb00b47afa3504280980e5
-    m_Address: ui/carditem
+  - m_GUID: 805a67ddf1563d74bb4c3d06fb3a7bae
+    m_Address: ui/tribebuild/tribecard
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -52,8 +57,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8b8688504f129174bbd468848be3caac
-    m_Address: ui/cardbuildpanel
+  - m_GUID: 93dd7b94f8b9ebc4b935dec0d3dc18f2
+    m_Address: ui/tribebuild/tribedetailtips
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -67,8 +72,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: af288c72fff1f7f41bc6502b6fe0136a
-    m_Address: ui/cardbuild/blessingpanel
+  - m_GUID: aead1aac3a3bad74ebc9732087475583
+    m_Address: ui/tribebuild/ritualpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -87,23 +92,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d9733a5d97164ff45b501f2b586a662f
-    m_Address: ui/cardbuild/attributeboostpanel
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e68d587aeaf7c2a44ac2f03a8933ae50
-    m_Address: ui/cardbuild/outingpanel
+  - m_GUID: e2ea3837121c5ad4d88f266c22f422b7
+    m_Address: ui/tribebuild/tribebuildpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e800269ee798b164895818d9d00ea771
     m_Address: ui/texture/buildbg
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: eb8b42ba21d8f07489b3284b4ee60d60
-    m_Address: ui/cardbuild/readme
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

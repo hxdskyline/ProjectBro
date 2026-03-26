@@ -1,43 +1,39 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TribeSystem;
+using TribeSystem.UI;
 
 /// <summary>
-/// 战前准备界面。
+/// 战前准备界面 - 族群系统版本
 /// </summary>
 public class BattlePreparePanel : UIPanel
 {
-    private const int RequiredOutingCardCount = 2;
     private const string RootName = "PrepareContentRoot";
     private const string TitleName = "PrepareTitleText";
     private const string SummaryName = "PrepareSummaryText";
     private const string StatusName = "PrepareStatusText";
-    private const string OwnedRootName = "OwnedCardsRoot";
-    private const string DeployedRootName = "DeployedCardsRoot";
+    private const string OwnedRootName = "OwnedTribesRoot";
+    private const string DeployedRootName = "DeployedTribesRoot";
     private const string EnemyRootName = "EnemyCardsRoot";
     private const string StartButtonName = "PrepareStartButton";
     private const string BackButtonName = "PrepareBackButton";
 
-    private readonly List<CardBuildCardData> _ownedCards = new List<CardBuildCardData>();
-    private readonly List<CardBuildCardData> _deployedCards = new List<CardBuildCardData>();
-    private readonly HashSet<int> _outingCardIds = new HashSet<int>();
-    private readonly HashSet<int> _blessingCardIds = new HashSet<int>();
+    private readonly List<TribeRecord> _ownedTribes = new List<TribeRecord>();
+    private readonly List<TribeRecord> _deployedTribes = new List<TribeRecord>();
 
     [SerializeField] private Text _titleText;
     [SerializeField] private Text _summaryText;
     [SerializeField] private Text _statusText;
     [SerializeField] private Button _startBattleButton;
     [SerializeField] private Button _backButton;
-    [SerializeField] private RectTransform _ownedCardsRoot;
-    [SerializeField] private RectTransform _deployedCardsRoot;
+    [SerializeField] private RectTransform _ownedTribesRoot;
+    [SerializeField] private RectTransform _deployedTribesRoot;
     [SerializeField] private RectTransform _enemyCardsRoot;
     private Font _uiFont;
 
     private int _currentLevel;
-    private bool _grantOutingRewardOnBattleEnd;
-    private bool _consumeBlessingOnBattleEnd;
-    private bool _grantAttributeBoostOnBattleEnd;
-    private int _maxDeployedCount = 5;
+    private int _maxDeployedCount = 6;
 
     public override void Initialize()
     {
@@ -61,116 +57,61 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
+    /// <summary>
+    /// 设置战斗准备 - 新族群系统
+    /// </summary>
     public void SetupBattle(
         int levelId,
-        CardBuildCardData[] allOwnedCards,
-        CardBuildCardData[] defaultDeployedCards,
-        int[] outingCardIds,
-        int[] blessingCardIds,
-        bool grantOutingRewardOnBattleEnd,
-        bool consumeBlessingOnBattleEnd,
-        bool grantAttributeBoostOnBattleEnd,
+        List<TribeRecord> allTribes,
+        List<TribeRecord> defaultDeployedTribes,
         int maxDeployedCount)
     {
         _currentLevel = levelId;
-        _grantOutingRewardOnBattleEnd = grantOutingRewardOnBattleEnd;
-        _consumeBlessingOnBattleEnd = consumeBlessingOnBattleEnd;
-        _grantAttributeBoostOnBattleEnd = grantAttributeBoostOnBattleEnd;
         _maxDeployedCount = Mathf.Max(1, maxDeployedCount);
 
-        _ownedCards.Clear();
-        _deployedCards.Clear();
-        _outingCardIds.Clear();
-        _blessingCardIds.Clear();
+        _ownedTribes.Clear();
+        _deployedTribes.Clear();
 
-        if (outingCardIds != null && outingCardIds.Length == RequiredOutingCardCount)
+        if (allTribes != null)
         {
-            for (int i = 0; i < outingCardIds.Length; i++)
-            {
-                _outingCardIds.Add(outingCardIds[i]);
-            }
+            _ownedTribes.AddRange(allTribes);
         }
 
-        if (blessingCardIds != null)
+        if (defaultDeployedTribes != null)
         {
-            for (int i = 0; i < blessingCardIds.Length; i++)
+            foreach (TribeRecord tribe in defaultDeployedTribes)
             {
-                _blessingCardIds.Add(blessingCardIds[i]);
-            }
-        }
-
-        if (allOwnedCards != null)
-        {
-            _ownedCards.AddRange(allOwnedCards);
-        }
-
-        if (defaultDeployedCards != null)
-        {
-            for (int i = 0; i < defaultDeployedCards.Length; i++)
-            {
-                CardBuildCardData card = defaultDeployedCards[i];
-                RemoveCardById(_ownedCards, card.Id);
-                _deployedCards.Add(card);
+                RemoveTribeById(_ownedTribes, tribe.tribeId);
+                _deployedTribes.Add(tribe);
             }
         }
 
         RefreshUI();
     }
 
-    public void HandleCardDrop(PrepareCardDragItem dragItem, PrepareCardZoneType targetZone)
+    public void HandleTribeClick(TribeRecord tribe)
     {
-        dragItem.gameObject.SendMessage("ForceCleanupDragVisual", SendMessageOptions.DontRequireReceiver);
+        PrepareTribeZoneType fromZone = _deployedTribes.Contains(tribe)
+            ? PrepareTribeZoneType.Deployed
+            : PrepareTribeZoneType.Owned;
 
-        CardBuildCardData card = dragItem.CardData;
-        PrepareCardZoneType fromZone = dragItem.ZoneType;
-        if (fromZone == targetZone)
+        PrepareTribeZoneType targetZone = fromZone == PrepareTribeZoneType.Deployed
+            ? PrepareTribeZoneType.Owned
+            : PrepareTribeZoneType.Deployed;
+
+        if (targetZone == PrepareTribeZoneType.Deployed && _deployedTribes.Count >= _maxDeployedCount)
         {
-            RebuildCardViews();
+            SetStatusText($"上阵区已满，最多 {_maxDeployedCount} 个族群。", true);
             return;
         }
 
-        if (targetZone == PrepareCardZoneType.Deployed && _deployedCards.Count >= _maxDeployedCount)
+        if (targetZone == PrepareTribeZoneType.Deployed && IsLeaderResting(tribe))
         {
-            SetStatusText($"上阵区已满，最多 {_maxDeployedCount} 只猫咪。", true);
-            RebuildCardViews();
+            SetStatusText($"{GetTribeTypeName(tribe.tribeType)}族长正在休息，无法上阵。", true);
             return;
         }
 
-        if (targetZone == PrepareCardZoneType.Deployed && IsOutingCard(card.Id))
-        {
-            SetStatusText($"{card.Name} 正在游历中，本场只能停留在待选区。", true);
-            RebuildCardViews();
-            return;
-        }
-
-        if (!MoveCardBetweenZones(fromZone, targetZone, card.Id))
-        {
-            RebuildCardViews();
-            return;
-        }
-
-        RefreshUI();
-    }
-
-    public void HandleCardClick(CardBuildCardData card, PrepareCardZoneType fromZone)
-    {
-        PrepareCardZoneType targetZone = fromZone == PrepareCardZoneType.Deployed
-            ? PrepareCardZoneType.Owned
-            : PrepareCardZoneType.Deployed;
-
-        if (targetZone == PrepareCardZoneType.Deployed && _deployedCards.Count >= _maxDeployedCount)
-        {
-            SetStatusText($"上阵区已满，最多 {_maxDeployedCount} 只猫咪。", true);
-            return;
-        }
-
-        if (targetZone == PrepareCardZoneType.Deployed && IsOutingCard(card.Id))
-        {
-            SetStatusText($"{card.Name} 正在游历中，本场不能加入出战区。", true);
-            return;
-        }
-
-        if (!MoveCardBetweenZones(fromZone, targetZone, card.Id))
+        if (!MoveTribeBetweenZones(fromZone, targetZone, tribe.tribeId))
         {
             return;
         }
@@ -181,7 +122,7 @@ public class BattlePreparePanel : UIPanel
     private void RefreshUI()
     {
         RefreshTexts();
-        RebuildCardViews();
+        RebuildTribeViews();
         RebuildEnemyViews();
     }
 
@@ -189,45 +130,50 @@ public class BattlePreparePanel : UIPanel
     {
         if (_titleText != null)
         {
-            _titleText.text = $"站前准备  Battle {_currentLevel}";
+            _titleText.text = $"战前准备  Battle {_currentLevel}";
+        }
+
+        // 计算上阵小猫总数
+        int totalCatCount = 0;
+        int restingLeaderCount = 0;
+        foreach (TribeRecord tribe in _deployedTribes)
+        {
+            totalCatCount += tribe.GetCatCount();
+            if (tribe.leader?.restTurns > 0)
+            {
+                restingLeaderCount++;
+            }
         }
 
         if (_summaryText != null)
         {
             _summaryText.text =
-                $"持有猫咪: {_ownedCards.Count + _deployedCards.Count}    " +
-                $"上阵: {_deployedCards.Count}/{_maxDeployedCount}    " +
-                $"游历生效: {(_outingCardIds.Count == RequiredOutingCardCount ? "是" : "否")}    " +
-                $"赐福中: {_blessingCardIds.Count}    " +
-                $"敌人: {ResolveEnemyCount(_currentLevel)}    " +
-                $"外出结算: {(_grantOutingRewardOnBattleEnd ? "开" : "关")}    " +
-                $"赐福消耗: {(_consumeBlessingOnBattleEnd ? "开" : "关")}    " +
-                $"强化结算: {(_grantAttributeBoostOnBattleEnd ? "开" : "关")}";
+                $"持有族群: {_ownedTribes.Count + _deployedTribes.Count}    " +
+                $"上阵: {_deployedTribes.Count}/{_maxDeployedCount}    " +
+                $"上阵小猫: {totalCatCount}    " +
+                $"休息族长: {restingLeaderCount}    " +
+                $"敌人: {ResolveEnemyCount(_currentLevel)}";
         }
 
         if (_statusText != null && string.IsNullOrEmpty(_statusText.text))
         {
-            _statusText.text = _outingCardIds.Count == RequiredOutingCardCount
-                ? "带有“游历中”标记的猫咪无法拖入上阵区。"
-                : _blessingCardIds.Count > 0
-                    ? "带有“赐福”标记的猫咪会在本场战斗获得临时强化。"
-                    : "把猫咪拖入上阵区，右侧查看本场敌人列表。";
+            _statusText.text = "点击族群卡片进行上阵/下阵操作。族长休息中的族群无法上阵。";
         }
     }
 
-    private void RebuildCardViews()
+    private void RebuildTribeViews()
     {
-        ClearChildren(_ownedCardsRoot);
-        ClearChildren(_deployedCardsRoot);
+        ClearChildren(_ownedTribesRoot);
+        ClearChildren(_deployedTribesRoot);
 
-        for (int i = 0; i < _ownedCards.Count; i++)
+        for (int i = 0; i < _ownedTribes.Count; i++)
         {
-            CreateCardItem(_ownedCardsRoot, _ownedCards[i], PrepareCardZoneType.Owned);
+            CreateTribeCard(_ownedTribesRoot, _ownedTribes[i], PrepareTribeZoneType.Owned);
         }
 
-        for (int i = 0; i < _deployedCards.Count; i++)
+        for (int i = 0; i < _deployedTribes.Count; i++)
         {
-            CreateCardItem(_deployedCardsRoot, _deployedCards[i], PrepareCardZoneType.Deployed);
+            CreateTribeCard(_deployedTribesRoot, _deployedTribes[i], PrepareTribeZoneType.Deployed);
         }
     }
 
@@ -252,16 +198,14 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
-    private void CreateCardItem(RectTransform parent, CardBuildCardData cardData, PrepareCardZoneType zoneType)
+    private void CreateTribeCard(RectTransform parent, TribeRecord tribe, PrepareTribeZoneType zoneType)
     {
-        bool isOutingCard = IsOutingCard(cardData.Id);
-        bool isBlessingCard = IsBlessingCard(cardData.Id);
-        GameObject cardGo = new GameObject($"PrepareCard_{cardData.Id}",
+        bool isLeaderResting = IsLeaderResting(tribe);
+        GameObject cardGo = new GameObject($"PrepareTribe_{tribe.tribeId}",
             typeof(RectTransform),
             typeof(Image),
             typeof(LayoutElement),
-            typeof(CanvasGroup),
-            typeof(PrepareCardDragItem));
+            typeof(Button));
         cardGo.transform.SetParent(parent, false);
 
         RectTransform cardRect = cardGo.GetComponent<RectTransform>();
@@ -270,47 +214,42 @@ public class BattlePreparePanel : UIPanel
         cardRect.pivot = new Vector2(0.5f, 1f);
 
         LayoutElement layoutElement = cardGo.GetComponent<LayoutElement>();
-        layoutElement.minHeight = 96f;
-        layoutElement.preferredHeight = 96f;
+        layoutElement.minHeight = 110f;
+        layoutElement.preferredHeight = 110f;
         layoutElement.flexibleWidth = 1f;
 
         Image cardBg = cardGo.GetComponent<Image>();
-        cardBg.color = ResolveCardBackgroundColor(zoneType, isOutingCard, isBlessingCard);
+        cardBg.color = ResolveTribeCardBackgroundColor(zoneType, isLeaderResting, tribe.tribeType);
 
-        Sprite portraitSprite = CardPortraitResolver.ResolvePortrait(cardData.AvatarDefinitionAddress);
-        if (portraitSprite != null)
-        {
-            CreateCardPortrait(cardGo.transform, portraitSprite);
-        }
+        // 绑定点击事件
+        Button cardButton = cardGo.GetComponent<Button>();
+        TribeRecord capturedTribe = tribe; // 捕获变量
+        cardButton.onClick.AddListener(() => HandleTribeClick(capturedTribe));
 
-        Text nameText = CreateCardText(cardGo.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 18);
-        nameText.alignment = TextAnchor.UpperLeft;
-
-        Text statText = CreateCardText(cardGo.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 14);
-        statText.alignment = TextAnchor.LowerLeft;
-
-        PrepareCardDragItem dragItem = cardGo.GetComponent<PrepareCardDragItem>();
-        dragItem.BindTextRefs(nameText, statText);
-        dragItem.Initialize(this, cardData, zoneType, isOutingCard, isBlessingCard);
+        // 创建卡片内容
+        CreateTribeCardContent(cardRect, tribe);
     }
 
-    private static void CreateCardPortrait(Transform parent, Sprite portraitSprite)
+    private void CreateTribeCardContent(RectTransform cardRect, TribeRecord tribe)
     {
-        GameObject portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
-        portraitGo.transform.SetParent(parent, false);
-        portraitGo.transform.SetAsFirstSibling();
+        // 族群名称
+        Text nameText = CreateCardText(cardRect.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 18);
+        nameText.alignment = TextAnchor.UpperLeft;
+        nameText.text = $"{GetTribeTypeName(tribe.tribeType)}族 (ID:{tribe.tribeId})";
 
-        RectTransform portraitRect = portraitGo.GetComponent<RectTransform>();
-        portraitRect.anchorMin = Vector2.zero;
-        portraitRect.anchorMax = Vector2.one;
-        portraitRect.offsetMin = new Vector2(8f, 8f);
-        portraitRect.offsetMax = new Vector2(-8f, -8f);
+        // 族长状态和小猫信息
+        string statusInfo = $"族长: {(tribe.leader?.restTurns > 0 ? $"休息中({tribe.leader.restTurns}回)" : "可出战")}  小猫: {tribe.GetCatCount()}只";
+        Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 14);
+        statText.alignment = TextAnchor.LowerLeft;
+        statText.text = statusInfo;
 
-        Image portraitImage = portraitGo.GetComponent<Image>();
-        portraitImage.sprite = portraitSprite;
-        portraitImage.preserveAspect = true;
-        portraitImage.color = new Color(1f, 1f, 1f, 0.38f);
-        portraitImage.raycastTarget = false;
+        // 族长属性简略
+        if (tribe.leader != null)
+        {
+            Text detailText = CreateCardText(cardRect.transform, "Detail", new Vector2(0f, 0.5f), new Vector2(1f, 0.8f), new Vector2(10f, 0f), 12);
+            detailText.alignment = TextAnchor.MiddleLeft;
+            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 速{tribe.leader.baseSpeed} 统{tribe.leader.command}";
+        }
     }
 
     private void CreateEnemyItem(RectTransform parent, int displayIndex, int enemyUnitId)
@@ -367,10 +306,20 @@ public class BattlePreparePanel : UIPanel
 
     private void OnStartBattleClicked()
     {
-        if (_deployedCards.Count == 0)
+        if (_deployedTribes.Count == 0)
         {
-            SetStatusText("至少需要上阵 1 只猫咪。", true);
+            SetStatusText("至少需要上阵 1 个族群。", true);
             return;
+        }
+
+        // 检查是否有族长在休息
+        foreach (TribeRecord tribe in _deployedTribes)
+        {
+            if (IsLeaderResting(tribe))
+            {
+                SetStatusText($"{GetTribeTypeName(tribe.tribeType)}族长正在休息，无法出战。", true);
+                return;
+            }
         }
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePreparePanel");
@@ -378,20 +327,24 @@ public class BattlePreparePanel : UIPanel
         BattlePanel battlePanel = GameManager.Instance.UIManager.ShowPanel<BattlePanel>("ui/BattlePanel", UIManager.UILayer.Normal);
         if (battlePanel != null)
         {
-            battlePanel.StartBattle(
-                _currentLevel,
-                _deployedCards.ToArray(),
-                BuildBlessingCardIdSnapshot(),
-                _grantOutingRewardOnBattleEnd,
-                _consumeBlessingOnBattleEnd,
-                _grantAttributeBoostOnBattleEnd);
+            battlePanel.StartBattle(_currentLevel, new List<TribeRecord>(_deployedTribes));
         }
     }
 
     private void OnBackClicked()
     {
         GameManager.Instance.UIManager.HidePanel("ui/BattlePreparePanel");
-        GameManager.Instance.UIManager.ShowPanel<CardBuildPanel>("ui/CardBuildPanel", UIManager.UILayer.Normal);
+        // 返回族群构筑界面
+        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/TribeBuildPanel");
+        if (tribeBuildPanel != null)
+        {
+            tribeBuildPanel.gameObject.SetActive(true);
+        }
+        else
+        {
+            // 如果找不到面板，尝试显示
+            GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/TribeBuildPanel", UIManager.UILayer.Normal);
+        }
     }
 
     private void EnsureRuntimeLayout()
@@ -404,17 +357,15 @@ public class BattlePreparePanel : UIPanel
         Image backgroundImage = GetOrAddComponent<Image>(gameObject);
         backgroundImage.color = new Color(0.06f, 0.09f, 0.14f, 0.96f);
 
-        // Prefer prefab-provided root (set via inspector). If missing, try to find child by name; if still missing, create fallback but log a warning.
         RectTransform contentRoot = panelRect.Find(RootName) as RectTransform;
         if (contentRoot == null)
         {
             contentRoot = GetOrCreateChildRect(panelRect, RootName, new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.95f));
             Image contentBackgroundFallback = GetOrAddComponent<Image>(contentRoot.gameObject);
             contentBackgroundFallback.color = new Color(0.87f, 0.91f, 0.96f, 0.98f);
-            Debug.LogWarning("[BattlePreparePanel] Content root not found on prefab; created runtime fallback. Prefer placing UI in prefab.");
+            Debug.LogWarning("[BattlePreparePanel] Content root not found on prefab; created runtime fallback.");
         }
 
-        // Title / summary / status: prefer serialized fields or find existing children
         if (_titleText == null)
         {
             var tf = contentRoot.Find(TitleName);
@@ -448,24 +399,23 @@ public class BattlePreparePanel : UIPanel
             Debug.LogWarning("[BattlePreparePanel] Status text not found on prefab; created runtime fallback.");
         }
 
-        // Card list roots: prefer serialized fields or find existing children
-        if (_ownedCardsRoot == null)
+        if (_ownedTribesRoot == null)
         {
-            _ownedCardsRoot = contentRoot.Find(OwnedRootName) as RectTransform;
-            if (_ownedCardsRoot == null)
+            _ownedTribesRoot = contentRoot.Find(OwnedRootName) as RectTransform;
+            if (_ownedTribesRoot == null)
             {
-                _ownedCardsRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有猫咪", new Vector2(0.03f, 0.16f), new Vector2(0.32f, 0.75f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
-                Debug.LogWarning("[BattlePreparePanel] OwnedCardsRoot not found on prefab; created runtime fallback.");
+                _ownedTribesRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有族群", new Vector2(0.03f, 0.16f), new Vector2(0.32f, 0.75f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
+                Debug.LogWarning("[BattlePreparePanel] OwnedTribesRoot not found on prefab; created runtime fallback.");
             }
         }
 
-        if (_deployedCardsRoot == null)
+        if (_deployedTribesRoot == null)
         {
-            _deployedCardsRoot = contentRoot.Find(DeployedRootName) as RectTransform;
-            if (_deployedCardsRoot == null)
+            _deployedTribesRoot = contentRoot.Find(DeployedRootName) as RectTransform;
+            if (_deployedTribesRoot == null)
             {
-                _deployedCardsRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.16f), new Vector2(0.645f, 0.75f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
-                Debug.LogWarning("[BattlePreparePanel] DeployedCardsRoot not found on prefab; created runtime fallback.");
+                _deployedTribesRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.16f), new Vector2(0.645f, 0.75f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
+                Debug.LogWarning("[BattlePreparePanel] DeployedTribesRoot not found on prefab; created runtime fallback.");
             }
         }
 
@@ -479,7 +429,6 @@ public class BattlePreparePanel : UIPanel
             }
         }
 
-        // Buttons: prefer serialized fields or find existing children
         if (_backButton == null)
         {
             var btTf = contentRoot.Find(BackButtonName);
@@ -505,22 +454,20 @@ public class BattlePreparePanel : UIPanel
 
     private void EnsureDropZones()
     {
-        BattlePrepareOwnedDropZone ownedDropZone = GetOrAddComponent<BattlePrepareOwnedDropZone>(_ownedCardsRoot.gameObject);
-        ownedDropZone.Initialize(this);
-
-        BattlePrepareDeployedDropZone deployedDropZone = GetOrAddComponent<BattlePrepareDeployedDropZone>(_deployedCardsRoot.gameObject);
-        deployedDropZone.Initialize(this);
+        // 族群系统不需要拖放区域，使用点击切换
     }
 
     private void EnsureZoneLayouts()
     {
-        ConfigureVerticalLayout(_ownedCardsRoot);
-        ConfigureVerticalLayout(_deployedCardsRoot);
+        ConfigureVerticalLayout(_ownedTribesRoot);
+        ConfigureVerticalLayout(_deployedTribesRoot);
         ConfigureVerticalLayout(_enemyCardsRoot);
     }
 
     private static void ConfigureVerticalLayout(RectTransform zoneRoot)
     {
+        if (zoneRoot == null) return;
+
         HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
         if (oldHorizontal != null)
         {
@@ -559,7 +506,6 @@ public class BattlePreparePanel : UIPanel
         {
             component = gameObject.AddComponent<T>();
         }
-
         return component;
     }
 
@@ -638,56 +584,53 @@ public class BattlePreparePanel : UIPanel
         return button;
     }
 
-    private bool MoveCardBetweenZones(PrepareCardZoneType fromZone, PrepareCardZoneType targetZone, int cardId)
+    private bool MoveTribeBetweenZones(PrepareTribeZoneType fromZone, PrepareTribeZoneType targetZone, int tribeId)
     {
-        List<CardBuildCardData> fromList = GetZoneList(fromZone);
-        List<CardBuildCardData> targetList = GetZoneList(targetZone);
+        List<TribeRecord> fromList = GetZoneList(fromZone);
+        List<TribeRecord> targetList = GetZoneList(targetZone);
         if (fromList == null || targetList == null)
         {
             return false;
         }
 
-        return MoveCardById(fromList, targetList, cardId);
+        return MoveTribeById(fromList, targetList, tribeId);
     }
 
-    private List<CardBuildCardData> GetZoneList(PrepareCardZoneType zoneType)
+    private List<TribeRecord> GetZoneList(PrepareTribeZoneType zoneType)
     {
-        if (zoneType == PrepareCardZoneType.Deployed)
+        if (zoneType == PrepareTribeZoneType.Deployed)
         {
-            return _deployedCards;
+            return _deployedTribes;
         }
-
-        return _ownedCards;
+        return _ownedTribes;
     }
 
-    private static bool MoveCardById(List<CardBuildCardData> from, List<CardBuildCardData> to, int cardId)
+    private static bool MoveTribeById(List<TribeRecord> from, List<TribeRecord> to, int tribeId)
     {
         for (int i = 0; i < from.Count; i++)
         {
-            if (from[i].Id != cardId)
+            if (from[i].tribeId != tribeId)
             {
                 continue;
             }
 
-            CardBuildCardData card = from[i];
+            TribeRecord tribe = from[i];
             from.RemoveAt(i);
-            to.Add(card);
+            to.Add(tribe);
             return true;
         }
-
         return false;
     }
 
-    private static void RemoveCardById(List<CardBuildCardData> cards, int cardId)
+    private static void RemoveTribeById(List<TribeRecord> tribes, int tribeId)
     {
-        for (int i = 0; i < cards.Count; i++)
+        for (int i = 0; i < tribes.Count; i++)
         {
-            if (cards[i].Id != cardId)
+            if (tribes[i].tribeId != tribeId)
             {
                 continue;
             }
-
-            cards.RemoveAt(i);
+            tribes.RemoveAt(i);
             return;
         }
     }
@@ -712,7 +655,6 @@ public class BattlePreparePanel : UIPanel
         {
             return 1;
         }
-
         return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
     }
 
@@ -731,50 +673,52 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
-    private bool IsOutingCard(int cardId)
+    private bool IsLeaderResting(TribeRecord tribe)
     {
-        return _outingCardIds.Contains(cardId);
+        return tribe.leader != null && tribe.leader.restTurns > 0;
     }
 
-    private bool IsBlessingCard(int cardId)
+    private Color ResolveTribeCardBackgroundColor(PrepareTribeZoneType zoneType, bool isLeaderResting, TribeType tribeType)
     {
-        return _blessingCardIds.Contains(cardId);
+        if (isLeaderResting)
+        {
+            return new Color(0.4f, 0.25f, 0.25f, 0.95f); // 红色调 - 无法上阵
+        }
+
+        if (zoneType == PrepareTribeZoneType.Deployed)
+        {
+            return new Color(0.22f, 0.5f, 0.3f, 0.95f); // 绿色调 - 已上阵
+        }
+
+        return GetTribeTypeColor(tribeType);
     }
 
-    private int[] BuildBlessingCardIdSnapshot()
+    private Color GetTribeTypeColor(TribeType type)
     {
-        List<int> deployedBlessingIds = new List<int>();
-        for (int i = 0; i < _deployedCards.Count; i++)
+        switch (type)
         {
-            if (_blessingCardIds.Contains(_deployedCards[i].Id))
-            {
-                deployedBlessingIds.Add(_deployedCards[i].Id);
-            }
+            case TribeType.Maine: return new Color(0.3f, 0.5f, 0.7f, 0.95f);
+            case TribeType.Tabby: return new Color(0.6f, 0.4f, 0.3f, 0.95f);
+            case TribeType.Orange: return new Color(0.7f, 0.5f, 0.2f, 0.95f);
+            case TribeType.Cow: return new Color(0.4f, 0.4f, 0.5f, 0.95f);
+            case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 0.95f);
+            case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 0.95f);
+            default: return new Color(0.5f, 0.5f, 0.5f, 0.95f);
         }
-
-        return deployedBlessingIds.ToArray();
     }
 
-    private static Color ResolveCardBackgroundColor(PrepareCardZoneType zoneType, bool isOutingCard, bool isBlessingCard)
+    private string GetTribeTypeName(TribeType type)
     {
-        if (zoneType == PrepareCardZoneType.Deployed)
+        switch (type)
         {
-            return isBlessingCard
-                ? new Color(0.73f, 0.59f, 0.17f, 0.95f)
-                : new Color(0.22f, 0.5f, 0.3f, 0.95f);
+            case TribeType.Maine: return "缅因";
+            case TribeType.Tabby: return "狸花";
+            case TribeType.Orange: return "大橘";
+            case TribeType.Cow: return "奶牛";
+            case TribeType.Siamese: return "暹罗";
+            case TribeType.Ragdoll: return "布偶";
+            default: return type.ToString();
         }
-
-        if (isOutingCard)
-        {
-            return new Color(0.58f, 0.39f, 0.12f, 0.95f);
-        }
-
-        if (isBlessingCard)
-        {
-            return new Color(0.66f, 0.52f, 0.16f, 0.95f);
-        }
-
-        return new Color(0.19f, 0.29f, 0.47f, 0.95f);
     }
 
     private void SetStatusText(string message, bool overwrite)
@@ -797,7 +741,15 @@ public class BattlePreparePanel : UIPanel
         {
             return font;
         }
-
         return Resources.GetBuiltinResource<Font>("Arial.ttf");
     }
+}
+
+/// <summary>
+/// 族群战备区域类型
+/// </summary>
+public enum PrepareTribeZoneType
+{
+    Owned,
+    Deployed
 }

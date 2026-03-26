@@ -1,0 +1,113 @@
+{
+  "tiers": [
+    {
+      "tierName": "free",
+      "costRange": [0, 0],
+      "rewardCount": [1, 2],
+      "rewards": [
+        {
+          "type": "LeaderStatBoostTemporary",
+          "weight": 30,
+          "statTypes": ["attack", "defense", "hp", "speed"],
+          "minAmount": 10,
+          "maxAmount": 50
+        },
+        {
+          "type": "Cats",
+          "weight": 40,
+          "qualities": ["white"],
+          "minCount": 1,
+          "maxCount": 3
+        },
+        {
+          "type": "Consumable",
+          "weight": 20,
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "type": "CatFood",
+          "weight": 10,
+          "minAmount": 1,
+          "maxAmount": 100
+        }
+      ]
+    },
+    {
+      "tierName": "low",
+      "costRange": [50, 150],
+      "rewardCount": [1, 2],
+      "rewards": [
+        {
+          "type": "LeaderStatBoostPermanent",
+          "weight": 25,
+          "statTypes": ["attack", "defense", "hp", "speed", "command"],
+          "minAmount": 5,
+          "maxAmount": 20
+        },
+        {
+          "type": "Cats",
+          "weight": 35,
+          "qualities": ["blue", "purple"],
+          "qualityChance": 0.5,
+          "minCount": 1,
+          "maxCount": 3
+        },
+        {
+          "type": "Consumable",
+          "weight": 25,
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "type": "CatFood",
+          "weight": 15,
+          "multiplierMin": 2.0,
+          "multiplierMax": 5.0
+        }
+      ]
+    },
+    {
+      "tierName": "high",
+      "costRange": [400, 600],
+      "rewardCount": [1, 2],
+      "rewards": [
+        {
+          "type": "LeaderStatBoostPercent",
+          "weight": 20,
+          "statTypes": ["attack", "defense", "hp", "speed", "command"],
+          "minPercent": 0.05,
+          "maxPercent": 0.15
+        },
+        {
+          "type": "Cats",
+          "weight": 30,
+          "qualities": ["purple", "gold"],
+          "qualityChance": 0.5,
+          "minCount": 1,
+          "maxCount": 3
+        },
+        {
+          "type": "Consumable",
+          "weight": 20,
+          "minCount": 3,
+          "maxCount": 3
+        },
+        {
+          "type": "Accessory",
+          "weight": 15,
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "type": "CatFood",
+          "weight": 15,
+          "multiplierMin": 3.0,
+          "multiplierMax": 6.0
+        }
+      ]
+    }
+  ],
+  "ritualInterval": 3,
+  "startRound": 3
+}

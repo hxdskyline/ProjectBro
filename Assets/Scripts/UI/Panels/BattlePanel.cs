@@ -1,17 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
+using TribeSystem;
+using TribeSystem.UI;
 
 /// <summary>
-/// ս������ - ��ʾս�������е�UI
+/// 战斗界面 - 显示战斗进行中的UI
 /// </summary>
 public class BattlePanel : UIPanel
 {
-    private const float BlessingAttackMultiplier = 1.6f;
-    private const float BlessingDefenseMultiplier = 1.5f;
-    private const float BlessingHpMultiplier = 1.5f;
-    private const float BlessingMoveSpeedMultiplier = 1.3f;
-    private const float BlessingAttackRangeMultiplier = 1.25f;
-
     [SerializeField] private Text _battleInfoText;
     [SerializeField] private Text _levelText;
     [SerializeField] private Button _pauseButton;
@@ -22,11 +19,9 @@ public class BattlePanel : UIPanel
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
-    private bool _consumeBlessingOnBattleEnd;
-    private bool _grantOutingRewardOnBattleEnd;
-    private bool _grantAttributeBoostOnBattleEnd;
-    private readonly System.Collections.Generic.Dictionary<string, AvatarAnimationDefinition> _playerAvatarDefinitionsByAddress
-        = new System.Collections.Generic.Dictionary<string, AvatarAnimationDefinition>();
+
+    private readonly Dictionary<string, AvatarAnimationDefinition> _playerAvatarDefinitionsByAddress
+        = new Dictionary<string, AvatarAnimationDefinition>();
 
     public override void Initialize()
     {
@@ -41,19 +36,13 @@ public class BattlePanel : UIPanel
         Debug.Log("[BattlePanel] Initialized");
     }
 
-    public void StartBattle(
-        int levelId,
-        CardBuildCardData[] deployedCards,
-        int[] blessingCardIds,
-        bool grantOutingRewardOnBattleEnd,
-        bool consumeBlessingOnBattleEnd,
-        bool grantAttributeBoostOnBattleEnd)
+    /// <summary>
+    /// 开始战斗 - 使用新族群系统
+    /// </summary>
+    public void StartBattle(int levelId, List<TribeRecord> deployedTribes)
     {
         _currentLevel = levelId;
         _isPaused = false;
-        _consumeBlessingOnBattleEnd = consumeBlessingOnBattleEnd;
-        _grantOutingRewardOnBattleEnd = grantOutingRewardOnBattleEnd;
-        _grantAttributeBoostOnBattleEnd = grantAttributeBoostOnBattleEnd;
 
         if (_flowController == null)
         {
@@ -76,10 +65,10 @@ public class BattlePanel : UIPanel
             _playerAvatarDefinition,
             _enemyAvatarDefinition,
             ResolveEnemyCount(levelId),
-            BuildPlayerSpawnDefinitions(deployedCards, blessingCardIds),
+            BuildPlayerSpawnDefinitions(deployedTribes),
             OnBattleEnded);
 
-        Debug.Log("[BattlePanel] Battle started for level: " + levelId);
+        Debug.Log($"[BattlePanel] Battle started for level: {levelId}, tribes: {deployedTribes?.Count ?? 0}");
     }
 
     private int ResolveEnemyCount(int levelId)
@@ -93,47 +82,122 @@ public class BattlePanel : UIPanel
         return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
     }
 
-    private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(CardBuildCardData[] deployedCards, int[] blessingCardIds)
+    /// <summary>
+    /// 从上阵的族群构建战斗单位生成定义
+    /// 每个族群生成：1个族长 + N个小猫
+    /// </summary>
+    private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(List<TribeRecord> deployedTribes)
     {
-        if (deployedCards == null || deployedCards.Length == 0)
+        if (deployedTribes == null || deployedTribes.Count == 0)
         {
             return null;
         }
 
-        System.Collections.Generic.HashSet<int> blessingIdSet = new System.Collections.Generic.HashSet<int>();
-        if (blessingCardIds != null)
+        List<BattleFighterSpawnDefinition> definitions = new List<BattleFighterSpawnDefinition>();
+
+        foreach (TribeRecord tribe in deployedTribes)
         {
-            for (int i = 0; i < blessingCardIds.Length; i++)
+            // 检查族长是否在休息
+            if (tribe.leader != null && tribe.leader.restTurns > 0)
             {
-                blessingIdSet.Add(blessingCardIds[i]);
+                Debug.LogWarning($"[BattlePanel] {tribe.tribeType}族长正在休息，无法上阵");
+                continue;
+            }
+
+            // 添加族长（1个）
+            if (CreateLeaderSpawnDefinition(tribe, out BattleFighterSpawnDefinition leaderDef))
+            {
+                definitions.Add(leaderDef);
+            }
+
+            // 添加小猫（N个）
+            if (tribe.cats != null)
+            {
+                foreach (CatData cat in tribe.cats)
+                {
+                    if (CreateCatSpawnDefinition(tribe, cat, out BattleFighterSpawnDefinition catDef))
+                    {
+                        definitions.Add(catDef);
+                    }
+                }
             }
         }
 
-        BattleFighterSpawnDefinition[] definitions = new BattleFighterSpawnDefinition[deployedCards.Length];
-        for (int i = 0; i < deployedCards.Length; i++)
+        return definitions.Count > 0 ? definitions.ToArray() : null;
+    }
+
+    /// <summary>
+    /// 创建族长战斗单位定义
+    /// </summary>
+    private bool CreateLeaderSpawnDefinition(TribeRecord tribe, out BattleFighterSpawnDefinition definition)
+    {
+        definition = default;
+
+        if (tribe.leader == null)
+            return false;
+
+        // 计算族长最终属性（含永久buff、临时buff、心情加成）
+        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader);
+
+        UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
-            CardBuildCardData card = deployedCards[i];
-            UnitStaticAttributes staticAttributes = new UnitStaticAttributes
-            {
-                MaxHp = Mathf.Max(1, card.Hp),
-                Attack = Mathf.Max(1, card.Attack),
-                Defense = Mathf.Max(0, card.Defense),
-                MoveSpeed = Mathf.Max(0.1f, card.MoveSpeed),
-                AttackRange = Mathf.Max(0.1f, card.AttackRange)
-            };
+            MaxHp = Mathf.Max(1, leaderStats.hp),
+            Attack = Mathf.Max(1, leaderStats.attack),
+            Defense = Mathf.Max(0, leaderStats.defense),
+            MoveSpeed = Mathf.Max(0.1f, leaderStats.speed),
+            AttackRange = Mathf.Max(0.1f, 1.5f) // 族长攻击范围略大
+        };
 
-            if (blessingIdSet.Contains(card.Id))
-            {
-                staticAttributes = ApplyBlessingBuff(staticAttributes);
-            }
+        // 族长名称格式："[族长] 族群名称"
+        string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}";
 
-            definitions[i] = new BattleFighterSpawnDefinition(
-                card.Name,
-                staticAttributes,
-                ResolveAvatarDefinition(card.AvatarDefinitionAddress));
-        }
+        definition = new BattleFighterSpawnDefinition(
+            leaderName,
+            staticAttributes,
+            ResolveAvatarDefinition(null)); // 族长使用默认avatar
 
-        return definitions;
+        return true;
+    }
+
+    /// <summary>
+    /// 创建小猫战斗单位定义
+    /// </summary>
+    private bool CreateCatSpawnDefinition(TribeRecord tribe, CatData cat, out BattleFighterSpawnDefinition definition)
+    {
+        definition = default;
+
+        if (tribe.leader == null)
+            return false;
+
+        // 计算族长属性（作为基数）
+        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader);
+
+        // 计算小猫属性（基于品质比例）
+        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, leaderStats);
+
+        // 应用统帅惩罚（小猫数量影响速度）
+        int catCount = tribe.cats?.Count ?? 0;
+        int command = tribe.leader.command;
+        int finalSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
+
+        UnitStaticAttributes staticAttributes = new UnitStaticAttributes
+        {
+            MaxHp = Mathf.Max(1, catStats.hp),
+            Attack = Mathf.Max(1, catStats.attack),
+            Defense = Mathf.Max(0, catStats.defense),
+            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            AttackRange = Mathf.Max(0.1f, 1.0f) // 小猫攻击范围正常
+        };
+
+        // 小猫名称格式："[品质] 族群名称"
+        string catName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
+
+        definition = new BattleFighterSpawnDefinition(
+            catName,
+            staticAttributes,
+            ResolveAvatarDefinition(null)); // 小猫使用默认avatar
+
+        return true;
     }
 
     private AvatarAnimationDefinition ResolveAvatarDefinition(string address)
@@ -159,14 +223,30 @@ public class BattlePanel : UIPanel
         return loadedDefinition;
     }
 
-    private static UnitStaticAttributes ApplyBlessingBuff(UnitStaticAttributes staticAttributes)
+    private string GetTribeTypeName(TribeType type)
     {
-        staticAttributes.MaxHp = Mathf.Max(1, Mathf.RoundToInt(staticAttributes.MaxHp * BlessingHpMultiplier));
-        staticAttributes.Attack = Mathf.Max(1, Mathf.RoundToInt(staticAttributes.Attack * BlessingAttackMultiplier));
-        staticAttributes.Defense = Mathf.Max(0, Mathf.RoundToInt(staticAttributes.Defense * BlessingDefenseMultiplier));
-        staticAttributes.MoveSpeed = Mathf.Max(0.1f, staticAttributes.MoveSpeed * BlessingMoveSpeedMultiplier);
-        staticAttributes.AttackRange = Mathf.Max(0.1f, staticAttributes.AttackRange * BlessingAttackRangeMultiplier);
-        return staticAttributes;
+        switch (type)
+        {
+            case TribeType.Maine: return "缅因";
+            case TribeType.Tabby: return "狸花";
+            case TribeType.Orange: return "大橘";
+            case TribeType.Cow: return "奶牛";
+            case TribeType.Siamese: return "暹罗";
+            case TribeType.Ragdoll: return "布偶";
+            default: return type.ToString();
+        }
+    }
+
+    private string GetQualityName(CatQuality quality)
+    {
+        switch (quality)
+        {
+            case CatQuality.White: return "白";
+            case CatQuality.Blue: return "蓝";
+            case CatQuality.Purple: return "紫";
+            case CatQuality.Gold: return "金";
+            default: return quality.ToString();
+        }
     }
 
     private void OnBattleEnded(bool victory)
@@ -188,19 +268,52 @@ public class BattlePanel : UIPanel
             _battleInfoText.text = victory ? "Victory!" : "Defeat!";
         }
 
-        if (_grantOutingRewardOnBattleEnd || _grantAttributeBoostOnBattleEnd || _consumeBlessingOnBattleEnd)
-        {
-            CardBuildPanel cardBuildPanel = GameManager.Instance.UIManager.GetPanel<CardBuildPanel>("ui/CardBuildPanel");
-            cardBuildPanel?.ResolveBattleEndZoneRewards(_grantOutingRewardOnBattleEnd, _grantAttributeBoostOnBattleEnd, _consumeBlessingOnBattleEnd);
-        }
+        // 处理战斗结束后的恢复逻辑
+        ProcessPostBattleRecovery(victory);
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
+
+        // 回调TribeBuildPanel处理战斗结束
+        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/TribeBuildPanel");
+        if (tribeBuildPanel != null)
+        {
+            tribeBuildPanel.OnBattleEnded(victory);
+        }
 
         VictoryPanel victoryPanel = GameManager.Instance.UIManager.ShowPanel<VictoryPanel>("ui/VictoryPanel", UIManager.UILayer.PopUp);
         if (victoryPanel != null)
         {
             victoryPanel.ShowVictoryRewards(_currentLevel);
         }
+    }
+
+    /// <summary>
+    /// 处理战斗后的恢复逻辑
+    /// 胜利：小猫下回合自动恢复，族长不休息
+    /// 失败：小猫下回合自动恢复，族长休息1回合
+    /// </summary>
+    private void ProcessPostBattleRecovery(bool victory)
+    {
+        DataManager dataManager = GameManager.Instance?.DataManager;
+        if (dataManager == null) return;
+
+        List<TribeRecord> tribes = dataManager.GetTribes();
+        if (tribes == null) return;
+
+        foreach (TribeRecord tribe in tribes)
+        {
+            // 失败时族长需要休息
+            if (!victory && tribe.leader != null)
+            {
+                tribe.leader.restTurns = 1;
+                Debug.Log($"[BattlePanel] {tribe.tribeType}族长需要休息1回合");
+            }
+
+            // 小猫总是下回合自动恢复（无需操作，仅作为记录）
+            // 实际恢复在下一回合开始时处理
+        }
+
+        dataManager.SavePlayerData();
     }
 
     private void OnPauseButtonClicked()
