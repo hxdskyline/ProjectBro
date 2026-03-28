@@ -36,6 +36,7 @@ public class GameManager : MonoBehaviour
     private SceneManager _sceneManager;
     private TableReader _tableReader;
     private BattleCampaignRuntime _battleCampaignRuntime;
+    private GameFlowController _gameFlowController;
 
     public ResourceManager ResourceManager => _resourceManager;
     public UIManager UIManager => _uiManager;
@@ -46,17 +47,22 @@ public class GameManager : MonoBehaviour
     public SceneManager SceneManager => _sceneManager;
     public TableReader TableReader => _tableReader;
     public BattleCampaignRuntime BattleCampaignRuntime => _battleCampaignRuntime;
+    public GameFlowController GameFlowController => _gameFlowController;
 
     private void Awake()
     {
+        Debug.Log("[GameManager] Awake called");
+
         if (_instance != null && _instance != this)
         {
+            Debug.Log("[GameManager] Instance already exists, destroying this one");
             Destroy(gameObject);
             return;
         }
 
         _instance = this;
         DontDestroyOnLoad(gameObject);
+        Debug.Log("[GameManager] Instance set and marked DontDestroyOnLoad");
 
         InitializeManagers();
     }
@@ -77,6 +83,7 @@ public class GameManager : MonoBehaviour
         _dataManager = gameObject.AddComponent<DataManager>();
         _dataManager.Initialize();
         _currencyManager = new CurrencyManager(_dataManager);
+        Debug.Log("[GameManager] DataManager initialized: " + (_dataManager != null ? "✓" : "✗"));
 
         // 4. 初始化音频管理器（依赖 ResourceManager）
         _audioManager = gameObject.AddComponent<AudioManager>();
@@ -97,6 +104,10 @@ public class GameManager : MonoBehaviour
         // 8. 初始化运行时战斗进度（仅在本次启动期间有效）
         _battleCampaignRuntime = new BattleCampaignRuntime();
 
+        // 9. 初始化游戏流程控制器（管理游戏的整体流程）
+        _gameFlowController = gameObject.AddComponent<GameFlowController>();
+        Debug.Log("[GameManager] GameFlowController Initialized");
+
         Debug.Log("[GameManager] Game Framework Initialized Successfully!");
     }
 
@@ -106,7 +117,7 @@ public class GameManager : MonoBehaviour
         _dataManager.LoadPlayerData();
 
         // 显示主界面 - 使用完整的 Address
-        _uiManager.ShowPanel<MainPanel>("ui/MainPanel", UIManager.UILayer.Normal);
+        _uiManager.ShowPanel<MainPanel>("ui/mainpanel", UIManager.UILayer.Normal);
     }
 
     public void SaveGame()

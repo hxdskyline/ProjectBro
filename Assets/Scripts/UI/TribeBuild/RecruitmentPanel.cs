@@ -24,6 +24,7 @@ namespace TribeSystem.UI
         private Font _cachedFont;
         private RectTransform _cachedParent;
         private bool _isRuntimeCreated;
+        private GameObject _panelContent;
 
         // 当前显示的选项
         private List<RecruitmentOption> _currentOptions;
@@ -100,6 +101,17 @@ namespace TribeSystem.UI
             _hintText = transform.Find("Hint")?.GetComponent<Text>();
             _optionsContainer = transform.Find("OptionsContainer") as RectTransform;
             _confirmButton = transform.Find("ConfirmButton")?.GetComponent<Button>();
+
+            // 如果组件仍然缺失，尝试用运行时创建
+            if (_optionsContainer == null)
+            {
+                if (_cachedFont == null)
+                    _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+                RectTransform parent = _externalRoot != null ? _externalRoot : transform.parent as RectTransform;
+                if (parent == null) parent = transform as RectTransform;
+                EnsureRuntimeUI(parent, _cachedFont);
+            }
         }
 
         private void EnsureRuntimeUI(RectTransform parent, Font font)
@@ -110,24 +122,27 @@ namespace TribeSystem.UI
 
             _isRuntimeCreated = true;
 
-            RectTransform panelRect;
+            RectTransform targetParent = _externalRoot != null ? _externalRoot : parent;
+            GameObject panelGo = new GameObject("RecruitmentPanelContent", typeof(RectTransform), typeof(Image));
+            panelGo.transform.SetParent(targetParent, false);
+            RectTransform panelRect = panelGo.GetComponent<RectTransform>();
             if (_externalRoot != null)
             {
-                panelRect = _externalRoot;
+                panelRect.anchorMin = Vector2.zero;
+                panelRect.anchorMax = Vector2.one;
+                panelRect.offsetMin = Vector2.zero;
+                panelRect.offsetMax = Vector2.zero;
             }
             else
             {
-                GameObject panelGo = new GameObject("RecruitmentPanel", typeof(RectTransform), typeof(Image));
-                panelGo.transform.SetParent(parent, false);
-                panelRect = panelGo.GetComponent<RectTransform>();
                 panelRect.anchorMin = new Vector2(0.2f, 0.2f);
                 panelRect.anchorMax = new Vector2(0.8f, 0.8f);
                 panelRect.offsetMin = Vector2.zero;
                 panelRect.offsetMax = Vector2.zero;
-
-                Image bg = panelGo.GetComponent<Image>();
-                bg.color = new Color(0.1f, 0.08f, 0.12f, 0.98f);
             }
+            Image bg = panelGo.GetComponent<Image>();
+            bg.color = new Color(0.1f, 0.08f, 0.12f, 0.98f);
+            _panelContent = panelGo;
 
             // 标题
             GameObject titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
@@ -256,7 +271,7 @@ namespace TribeSystem.UI
             titleRect.offsetMax = Vector2.zero;
             Text titleText = titleGo.GetComponent<Text>();
             titleText.font = font;
-            titleText.fontSize = 18;
+            titleText.fontSize = 36;
             titleText.alignment = TextAnchor.MiddleCenter;
             titleText.color = Color.white;
             titleText.text = GetOptionTypeTitle(option.optionType);
@@ -271,7 +286,7 @@ namespace TribeSystem.UI
             costRect.offsetMax = Vector2.zero;
             Text costText = costGo.GetComponent<Text>();
             costText.font = font;
-            costText.fontSize = 16;
+            costText.fontSize = 18;
             costText.alignment = TextAnchor.MiddleCenter;
             costText.color = new Color(1f, 0.9f, 0.3f, 1f);
             costText.text = $"消耗: {option.cost} 猫粮";
@@ -286,7 +301,7 @@ namespace TribeSystem.UI
             descRect.offsetMax = Vector2.zero;
             Text descText = descGo.GetComponent<Text>();
             descText.font = font;
-            descText.fontSize = 14;
+            descText.fontSize = 32;
             descText.alignment = TextAnchor.MiddleCenter;
             descText.color = new Color(0.9f, 0.9f, 0.9f, 1f);
             descText.text = option.description;
@@ -386,35 +401,26 @@ namespace TribeSystem.UI
 
         public void Show()
         {
-            if (_externalRoot != null && _optionsContainer == null && _cachedFont != null)
-            {
-                RectTransform parentToUse = _cachedParent != null ? _cachedParent : transform.parent as RectTransform;
-                if (parentToUse != null)
-                {
-                    EnsureRuntimeUI(parentToUse, _cachedFont);
-                }
-            }
+            EnsureUIComponents();
+            gameObject.SetActive(true);
+            transform.SetAsLastSibling();
 
-            if (_externalRoot == null)
-            {
-                gameObject.SetActive(true);
-            }
+            if (_externalRoot != null)
+                _externalRoot.gameObject.SetActive(true);
+            if (_panelContent != null)
+                _panelContent.SetActive(true);
+
             UpdateHintText();
         }
 
         public void Hide()
         {
+            gameObject.SetActive(false);
+
             if (_externalRoot != null)
-            {
-                if (_externalRoot.gameObject != null)
-                {
-                    _externalRoot.gameObject.SetActive(false);
-                }
-            }
-            else
-            {
-                gameObject.SetActive(false);
-            }
+                _externalRoot.gameObject.SetActive(false);
+            if (_panelContent != null)
+                _panelContent.SetActive(false);
         }
 
         private void UpdateHintText()

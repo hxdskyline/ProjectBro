@@ -15,10 +15,15 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 43f94bcf0924f7341a83071fe3eb3275
+  m_GUID: 4d4d37a8682524c44b2b11f18b702bf3
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0ec661d05ff4a76449266709a770e31d
+    m_Address: ui/tribebuild/initialtribeselectionpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -34,6 +39,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4101569e0fab8e343bbbf7f19e7cd604
     m_Address: ui/victorypanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 64236cf222fbd2b40a1a6c1851f00460
+    m_Address: ui/tribebuild/littlecatcard
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

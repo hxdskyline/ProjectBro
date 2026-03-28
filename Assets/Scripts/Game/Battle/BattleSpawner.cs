@@ -94,7 +94,8 @@ public static class BattleSpawner
                 spawnPosition,
                 faceRight,
                 tint,
-                config);
+                config,
+                fighterDefinition.ScaleMultiplier > 0f ? fighterDefinition.ScaleMultiplier : 1.0f);
 
             occupiedPositions.Add(spawnPosition);
         }
@@ -182,7 +183,8 @@ public static class BattleSpawner
         Vector3 position,
         bool faceRight,
         Color tint,
-        BattleSpawnConfig config)
+        BattleSpawnConfig config,
+        float scaleMultiplier = 1.0f)
     {
         GameObject go;
         if (config.FighterPrefab != null)
@@ -197,7 +199,7 @@ public static class BattleSpawner
         }
 
         go.transform.position = position;
-        float scale = Mathf.Max(0.1f, config.FighterScale);
+        float scale = Mathf.Max(0.1f, config.FighterScale * scaleMultiplier);
         Vector3 baseScale = new Vector3(scale, scale, 1f);
         bool initialFaceRight = position.x < 0f ? false : (position.x > 0f ? true : faceRight);
         go.transform.localScale = initialFaceRight ? baseScale : new Vector3(-baseScale.x, baseScale.y, baseScale.z);

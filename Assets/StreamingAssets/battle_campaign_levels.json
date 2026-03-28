@@ -2,61 +2,81 @@
   {
     "battleNumber": 1,
     "enemyUnitIds": [1, 1, 1],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 200,
+    "hasRecruitment": false,
+    "hasRitual": false,
+    "hasShop": false
   },
   {
     "battleNumber": 2,
     "enemyUnitIds": [1, 1, 1, 1],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 250,
+    "hasRecruitment": true,
+    "hasRitual": false,
+    "hasShop": false
   },
   {
     "battleNumber": 3,
     "enemyUnitIds": [1, 1, 2, 2, 2],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 300,
+    "hasRecruitment": true,
+    "hasRitual": true,
+    "hasShop": false
   },
   {
     "battleNumber": 4,
     "enemyUnitIds": [1, 1, 2, 2, 2, 2],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 350,
+    "hasRecruitment": true,
+    "hasRitual": false,
+    "hasShop": true
   },
   {
     "battleNumber": 5,
     "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 400,
+    "hasRecruitment": true,
+    "hasRitual": true,
+    "hasShop": false
   },
   {
     "battleNumber": 6,
     "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 450,
+    "hasRecruitment": true,
+    "hasRitual": false,
+    "hasShop": false
   },
   {
     "battleNumber": 7,
     "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 500,
+    "hasRecruitment": true,
+    "hasRitual": true,
+    "hasShop": false
   },
   {
     "battleNumber": 8,
     "enemyUnitIds": [1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 550,
+    "hasRecruitment": true,
+    "hasRitual": false,
+    "hasShop": true
   },
   {
     "battleNumber": 9,
     "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 600,
+    "hasRecruitment": true,
+    "hasRitual": true,
+    "hasShop": false
   },
   {
     "battleNumber": 10,
     "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3],
-    "blessingEntry": true,
-    "attributeBoostEntry": true
+    "catFoodReward": 650,
+    "hasRecruitment": true,
+    "hasRitual": false,
+    "hasShop": false
   }
 ]

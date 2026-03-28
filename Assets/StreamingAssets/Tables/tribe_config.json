@@ -8,8 +8,15 @@
         "attack": 100,
         "defense": 80,
         "hp": 1000,
-        "speed": 1000,
+        "speed": 3000,
         "command": 10
+      },
+      "catBaseStats": {
+        "attack": 70,
+        "defense": 55,
+        "hp": 600,
+        "speed": 700,
+        "command": 0
       }
     },
     {
@@ -18,10 +25,17 @@
       "initialCatCount": 5,
       "leaderBaseStats": {
         "attack": 120,
-        "defense": 60,
+        "defense": 70,
         "hp": 900,
         "speed": 1100,
-        "command": 12
+        "command": 8
+      },
+      "catBaseStats": {
+        "attack": 85,
+        "defense": 50,
+        "hp": 550,
+        "speed": 800,
+        "command": 0
       }
     },
     {
@@ -29,11 +43,18 @@
       "tribeName": "大橘猫族",
       "initialCatCount": 2,
       "leaderBaseStats": {
-        "attack": 80,
-        "defense": 100,
-        "hp": 1300,
-        "speed": 900,
-        "command": 8
+        "attack": 110,
+        "defense": 90,
+        "hp": 1100,
+        "speed": 2500,
+        "command": 12
+      },
+      "catBaseStats": {
+        "attack": 78,
+        "defense": 65,
+        "hp": 680,
+        "speed": 630,
+        "command": 0
       }
     },
     {
@@ -42,10 +63,17 @@
       "initialCatCount": 4,
       "leaderBaseStats": {
         "attack": 85,
-        "defense": 110,
-        "hp": 1050,
+        "defense": 100,
+        "hp": 1200,
         "speed": 950,
-        "command": 10
+        "command": 11
+      },
+      "catBaseStats": {
+        "attack": 60,
+        "defense": 72,
+        "hp": 750,
+        "speed": 660,
+        "command": 0
       }
     },
     {
@@ -53,11 +81,18 @@
       "tribeName": "暹罗猫族",
       "initialCatCount": 4,
       "leaderBaseStats": {
-        "attack": 90,
-        "defense": 70,
+        "attack": 130,
+        "defense": 75,
         "hp": 850,
-        "speed": 1300,
-        "command": 11
+        "speed": 1200,
+        "command": 9
+      },
+      "catBaseStats": {
+        "attack": 92,
+        "defense": 52,
+        "hp": 510,
+        "speed": 890,
+        "command": 0
       }
     },
     {
@@ -65,11 +100,18 @@
       "tribeName": "布偶猫族",
       "initialCatCount": 3,
       "leaderBaseStats": {
-        "attack": 95,
+        "attack": 105,
         "defense": 85,
         "hp": 950,
         "speed": 1050,
         "command": 10
+      },
+      "catBaseStats": {
+        "attack": 74,
+        "defense": 60,
+        "hp": 580,
+        "speed": 730,
+        "command": 0
       }
     }
   ]

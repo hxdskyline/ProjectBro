@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using System;
 using System.Collections.Generic;
 
@@ -16,30 +18,23 @@ namespace TribeSystem.UI
         [SerializeField] private Text _leaderNameText;
         [SerializeField] private Text _leaderStatsText;
         [SerializeField] private RectTransform _catsListContainer;
-        [SerializeField] private Button _restButton;
-        [SerializeField] private Button _deployButton;
-        [SerializeField] private Text _deployButtonText;
 
         private TribeRecord _tribe;
         private bool _isDeployed;
         private Action<TribeRecord> _onRestClicked;
         private Action<TribeRecord, bool> _onDeployChanged;
 
+        // 小猫卡片预制体（Addressables 缓存）
+        private GameObject _littleCatCardPrefab;
+        private bool _prefabLoading;
+        // ScrollRect 运行时构建后的 Content 节点
+        private RectTransform _catsContentRect;
+
         private void Awake()
         {
             if (_closeButton != null)
             {
                 _closeButton.onClick.AddListener(Hide);
-            }
-
-            if (_restButton != null)
-            {
-                _restButton.onClick.AddListener(OnRestButtonClicked);
-            }
-
-            if (_deployButton != null)
-            {
-                _deployButton.onClick.AddListener(OnDeployButtonClicked);
             }
         }
 
@@ -95,24 +90,6 @@ namespace TribeSystem.UI
                 }
             }
 
-            // 上阵按钮状态
-            if (_deployButton != null)
-            {
-                bool canDeploy = !_tribe.IsLeaderResting();
-                _deployButton.interactable = canDeploy;
-            }
-
-            if (_deployButtonText != null)
-            {
-                _deployButtonText.text = _isDeployed ? "下阵" : "上阵";
-            }
-
-            // 休息按钮状态
-            if (_restButton != null)
-            {
-                _restButton.interactable = !_tribe.IsLeaderResting();
-            }
-
             // 更新小猫列表
             UpdateCatsList();
         }
@@ -121,84 +98,110 @@ namespace TribeSystem.UI
         {
             if (_catsListContainer == null || _tribe?.cats == null) return;
 
-            // 清空现有列表
-            for (int i = _catsListContainer.childCount - 1; i >= 0; i--)
-            {
-                Destroy(_catsListContainer.GetChild(i).gameObject);
-            }
+            EnsureScrollView();
 
-            // 统计各品质小猫数量
-            Dictionary<CatQuality, int> qualityCounts = new Dictionary<CatQuality, int>();
+            // 清空 Content 内现有卡片
+            RectTransform content = _catsContentRect ?? _catsListContainer;
+            for (int i = content.childCount - 1; i >= 0; i--)
+                Destroy(content.GetChild(i).gameObject);
+
+            if (_littleCatCardPrefab != null)
+            {
+                PopulateCatCards(content);
+            }
+            else if (!_prefabLoading)
+            {
+                _prefabLoading = true;
+                var handle = Addressables.LoadAssetAsync<GameObject>("ui/tribebuild/littlecatcard");
+                handle.Completed += op =>
+                {
+                    _prefabLoading = false;
+                    if (op.Status == AsyncOperationStatus.Succeeded)
+                    {
+                        _littleCatCardPrefab = op.Result;
+                        // 如果弹窗仍然可见，重新填充
+                        if (gameObject.activeInHierarchy && _tribe != null)
+                        {
+                            RectTransform c = _catsContentRect ?? _catsListContainer;
+                            for (int i = c.childCount - 1; i >= 0; i--)
+                                Destroy(c.GetChild(i).gameObject);
+                            PopulateCatCards(c);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[TribeDetailTips] Failed to load ui/tribebuild/littlecatcard");
+                    }
+                };
+            }
+        }
+
+        /// <summary>
+        /// 将 _catsListContainer 替换为内含 ScrollRect 的可滚动布局（只执行一次）
+        /// </summary>
+        private void EnsureScrollView()
+        {
+            if (_catsContentRect != null) return;
+
+            // 在 _catsListContainer 内构建 ScrollRect + Viewport + Content
+            var scrollGo = new GameObject("CatsScroll", typeof(RectTransform), typeof(ScrollRect));
+            scrollGo.transform.SetParent(_catsListContainer, false);
+            var scrollRect = scrollGo.GetComponent<RectTransform>();
+            scrollRect.anchorMin = Vector2.zero;
+            scrollRect.anchorMax = Vector2.one;
+            scrollRect.offsetMin = Vector2.zero;
+            scrollRect.offsetMax = Vector2.zero;
+
+            var sr = scrollGo.GetComponent<ScrollRect>();
+            sr.horizontal = false;
+            sr.vertical = true;
+
+            // Viewport
+            var vpGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            vpGo.transform.SetParent(scrollRect, false);
+            var vpRect = vpGo.GetComponent<RectTransform>();
+            vpRect.anchorMin = Vector2.zero;
+            vpRect.anchorMax = Vector2.one;
+            vpRect.offsetMin = Vector2.zero;
+            vpRect.offsetMax = Vector2.zero;
+            vpGo.GetComponent<Image>().color = new Color(0, 0, 0, 0.01f); // 透明但保留 Mask
+            vpGo.GetComponent<Mask>().showMaskGraphic = false;
+            sr.viewport = vpRect;
+
+            // Content
+            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            contentGo.transform.SetParent(vpRect, false);
+            var contentRect = contentGo.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0, 1);
+            contentRect.anchorMax = new Vector2(1, 1);
+            contentRect.pivot = new Vector2(0.5f, 1);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+            contentRect.sizeDelta = Vector2.zero;
+
+            var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
+            vlg.spacing = 6f;
+            vlg.padding = new RectOffset(4, 4, 4, 4);
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = true;
+            vlg.childForceExpandWidth = false;
+            vlg.childForceExpandHeight = false;
+
+            var csf = contentGo.GetComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            sr.content = contentRect;
+            _catsContentRect = contentRect;
+        }
+
+        private void PopulateCatCards(RectTransform content)
+        {
             foreach (var cat in _tribe.cats)
             {
-                if (qualityCounts.ContainsKey(cat.quality))
-                {
-                    qualityCounts[cat.quality]++;
-                }
-                else
-                {
-                    qualityCounts[cat.quality] = 1;
-                }
-            }
-
-            // 生成小猫统计
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            foreach (var kvp in qualityCounts)
-            {
-                GameObject catGo = new GameObject("CatItem", typeof(RectTransform), typeof(Text));
-                catGo.transform.SetParent(_catsListContainer, false);
-
-                RectTransform catRect = catGo.GetComponent<RectTransform>();
-                catRect.sizeDelta = new Vector2(150f, 20f);
-
-                Text catText = catGo.GetComponent<Text>();
-                catText.font = font;
-                catText.fontSize = 12;
-                catText.alignment = TextAnchor.MiddleLeft;
-                catText.color = GetQualityColor(kvp.Key);
-                catText.text = $"{GetQualityName(kvp.Key)}: {kvp.Value} 只";
-            }
-        }
-
-        private void OnRestButtonClicked()
-        {
-            if (_tribe != null)
-            {
-                _onRestClicked?.Invoke(_tribe);
-                Hide();
-            }
-        }
-
-        private void OnDeployButtonClicked()
-        {
-            if (_tribe != null)
-            {
-                _onDeployChanged?.Invoke(_tribe, !_isDeployed);
-                Hide();
-            }
-        }
-
-        private Color GetQualityColor(CatQuality quality)
-        {
-            switch (quality)
-            {
-                case CatQuality.White: return new Color(0.9f, 0.9f, 0.9f, 1f);
-                case CatQuality.Blue: return new Color(0.3f, 0.5f, 0.9f, 1f);
-                case CatQuality.Purple: return new Color(0.6f, 0.3f, 0.8f, 1f);
-                case CatQuality.Gold: return new Color(1f, 0.6f, 0.2f, 1f);
-                default: return Color.white;
-            }
-        }
-
-        private string GetQualityName(CatQuality quality)
-        {
-            switch (quality)
-            {
-                case CatQuality.White: return "白色";
-                case CatQuality.Blue: return "蓝色";
-                case CatQuality.Purple: return "紫色";
-                case CatQuality.Gold: return "金色";
-                default: return quality.ToString();
+                var cardGo = Instantiate(_littleCatCardPrefab, content, false);
+                var card = cardGo.GetComponent<LittleCatCard>();
+                card.Setup(cat, _tribe);
             }
         }
 

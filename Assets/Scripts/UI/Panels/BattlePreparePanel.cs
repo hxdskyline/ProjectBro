@@ -343,7 +343,7 @@ public class BattlePreparePanel : UIPanel
         else
         {
             // 如果找不到面板，尝试显示
-            GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/TribeBuildPanel", UIManager.UILayer.Normal);
+            GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel", UIManager.UILayer.Normal);
         }
     }
 

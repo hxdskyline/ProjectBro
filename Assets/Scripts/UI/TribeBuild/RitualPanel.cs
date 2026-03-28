@@ -6,659 +6,471 @@ using System.Collections.Generic;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 祭祀面板 - 强制两步选择弹窗
-    /// 第一步：选择种族（三选一）
-    /// 第二步：选择消耗档位（三档）
+    /// 祭祀面板 - 两步选择弹窗
+    /// Step1：选择祭祀档次（免费/普通/盛大）
+    /// Step2：从该档次池中抽取若干祝福，玩家选一条
     /// </summary>
     public class RitualPanel : MonoBehaviour
     {
-        private const string PanelName = "祭祀祈福";
-        private const string HintStep1 = "第一步：选择祭祀的族群（三选一）";
-        private const string HintStep2 = "第二步：选择消耗的猫粮数量";
-
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;
-        [SerializeField] private Text _hintText;
-        [SerializeField] private RectTransform _cardsContainer;
-        [SerializeField] private Button _confirmButton;
+
+        [SerializeField] private GameObject _step1ContainerObj;
+        [SerializeField] private GameObject _step2ContainerObj;
+
+        // Step1：档次选择容器（复用 TribesContainer 节点）
+        [SerializeField] private RectTransform _tribesContainer;
+        [SerializeField] private Button _step1ConfirmButton;
+
+        // Step2：祝福选择容器（复用 CostOptionsContainer 节点）
+        [SerializeField] private RectTransform _costOptionsContainer;
+        [SerializeField] private Button _step2ConfirmButton;
+        [SerializeField] private Button _closeButton;
 
         private RectTransform _externalRoot;
         private Font _cachedFont;
-        private RectTransform _cachedParent;
         private bool _isRuntimeCreated;
+        private GameObject _panelContent;
 
-        // 当前状态
+        // 状态
         private int _currentStep = 1;
-        private List<TribeRecord> _availableTribes;
-        private TribeRecord _selectedTribe;
+        private List<RitualTier> _availableTiers;
         private RitualTier _selectedTier;
-        private int _selectedCost;
+        private List<RitualRewardItem> _drawnBlessings;
+        private RitualRewardItem _selectedBlessing;
 
-        // 回调
-        private Action<TribeRecord, int> _onRitualConfirmed;
+        // 服务引用（由调用方注入）
+        private Func<RitualTier, List<RitualRewardItem>> _drawBlessings;
 
-        /// <summary>
-        /// 设置外部根节点（用于强制弹窗场景）
-        /// </summary>
+        // 回调：(tier=null 表示跳过)
+        private Action<RitualTier, RitualRewardItem> _onRitualConfirmed;
+
+        // ─── 公共接口 ───────────────────────────────────────────────────────────
+
         public void SetExternalRoot(RectTransform externalRoot)
         {
             _externalRoot = externalRoot;
             _isRuntimeCreated = false;
         }
 
-        /// <summary>
-        /// 初始化面板
-        /// </summary>
         public void Initialize()
         {
             EnsureUIComponents();
-            if (_titleText != null)
-            {
-                _titleText.text = PanelName;
-            }
+            if (_titleText != null) _titleText.text = "族群祭祀";
         }
 
-        /// <summary>
-        /// 初始化面板（兼容旧调用方式，支持运行时创建 UI）
-        /// </summary>
-        public void Initialize(RectTransform parent, Font font)
+        public void StartRitual(
+            List<RitualTier> tiers,
+            Func<RitualTier, List<RitualRewardItem>> drawBlessings,
+            Action<RitualTier, RitualRewardItem> onConfirmed)
         {
-            _cachedFont = font;
-            _cachedParent = parent;
-            EnsureRuntimeUI(parent, font);
-            Initialize();
-        }
-
-        /// <summary>
-        /// 开始祭祀流程
-        /// </summary>
-        public void StartRitual(List<TribeRecord> tribes, Action<TribeRecord, int> onConfirmed)
-        {
-            _currentStep = 1;
-            _availableTribes = tribes;
-            _selectedTribe = null;
-            _selectedTier = null;
-            _selectedCost = 0;
+            _availableTiers    = tiers;
+            _drawBlessings     = drawBlessings;
             _onRitualConfirmed = onConfirmed;
+            _selectedTier      = null;
+            _selectedBlessing  = null;
+            _drawnBlessings    = null;
 
+            EnsureUIComponents();
             ShowStep1();
             Show();
         }
 
+        // ─── Step1：选档次 ─────────────────────────────────────────────────────
+
         private void ShowStep1()
         {
             _currentStep = 1;
-            ClearCards();
-            GenerateTribeCards(_availableTribes);
+            if (_step1ContainerObj != null) _step1ContainerObj.SetActive(true);
+            if (_step2ContainerObj != null) _step2ContainerObj.SetActive(false);
 
-            if (_confirmButton != null)
+            ClearContainer(_tribesContainer);
+            GenerateTierCards();
+
+            if (_step1ConfirmButton != null)
             {
-                _confirmButton.interactable = false;
-                _confirmButton.onClick.RemoveAllListeners();
-                _confirmButton.onClick.AddListener(OnStep1Confirm);
-            }
-
-            UpdateHintText();
-        }
-
-        private void ShowStep2()
-        {
-            _currentStep = 2;
-            ClearCards();
-            GenerateCostTierCards();
-
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = true;
-                _confirmButton.onClick.RemoveAllListeners();
-                _confirmButton.onClick.AddListener(OnStep2Confirm);
-            }
-
-            UpdateHintText();
-        }
-
-        private void EnsureUIComponents()
-        {
-            if (_titleText != null && _hintText != null && _cardsContainer != null && _confirmButton != null)
-            {
-                return;
-            }
-
-            _titleText = transform.Find("Title")?.GetComponent<Text>();
-            _hintText = transform.Find("Hint")?.GetComponent<Text>();
-            _cardsContainer = transform.Find("CardsContainer") as RectTransform;
-            _confirmButton = transform.Find("ConfirmButton")?.GetComponent<Button>();
-        }
-
-        private void EnsureRuntimeUI(RectTransform parent, Font font)
-        {
-            if (_isRuntimeCreated) return;
-
-            if (_cardsContainer != null) return;
-
-            _isRuntimeCreated = true;
-
-            RectTransform panelRect;
-            if (_externalRoot != null)
-            {
-                panelRect = _externalRoot;
-            }
-            else
-            {
-                GameObject panelGo = new GameObject("RitualPanel", typeof(RectTransform), typeof(Image));
-                panelGo.transform.SetParent(parent, false);
-                panelRect = panelGo.GetComponent<RectTransform>();
-                panelRect.anchorMin = new Vector2(0.2f, 0.2f);
-                panelRect.anchorMax = new Vector2(0.8f, 0.8f);
-                panelRect.offsetMin = Vector2.zero;
-                panelRect.offsetMax = Vector2.zero;
-
-                Image bg = panelGo.GetComponent<Image>();
-                bg.color = new Color(0.12f, 0.08f, 0.1f, 0.98f);
-            }
-
-            // 标题
-            GameObject titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
-            titleGo.transform.SetParent(panelRect, false);
-            RectTransform titleRect = titleGo.GetComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0f, 1f);
-            titleRect.anchorMax = new Vector2(1f, 1f);
-            titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.sizeDelta = new Vector2(0f, 40f);
-            titleRect.anchoredPosition = new Vector2(0f, -10f);
-            _titleText = titleGo.GetComponent<Text>();
-            _titleText.font = font;
-            _titleText.fontSize = 28;
-            _titleText.alignment = TextAnchor.MiddleCenter;
-            _titleText.color = Color.white;
-
-            // 提示文本
-            GameObject hintGo = new GameObject("Hint", typeof(RectTransform), typeof(Text));
-            hintGo.transform.SetParent(panelRect, false);
-            RectTransform hintRect = hintGo.GetComponent<RectTransform>();
-            hintRect.anchorMin = new Vector2(0f, 0.88f);
-            hintRect.anchorMax = new Vector2(1f, 0.93f);
-            hintRect.offsetMin = Vector2.zero;
-            hintRect.offsetMax = Vector2.zero;
-            _hintText = hintGo.GetComponent<Text>();
-            _hintText.font = font;
-            _hintText.fontSize = 16;
-            _hintText.alignment = TextAnchor.MiddleCenter;
-            _hintText.color = new Color(0.94f, 0.7f, 0.3f, 1f);
-
-            // 卡片容器（横向布局）
-            GameObject cardsGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
-            cardsGo.transform.SetParent(panelRect, false);
-            RectTransform cardsRect = cardsGo.GetComponent<RectTransform>();
-            cardsRect.anchorMin = new Vector2(0.05f, 0.15f);
-            cardsRect.anchorMax = new Vector2(0.95f, 0.80f);
-            cardsRect.offsetMin = Vector2.zero;
-            cardsRect.offsetMax = Vector2.zero;
-            _cardsContainer = cardsRect;
-            Image cardsBg = cardsGo.GetComponent<Image>();
-            cardsBg.color = new Color(0f, 0f, 0f, 0.2f);
-
-            HorizontalLayoutGroup layout = cardsGo.GetComponent<HorizontalLayoutGroup>();
-            layout.spacing = 20f;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlHeight = true;
-            layout.childControlWidth = false;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = false;
-            layout.padding = new RectOffset(15, 15, 15, 15);
-
-            // 确认按钮
-            GameObject confirmGo = new GameObject("ConfirmButton", typeof(RectTransform), typeof(Image), typeof(Button));
-            confirmGo.transform.SetParent(panelRect, false);
-            RectTransform confirmRect = confirmGo.GetComponent<RectTransform>();
-            confirmRect.anchorMin = new Vector2(0.35f, 0.03f);
-            confirmRect.anchorMax = new Vector2(0.65f, 0.12f);
-            confirmRect.offsetMin = Vector2.zero;
-            confirmRect.offsetMax = Vector2.zero;
-            _confirmButton = confirmGo.GetComponent<Button>();
-            Image confirmImg = confirmGo.GetComponent<Image>();
-            confirmImg.color = new Color(0.5f, 0.3f, 0.2f, 1f);
-            _confirmButton.targetGraphic = confirmImg;
-            CreateButtonLabel(confirmRect, font, "确认祭祀");
-        }
-
-        private void CreateButtonLabel(RectTransform parent, Font font, string text)
-        {
-            GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            labelGo.transform.SetParent(parent, false);
-            RectTransform labelRect = labelGo.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-            Text label = labelGo.GetComponent<Text>();
-            label.font = font;
-            label.fontSize = 20;
-            label.alignment = TextAnchor.MiddleCenter;
-            label.color = Color.white;
-            label.text = text;
-        }
-
-        #region Step 1: Tribe Selection
-
-        private void GenerateTribeCards(List<TribeRecord> tribes)
-        {
-            if (_cardsContainer == null || tribes == null) return;
-
-            foreach (var tribe in tribes)
-            {
-                GameObject cardGo = new GameObject("TribeCard", typeof(RectTransform), typeof(Image), typeof(Button));
-                cardGo.transform.SetParent(_cardsContainer, false);
-
-                RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-                cardRect.sizeDelta = new Vector2(200f, 250f);
-
-                Image cardImg = cardGo.GetComponent<Image>();
-                cardImg.color = GetTribeCardColor(tribe.tribeType);
-
-                Button cardBtn = cardGo.GetComponent<Button>();
-                int tribeIndex = tribes.IndexOf(tribe);
-                cardBtn.onClick.AddListener(() => OnTribeCardClicked(tribeIndex));
-
-                // 创建卡片内容
-                CreateTribeCardContent(cardRect, tribe);
-
-                // 存储引用
-                RitualTribeCard cardComponent = cardGo.AddComponent<RitualTribeCard>();
-                cardComponent.Tribe = tribe;
-                cardComponent.Index = tribeIndex;
-                cardComponent.BackgroundImage = cardImg;
+                _step1ConfirmButton.interactable = false;
+                _step1ConfirmButton.onClick.RemoveAllListeners();
+                _step1ConfirmButton.onClick.AddListener(OnStep1Confirm);
             }
         }
 
-        private void CreateTribeCardContent(RectTransform cardRect, TribeRecord tribe)
+        private void GenerateTierCards()
         {
-            Font font = _cachedFont;
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (_tribesContainer == null || _availableTiers == null) return;
+            Font font = GetFont();
+            long catFood = GameManager.Instance?.DataManager?.GetCatFood() ?? 0;
 
-            // 族群名称
-            GameObject nameGo = new GameObject("Name", typeof(RectTransform), typeof(Text));
-            nameGo.transform.SetParent(cardRect, false);
-            RectTransform nameRect = nameGo.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0.1f, 0.80f);
-            nameRect.anchorMax = new Vector2(0.9f, 0.90f);
-            nameRect.offsetMin = Vector2.zero;
-            nameRect.offsetMax = Vector2.zero;
-            Text nameText = nameGo.GetComponent<Text>();
-            nameText.font = font;
-            nameText.fontSize = 18;
-            nameText.alignment = TextAnchor.MiddleCenter;
-            nameText.color = Color.white;
-            nameText.text = GetTribeTypeName(tribe.tribeType);
-
-            // 小猫数量
-            GameObject countGo = new GameObject("Count", typeof(RectTransform), typeof(Text));
-            countGo.transform.SetParent(cardRect, false);
-            RectTransform countRect = countGo.GetComponent<RectTransform>();
-            countRect.anchorMin = new Vector2(0.1f, 0.70f);
-            countRect.anchorMax = new Vector2(0.9f, 0.78f);
-            countRect.offsetMin = Vector2.zero;
-            countRect.offsetMax = Vector2.zero;
-            Text countText = countGo.GetComponent<Text>();
-            countText.font = font;
-            countText.fontSize = 14;
-            countText.alignment = TextAnchor.MiddleCenter;
-            countText.color = new Color(0.9f, 0.9f, 0.9f, 1f);
-            countText.text = $"小猫: {tribe.GetCatCount()} 只";
-
-            // 族长属性
-            GameObject statsGo = new GameObject("Stats", typeof(RectTransform), typeof(Text));
-            statsGo.transform.SetParent(cardRect, false);
-            RectTransform statsRect = statsGo.GetComponent<RectTransform>();
-            statsRect.anchorMin = new Vector2(0.1f, 0.20f);
-            statsRect.anchorMax = new Vector2(0.9f, 0.65f);
-            statsRect.offsetMin = Vector2.zero;
-            statsRect.offsetMax = Vector2.zero;
-            Text statsText = statsGo.GetComponent<Text>();
-            statsText.font = font;
-            statsText.fontSize = 12;
-            statsText.alignment = TextAnchor.UpperLeft;
-            statsText.color = new Color(0.8f, 0.8f, 0.8f, 1f);
-            statsText.text = $"攻: {tribe.leader.baseAttack}\n防: {tribe.leader.baseDefense}\n血: {tribe.leader.baseHp}\n速: {tribe.leader.baseSpeed}\n统: {tribe.leader.command}";
-        }
-
-        private Color GetTribeCardColor(TribeType tribeType)
-        {
-            switch (tribeType)
+            foreach (var tier in _availableTiers)
             {
-                case TribeType.Maine: return new Color(0.3f, 0.5f, 0.7f, 1f);
-                case TribeType.Tabby: return new Color(0.6f, 0.4f, 0.3f, 1f);
-                case TribeType.Orange: return new Color(0.7f, 0.5f, 0.2f, 1f);
-                case TribeType.Cow: return new Color(0.4f, 0.4f, 0.5f, 1f);
-                case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 1f);
-                case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 1f);
-                default: return new Color(0.5f, 0.5f, 0.5f, 1f);
+                var go = new GameObject("TierCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                go.transform.SetParent(_tribesContainer, false);
+                go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
+
+                var img = go.GetComponent<Image>();
+                img.color = GetTierColor(tier.tierName);
+
+                bool canAfford = catFood >= tier.cost;
+                var btn = go.GetComponent<Button>();
+                btn.interactable = canAfford;
+
+                var captured = tier;
+                btn.onClick.AddListener(() => OnTierCardClicked(captured));
+
+                CreateTierCardContent(go.GetComponent<RectTransform>(), tier, canAfford, font);
+
+                var comp = go.AddComponent<RitualTierCard>();
+                comp.Tier = tier;
+                comp.Img  = img;
             }
         }
 
-        private string GetTribeTypeName(TribeType type)
+        private void CreateTierCardContent(RectTransform rect, RitualTier tier, bool canAfford, Font font)
         {
-            switch (type)
-            {
-                case TribeType.Maine: return "缅因猫族";
-                case TribeType.Tabby: return "狸花猫族";
-                case TribeType.Orange: return "大橘猫族";
-                case TribeType.Cow: return "奶牛猫族";
-                case TribeType.Siamese: return "暹罗猫族";
-                case TribeType.Ragdoll: return "布偶猫族";
-                default: return type.ToString();
-            }
+            string costText = tier.cost == 0 ? "免费" : $"{tier.cost} 猫粮";
+            AddText(rect, "Name",  font, 20, new Vector2(0.05f, 0.78f), new Vector2(0.95f, 0.88f),
+                tier.displayName ?? tier.tierName, Color.white, TextAnchor.MiddleCenter);
+            AddText(rect, "Cost",  font, 16, new Vector2(0.05f, 0.65f), new Vector2(0.95f, 0.75f),
+                costText, canAfford ? new Color(1f, 0.9f, 0.3f) : new Color(1f, 0.4f, 0.4f), TextAnchor.MiddleCenter);
+            AddText(rect, "Hint",  font, 12, new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.60f),
+                $"抽取 {tier.drawCount} 条祝福\n三选一", new Color(0.85f, 0.85f, 0.85f), TextAnchor.UpperCenter);
+            if (!canAfford)
+                AddText(rect, "Lock", font, 13, new Vector2(0.05f, 0.02f), new Vector2(0.95f, 0.10f),
+                    "猫粮不足", new Color(1f, 0.4f, 0.4f), TextAnchor.MiddleCenter);
         }
 
-        private void OnTribeCardClicked(int index)
+        private void OnTierCardClicked(RitualTier tier)
         {
-            if (_availableTribes == null || index < 0 || index >= _availableTribes.Count)
-                return;
-
-            _selectedTribe = _availableTribes[index];
-            UpdateTribeCardSelection(index);
-
-            if (_confirmButton != null)
+            _selectedTier = tier;
+            // 高亮选中
+            foreach (Transform child in _tribesContainer)
             {
-                _confirmButton.interactable = true;
+                var card = child.GetComponent<RitualTierCard>();
+                if (card?.Img != null)
+                    card.Img.color = card.Tier == tier
+                        ? new Color(1f, 0.9f, 0.3f)
+                        : GetTierColor(card.Tier.tierName);
             }
-        }
-
-        private void UpdateTribeCardSelection(int selectedIndex)
-        {
-            if (_cardsContainer == null) return;
-
-            for (int i = 0; i < _cardsContainer.childCount; i++)
-            {
-                Transform child = _cardsContainer.GetChild(i);
-                RitualTribeCard card = child.GetComponent<RitualTribeCard>();
-                if (card != null && card.BackgroundImage != null)
-                {
-                    if (i == selectedIndex)
-                    {
-                        card.BackgroundImage.color = new Color(1f, 0.9f, 0.3f, 1f);
-                    }
-                    else
-                    {
-                        card.BackgroundImage.color = GetTribeCardColor(card.Tribe.tribeType);
-                    }
-                }
-            }
+            if (_step1ConfirmButton != null) _step1ConfirmButton.interactable = true;
         }
 
         private void OnStep1Confirm()
         {
-            if (_selectedTribe == null) return;
-
-            // 进入第二步
+            if (_selectedTier == null) return;
+            _drawnBlessings = _drawBlessings?.Invoke(_selectedTier) ?? new List<RitualRewardItem>();
             ShowStep2();
         }
 
-        #endregion
+        // ─── Step2：选祝福 ─────────────────────────────────────────────────────
 
-        #region Step 2: Cost Tier Selection
-
-        private void GenerateCostTierCards()
+        private void ShowStep2()
         {
-            if (_cardsContainer == null) return;
+            _currentStep = 2;
+            if (_step1ContainerObj != null) _step1ContainerObj.SetActive(false);
+            if (_step2ContainerObj != null) _step2ContainerObj.SetActive(true);
 
-            var config = TribeConfigLoader.Instance.GetRitualConfig();
-            if (config?.tiers == null) return;
+            ClearContainer(_costOptionsContainer);
+            GenerateBlessingCards();
 
-            foreach (var tier in config.tiers)
+            if (_step2ConfirmButton != null)
             {
-                // 随机生成消耗范围内的具体数值
-                int cost = UnityEngine.Random.Range(tier.costRange[0], tier.costRange[1] + 1);
-
-                GameObject cardGo = new GameObject("CostCard", typeof(RectTransform), typeof(Image), typeof(Button));
-                cardGo.transform.SetParent(_cardsContainer, false);
-
-                RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-                cardRect.sizeDelta = new Vector2(200f, 250f);
-
-                Image cardImg = cardGo.GetComponent<Image>();
-                cardImg.color = GetCostTierColor(tier.tierName);
-
-                Button cardBtn = cardGo.GetComponent<Button>();
-                cardBtn.onClick.AddListener(() => OnCostCardClicked(tier, cost));
-
-                // 创建卡片内容
-                CreateCostTierCardContent(cardRect, tier, cost);
-
-                // 存储引用
-                RitualCostCard cardComponent = cardGo.AddComponent<RitualCostCard>();
-                cardComponent.Tier = tier;
-                cardComponent.Cost = cost;
-                cardComponent.BackgroundImage = cardImg;
+                _step2ConfirmButton.interactable = false;
+                _step2ConfirmButton.onClick.RemoveAllListeners();
+                _step2ConfirmButton.onClick.AddListener(OnStep2Confirm);
             }
         }
 
-        private void CreateCostTierCardContent(RectTransform cardRect, RitualTier tier, int cost)
+        private void GenerateBlessingCards()
         {
-            Font font = _cachedFont;
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (_costOptionsContainer == null || _drawnBlessings == null) return;
+            Font font = GetFont();
 
-            // 档位名称
-            GameObject nameGo = new GameObject("Name", typeof(RectTransform), typeof(Text));
-            nameGo.transform.SetParent(cardRect, false);
-            RectTransform nameRect = nameGo.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0.1f, 0.75f);
-            nameRect.anchorMax = new Vector2(0.9f, 0.85f);
-            nameRect.offsetMin = Vector2.zero;
-            nameRect.offsetMax = Vector2.zero;
-            Text nameText = nameGo.GetComponent<Text>();
-            nameText.font = font;
-            nameText.fontSize = 20;
-            nameText.alignment = TextAnchor.MiddleCenter;
-            nameText.color = Color.white;
-            nameText.text = GetTierDisplayName(tier.tierName);
-
-            // 消耗
-            GameObject costGo = new GameObject("Cost", typeof(RectTransform), typeof(Text));
-            costGo.transform.SetParent(cardRect, false);
-            RectTransform costRect = costGo.GetComponent<RectTransform>();
-            costRect.anchorMin = new Vector2(0.1f, 0.60f);
-            costRect.anchorMax = new Vector2(0.9f, 0.70f);
-            costRect.offsetMin = Vector2.zero;
-            costRect.offsetMax = Vector2.zero;
-            Text costText = costGo.GetComponent<Text>();
-            costText.font = font;
-            costText.fontSize = 18;
-            costText.alignment = TextAnchor.MiddleCenter;
-            costText.color = new Color(1f, 0.9f, 0.3f, 1f);
-            costText.text = $"{cost} 猫粮";
-
-            // 奖励预览
-            GameObject rewardGo = new GameObject("Reward", typeof(RectTransform), typeof(Text));
-            rewardGo.transform.SetParent(cardRect, false);
-            RectTransform rewardRect = rewardGo.GetComponent<RectTransform>();
-            rewardRect.anchorMin = new Vector2(0.1f, 0.15f);
-            rewardRect.anchorMax = new Vector2(0.9f, 0.55f);
-            rewardRect.offsetMin = Vector2.zero;
-            rewardRect.offsetMax = Vector2.zero;
-            Text rewardText = rewardGo.GetComponent<Text>();
-            rewardText.font = font;
-            rewardText.fontSize = 12;
-            rewardText.alignment = TextAnchor.UpperLeft;
-            rewardText.color = new Color(0.8f, 0.8f, 0.8f, 1f);
-            rewardText.text = GetRewardPreview(tier);
-        }
-
-        private Color GetCostTierColor(string tierName)
-        {
-            switch (tierName)
+            foreach (var blessing in _drawnBlessings)
             {
-                case "free": return new Color(0.4f, 0.4f, 0.5f, 1f);
-                case "low": return new Color(0.3f, 0.5f, 0.4f, 1f);
-                case "high": return new Color(0.6f, 0.4f, 0.3f, 1f);
-                default: return new Color(0.5f, 0.5f, 0.5f, 1f);
+                var go = new GameObject("BlessingCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                go.transform.SetParent(_costOptionsContainer, false);
+                go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
+
+                var img = go.GetComponent<Image>();
+                img.color = GetBlessingColor(blessing.rewardType);
+
+                var captured = blessing;
+                go.GetComponent<Button>().onClick.AddListener(() => OnBlessingCardClicked(captured));
+
+                AddText(go.GetComponent<RectTransform>(), "Name", font, 16,
+                    new Vector2(0.05f, 0.70f), new Vector2(0.95f, 0.88f),
+                    GetRewardTypeName(blessing.rewardType), Color.white, TextAnchor.MiddleCenter);
+                AddText(go.GetComponent<RectTransform>(), "Desc", font, 14,
+                    new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.65f),
+                    blessing.displayName, new Color(0.9f, 0.9f, 0.9f), TextAnchor.UpperCenter);
+
+                var comp = go.AddComponent<RitualBlessingCard>();
+                comp.Blessing = blessing;
+                comp.Img      = img;
             }
         }
 
-        private string GetTierDisplayName(string tierName)
+        private void OnBlessingCardClicked(RitualRewardItem blessing)
         {
-            switch (tierName)
+            _selectedBlessing = blessing;
+            foreach (Transform child in _costOptionsContainer)
             {
-                case "free": return "免费祭祀";
-                case "low": return "普通祭祀";
-                case "high": return "盛大祭祀";
-                default: return tierName;
+                var card = child.GetComponent<RitualBlessingCard>();
+                if (card?.Img != null)
+                    card.Img.color = card.Blessing == blessing
+                        ? new Color(1f, 0.9f, 0.3f)
+                        : GetBlessingColor(card.Blessing.rewardType);
             }
-        }
-
-        private string GetRewardPreview(RitualTier tier)
-        {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine("奖励预览:");
-
-            foreach (var reward in tier.rewards)
-            {
-                string rewardType = GetRewardTypeDisplayName(reward.type);
-                sb.AppendLine($"• {rewardType}");
-            }
-
-            return sb.ToString();
-        }
-
-        private string GetRewardTypeDisplayName(string rewardType)
-        {
-            switch (rewardType)
-            {
-                case "LeaderStatBoostTemporary": return "族长属性临时提升";
-                case "LeaderStatBoostPermanent": return "族长属性永久提升";
-                case "LeaderStatBoostPercent": return "族长属性百分比提升";
-                case "Cats": return "获得小猫";
-                case "Consumable": return "获得道具";
-                case "CatFood": return "获得猫粮";
-                case "Accessory": return "获得饰品";
-                default: return rewardType;
-            }
-        }
-
-        private void OnCostCardClicked(RitualTier tier, int cost)
-        {
-            _selectedTier = tier;
-            _selectedCost = cost;
-            UpdateCostCardSelection();
-
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = true;
-            }
-        }
-
-        private void UpdateCostCardSelection()
-        {
-            if (_cardsContainer == null) return;
-
-            for (int i = 0; i < _cardsContainer.childCount; i++)
-            {
-                Transform child = _cardsContainer.GetChild(i);
-                RitualCostCard card = child.GetComponent<RitualCostCard>();
-                if (card != null && card.BackgroundImage != null)
-                {
-                    if (card.Tier == _selectedTier)
-                    {
-                        card.BackgroundImage.color = new Color(1f, 0.9f, 0.3f, 1f);
-                    }
-                    else
-                    {
-                        card.BackgroundImage.color = GetCostTierColor(card.Tier.tierName);
-                    }
-                }
-            }
+            if (_step2ConfirmButton != null) _step2ConfirmButton.interactable = true;
         }
 
         private void OnStep2Confirm()
         {
-            if (_selectedTribe == null || _selectedTier == null) return;
-
+            if (_selectedBlessing == null) return;
             Hide();
-
-            _onRitualConfirmed?.Invoke(_selectedTribe, _selectedCost);
+            _onRitualConfirmed?.Invoke(_selectedTier, _selectedBlessing);
         }
 
-        #endregion
-
-        #region Common Methods
-
-        private void ClearCards()
+        private void OnCloseClicked()
         {
-            if (_cardsContainer == null) return;
-
-            for (int i = _cardsContainer.childCount - 1; i >= 0; i--)
-            {
-                Destroy(_cardsContainer.GetChild(i).gameObject);
-            }
+            Hide();
+            _onRitualConfirmed?.Invoke(null, null); // 跳过祭祀
         }
+
+        // ─── 显示/隐藏 ─────────────────────────────────────────────────────────
 
         public void Show()
         {
-            if (_externalRoot != null && _cardsContainer == null && _cachedFont != null)
-            {
-                RectTransform parentToUse = _cachedParent != null ? _cachedParent : transform.parent as RectTransform;
-                if (parentToUse != null)
-                {
-                    EnsureRuntimeUI(parentToUse, _cachedFont);
-                }
-            }
-
-            if (_externalRoot == null)
-            {
-                gameObject.SetActive(true);
-            }
-            UpdateHintText();
+            EnsureUIComponents();
+            gameObject.SetActive(true);
+            transform.SetAsLastSibling();
+            if (_externalRoot != null) _externalRoot.gameObject.SetActive(true);
+            if (_panelContent  != null) _panelContent.SetActive(true);
         }
 
         public void Hide()
         {
-            if (_externalRoot != null)
-            {
-                if (_externalRoot.gameObject != null)
-                {
-                    _externalRoot.gameObject.SetActive(false);
-                }
-            }
-            else
-            {
-                gameObject.SetActive(false);
-            }
+            gameObject.SetActive(false);
+            if (_externalRoot != null) _externalRoot.gameObject.SetActive(false);
+            if (_panelContent  != null) _panelContent.SetActive(false);
         }
 
-        private void UpdateHintText()
+        // ─── 初始化组件 ────────────────────────────────────────────────────────
+
+        private void EnsureUIComponents()
         {
-            if (_hintText == null) return;
+            if (_titleText == null)
+                _titleText = transform.Find("Title")?.GetComponent<Text>();
 
-            if (_currentStep == 1)
+            if (_step1ContainerObj == null)
+            { var t = transform.Find("Step1Container"); if (t != null) _step1ContainerObj = t.gameObject; }
+            if (_step2ContainerObj == null)
+            { var t = transform.Find("Step2Container"); if (t != null) _step2ContainerObj = t.gameObject; }
+
+            if (_step1ContainerObj != null)
             {
-                _hintText.text = HintStep1;
+                if (_tribesContainer == null)
+                    _tribesContainer = _step1ContainerObj.transform.Find("TribesContainer") as RectTransform;
+                if (_step1ConfirmButton == null)
+                    _step1ConfirmButton = _step1ContainerObj.transform.Find("Step1ConfirmButton")?.GetComponent<Button>();
             }
-            else
+            if (_step2ContainerObj != null)
             {
-                _hintText.text = HintStep2;
+                if (_costOptionsContainer == null)
+                    _costOptionsContainer = _step2ContainerObj.transform.Find("CostOptionsContainer") as RectTransform;
+                if (_step2ConfirmButton == null)
+                    _step2ConfirmButton = _step2ContainerObj.transform.Find("Step2ConfirmButton")?.GetComponent<Button>();
+            }
+            if (_closeButton == null)
+                _closeButton = transform.Find("CloseButton")?.GetComponent<Button>();
+
+            if (_closeButton != null)
+            {
+                _closeButton.onClick.RemoveAllListeners();
+                _closeButton.onClick.AddListener(OnCloseClicked);
+            }
+
+            bool prefabOk = _step1ContainerObj != null && _step2ContainerObj != null
+                         && _tribesContainer != null && _costOptionsContainer != null;
+            if (!prefabOk) EnsureRuntimeUI();
+        }
+
+        private void EnsureRuntimeUI()
+        {
+            if (_isRuntimeCreated) return;
+            if (_tribesContainer != null && _costOptionsContainer != null) return;
+            _isRuntimeCreated = true;
+
+            Font font = GetFont();
+            var targetParent = _externalRoot != null ? _externalRoot : (transform.parent as RectTransform ?? transform as RectTransform);
+
+            var panelGo = new GameObject("RitualPanelContent", typeof(RectTransform), typeof(Image));
+            panelGo.transform.SetParent(targetParent, false);
+            var panelRect = panelGo.GetComponent<RectTransform>();
+            panelRect.anchorMin = Vector2.zero; panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero; panelRect.offsetMax = Vector2.zero;
+            panelGo.GetComponent<Image>().color = new Color(0.12f, 0.08f, 0.1f, 0.98f);
+            _panelContent = panelGo;
+
+            if (_titleText == null)
+            {
+                var tGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
+                tGo.transform.SetParent(panelRect, false);
+                var tRect = tGo.GetComponent<RectTransform>();
+                tRect.anchorMin = new Vector2(0, 1); tRect.anchorMax = new Vector2(1, 1);
+                tRect.pivot = new Vector2(0.5f, 1); tRect.sizeDelta = new Vector2(0, 50); tRect.anchoredPosition = new Vector2(0, -10);
+                _titleText = tGo.GetComponent<Text>();
+                _titleText.font = font; _titleText.fontSize = 28;
+                _titleText.alignment = TextAnchor.MiddleCenter; _titleText.color = Color.white;
+            }
+
+            // Step1Container
+            var s1 = new GameObject("Step1Container", typeof(RectTransform));
+            s1.transform.SetParent(panelRect, false);
+            SetStretch(s1.GetComponent<RectTransform>(), new Vector2(0, 60), Vector2.zero);
+            _step1ContainerObj = s1;
+
+            _tribesContainer = CreateHLayout(s1.GetComponent<RectTransform>(), "TribesContainer");
+            CreateConfirmBtn(s1.GetComponent<RectTransform>(), font, "确认档次", out _step1ConfirmButton);
+
+            // Step2Container
+            var s2 = new GameObject("Step2Container", typeof(RectTransform));
+            s2.transform.SetParent(panelRect, false);
+            SetStretch(s2.GetComponent<RectTransform>(), new Vector2(0, 60), Vector2.zero);
+            s2.SetActive(false);
+            _step2ContainerObj = s2;
+
+            _costOptionsContainer = CreateHLayout(s2.GetComponent<RectTransform>(), "CostOptionsContainer");
+            CreateConfirmBtn(s2.GetComponent<RectTransform>(), font, "选择祝福", out _step2ConfirmButton);
+
+            // CloseButton
+            var closeGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            closeGo.transform.SetParent(panelRect, false);
+            var closeRect = closeGo.GetComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(0.68f, 0.02f); closeRect.anchorMax = new Vector2(0.95f, 0.10f);
+            closeRect.offsetMin = Vector2.zero; closeRect.offsetMax = Vector2.zero;
+            closeGo.GetComponent<Image>().color = new Color(0.35f, 0.35f, 0.35f);
+            _closeButton = closeGo.GetComponent<Button>();
+            _closeButton.onClick.AddListener(OnCloseClicked);
+            AddLabel(closeRect, font, "先等等");
+        }
+
+        // ─── 工具方法 ──────────────────────────────────────────────────────────
+
+        private void ClearContainer(RectTransform ct)
+        {
+            if (ct == null) return;
+            for (int i = ct.childCount - 1; i >= 0; i--)
+                Destroy(ct.GetChild(i).gameObject);
+        }
+
+        private Font GetFont()
+        {
+            if (_cachedFont == null) _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return _cachedFont;
+        }
+
+        private void AddText(RectTransform parent, string name, Font font, int size,
+            Vector2 aMin, Vector2 aMax, string text, Color color, TextAnchor align)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Text));
+            go.transform.SetParent(parent, false);
+            var r = go.GetComponent<RectTransform>();
+            r.anchorMin = aMin; r.anchorMax = aMax;
+            r.offsetMin = Vector2.zero; r.offsetMax = Vector2.zero;
+            var t = go.GetComponent<Text>();
+            t.font = font; t.fontSize = size; t.alignment = align; t.color = color; t.text = text;
+        }
+
+        private void AddLabel(RectTransform parent, Font font, string text)
+            => AddText(parent, "Label", font, 18, Vector2.zero, Vector2.one, text, Color.white, TextAnchor.MiddleCenter);
+
+        private void SetStretch(RectTransform r, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one;
+            r.offsetMin = offsetMin;   r.offsetMax = offsetMax;
+        }
+
+        private RectTransform CreateHLayout(RectTransform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+            go.transform.SetParent(parent, false);
+            var r = go.GetComponent<RectTransform>();
+            r.anchorMin = new Vector2(0.05f, 0.15f); r.anchorMax = new Vector2(0.95f, 0.88f);
+            r.offsetMin = Vector2.zero; r.offsetMax = Vector2.zero;
+            go.GetComponent<Image>().color = new Color(0, 0, 0, 0.2f);
+            var hlg = go.GetComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 20; hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = false; hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+            hlg.padding = new RectOffset(15, 15, 15, 15);
+            return r;
+        }
+
+        private void CreateConfirmBtn(RectTransform parent, Font font, string label, out Button btn)
+        {
+            var go = new GameObject("ConfirmButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var r = go.GetComponent<RectTransform>();
+            r.anchorMin = new Vector2(0.35f, 0.02f); r.anchorMax = new Vector2(0.65f, 0.12f);
+            r.offsetMin = Vector2.zero; r.offsetMax = Vector2.zero;
+            go.GetComponent<Image>().color = new Color(0.5f, 0.3f, 0.2f);
+            btn = go.GetComponent<Button>();
+            AddLabel(r, font, label);
+        }
+
+        private Color GetTierColor(string tierName)
+        {
+            switch (tierName)
+            {
+                case "free": return new Color(0.4f, 0.4f, 0.5f);
+                case "low":  return new Color(0.3f, 0.5f, 0.4f);
+                case "high": return new Color(0.6f, 0.4f, 0.3f);
+                default:     return new Color(0.5f, 0.5f, 0.5f);
             }
         }
 
-        #endregion
+        private Color GetBlessingColor(RitualRewardType type)
+        {
+            switch (type)
+            {
+                case RitualRewardType.LeaderStatBoostTemporary:
+                case RitualRewardType.LeaderStatBoostPermanent:
+                case RitualRewardType.LeaderStatBoostPercent: return new Color(0.3f, 0.4f, 0.6f);
+                case RitualRewardType.Cats:     return new Color(0.3f, 0.55f, 0.3f);
+                case RitualRewardType.CatFood:  return new Color(0.5f, 0.4f, 0.2f);
+                case RitualRewardType.Accessory:return new Color(0.55f, 0.3f, 0.5f);
+                default:                        return new Color(0.45f, 0.45f, 0.45f);
+            }
+        }
+
+        private string GetRewardTypeName(RitualRewardType type)
+        {
+            switch (type)
+            {
+                case RitualRewardType.LeaderStatBoostTemporary: return "族长临时强化";
+                case RitualRewardType.LeaderStatBoostPermanent: return "族长永久强化";
+                case RitualRewardType.LeaderStatBoostPercent:   return "族长百分比强化";
+                case RitualRewardType.Cats:      return "获得小猫";
+                case RitualRewardType.CatFood:   return "获得猫粮";
+                case RitualRewardType.Consumable:return "获得道具";
+                case RitualRewardType.Accessory: return "获得饰品";
+                default: return "祝福";
+            }
+        }
     }
 
-    /// <summary>
-    /// 祭祀族群卡片组件
-    /// </summary>
-    public class RitualTribeCard : MonoBehaviour
-    {
-        public TribeRecord Tribe { get; set; }
-        public int Index { get; set; }
-        public Image BackgroundImage { get; set; }
-    }
+    // ─── 辅助组件 ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// 祭祀消耗档位卡片组件
-    /// </summary>
-    public class RitualCostCard : MonoBehaviour
+    public class RitualTierCard : MonoBehaviour
     {
         public RitualTier Tier { get; set; }
-        public int Cost { get; set; }
-        public Image BackgroundImage { get; set; }
+        public Image Img { get; set; }
+    }
+
+    public class RitualBlessingCard : MonoBehaviour
+    {
+        public RitualRewardItem Blessing { get; set; }
+        public Image Img { get; set; }
     }
 }

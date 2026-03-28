@@ -9,6 +9,10 @@ public class BattleCampaignRuntime
     private readonly int[][] _enemyUnitIdsByBattle;
     private readonly bool[] _blessingEnabledByBattle;
     private readonly bool[] _attributeBoostEnabledByBattle;
+    private readonly bool[] _hasRecruitmentByBattle;
+    private readonly bool[] _hasRitualByBattle;
+    private readonly bool[] _hasShopByBattle;
+    private readonly int[] _catFoodRewardByBattle;
     private int _currentBattleIndex;
     private bool _isCompleted;
 
@@ -20,7 +24,13 @@ public class BattleCampaignRuntime
 
     public BattleCampaignRuntime()
     {
-        _enemyUnitIdsByBattle = LoadEnemyUnitIds(out _blessingEnabledByBattle, out _attributeBoostEnabledByBattle);
+        _enemyUnitIdsByBattle = LoadEnemyUnitIds(
+            out _blessingEnabledByBattle,
+            out _attributeBoostEnabledByBattle,
+            out _hasRecruitmentByBattle,
+            out _hasRitualByBattle,
+            out _hasShopByBattle,
+            out _catFoodRewardByBattle);
         ResetProgress();
     }
 
@@ -72,7 +82,13 @@ public class BattleCampaignRuntime
         _currentBattleIndex++;
     }
 
-    private static int[][] LoadEnemyUnitIds(out bool[] blessingEnabledByBattle, out bool[] attributeBoostEnabledByBattle)
+    private static int[][] LoadEnemyUnitIds(
+        out bool[] blessingEnabledByBattle,
+        out bool[] attributeBoostEnabledByBattle,
+        out bool[] hasRecruitmentByBattle,
+        out bool[] hasRitualByBattle,
+        out bool[] hasShopByBattle,
+        out int[] catFoodRewardByBattle)
     {
         string configPath = Path.Combine(Application.streamingAssetsPath, BattleLevelConfigFileName);
         if (!File.Exists(configPath))
@@ -80,6 +96,10 @@ public class BattleCampaignRuntime
             Debug.LogError($"[BattleCampaignRuntime] Battle level config file not found: {configPath}");
             blessingEnabledByBattle = new[] { false };
             attributeBoostEnabledByBattle = new[] { false };
+            hasRecruitmentByBattle = new[] { false };
+            hasRitualByBattle = new[] { false };
+            hasShopByBattle = new[] { false };
+            catFoodRewardByBattle = new[] { 0 };
             return new[] { new[] { 1 } };
         }
 
@@ -92,21 +112,32 @@ public class BattleCampaignRuntime
                 Debug.LogError($"[BattleCampaignRuntime] Battle level config format is invalid: {configPath}");
                 blessingEnabledByBattle = new[] { false };
                 attributeBoostEnabledByBattle = new[] { false };
+                hasRecruitmentByBattle = new[] { false };
+                hasRitualByBattle = new[] { false };
+                hasShopByBattle = new[] { false };
+                catFoodRewardByBattle = new[] { 0 };
                 return new[] { new[] { 1 } };
             }
 
             int count = levelsJson.Count;
             int[][] enemyUnitIdsByBattle = new int[count][];
-            blessingEnabledByBattle = new bool[count];
+            blessingEnabledByBattle    = new bool[count];
             attributeBoostEnabledByBattle = new bool[count];
+            hasRecruitmentByBattle     = new bool[count];
+            hasRitualByBattle          = new bool[count];
+            hasShopByBattle            = new bool[count];
+            catFoodRewardByBattle      = new int[count];
 
             for (int i = 0; i < count; i++)
             {
                 JsonData levelJson = levelsJson[i];
                 enemyUnitIdsByBattle[i] = ReadIntArray(levelJson, "enemyUnitIds");
-                // read optional feature flags
-                blessingEnabledByBattle[i] = levelJson.Keys.Contains("blessingEntry") && bool.TryParse(levelJson["blessingEntry"].ToString(), out bool b1) && b1;
-                attributeBoostEnabledByBattle[i] = levelJson.Keys.Contains("attributeBoostEntry") && bool.TryParse(levelJson["attributeBoostEntry"].ToString(), out bool b2) && b2;
+                blessingEnabledByBattle[i]    = ReadBool(levelJson, "blessingEntry");
+                attributeBoostEnabledByBattle[i] = ReadBool(levelJson, "attributeBoostEntry");
+                hasRecruitmentByBattle[i]     = ReadBool(levelJson, "hasRecruitment");
+                hasRitualByBattle[i]          = ReadBool(levelJson, "hasRitual");
+                hasShopByBattle[i]            = ReadBool(levelJson, "hasShop");
+                catFoodRewardByBattle[i]      = ReadInt(levelJson, "catFoodReward");
             }
 
             return enemyUnitIdsByBattle;
@@ -116,8 +147,52 @@ public class BattleCampaignRuntime
             Debug.LogError($"[BattleCampaignRuntime] Failed to load battle level config: {exception.Message}");
             blessingEnabledByBattle = new[] { false };
             attributeBoostEnabledByBattle = new[] { false };
+            hasRecruitmentByBattle = new[] { false };
+            hasRitualByBattle = new[] { false };
+            hasShopByBattle = new[] { false };
+            catFoodRewardByBattle = new[] { 0 };
             return new[] { new[] { 1 } };
         }
+    }
+
+    private static int ReadInt(JsonData json, string key)
+    {
+        return json.Keys.Contains(key) && int.TryParse(json[key].ToString(), out int v) ? v : 0;
+    }
+
+    private static bool ReadBool(JsonData json, string key)
+    {
+        return json.Keys.Contains(key)
+            && bool.TryParse(json[key].ToString(), out bool v)
+            && v;
+    }
+
+    public int GetCatFoodRewardForBattle(int battleNumber)
+    {
+        if (_catFoodRewardByBattle == null || _catFoodRewardByBattle.Length == 0) return 0;
+        int index = Mathf.Clamp(battleNumber - 1, 0, _catFoodRewardByBattle.Length - 1);
+        return _catFoodRewardByBattle[index];
+    }
+
+    public bool HasRecruitmentForBattle(int battleNumber)
+    {
+        if (_hasRecruitmentByBattle == null || _hasRecruitmentByBattle.Length == 0) return false;
+        int index = Mathf.Clamp(battleNumber - 1, 0, _hasRecruitmentByBattle.Length - 1);
+        return _hasRecruitmentByBattle[index];
+    }
+
+    public bool HasRitualForBattle(int battleNumber)
+    {
+        if (_hasRitualByBattle == null || _hasRitualByBattle.Length == 0) return false;
+        int index = Mathf.Clamp(battleNumber - 1, 0, _hasRitualByBattle.Length - 1);
+        return _hasRitualByBattle[index];
+    }
+
+    public bool HasShopForBattle(int battleNumber)
+    {
+        if (_hasShopByBattle == null || _hasShopByBattle.Length == 0) return false;
+        int index = Mathf.Clamp(battleNumber - 1, 0, _hasShopByBattle.Length - 1);
+        return _hasShopByBattle[index];
     }
 
     public bool IsBlessingEnabledForBattle(int battleNumber)

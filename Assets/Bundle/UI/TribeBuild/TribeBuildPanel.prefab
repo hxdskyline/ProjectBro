@@ -335,11 +335,11 @@ MonoBehaviour:
   _catFoodText: {fileID: 420500431305102245}
   _tribeListContainer: {fileID: 8174839559896814755}
   _startBattleButton: {fileID: 5964046744294056465}
-  _shopButton: {fileID: 0}
-  _backButton: {fileID: 0}
+  _shopButton: {fileID: 3956067093410408347}
+  _backButton: {fileID: 3442466656356785286}
   _deployCostText: {fileID: 7709764209128403855}
-  _tribeCardPrefab: {fileID: 0}
-  _tribeDetailTipsPrefab: {fileID: 0}
+  _tribeCardPrefab: {fileID: 9173514629417532719, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
+  _tribeDetailTipsPrefab: {fileID: 8323053977849122858, guid: 93dd7b94f8b9ebc4b935dec0d3dc18f2, type: 3}
   _recruitmentPanel: {fileID: 5846606182133769223, guid: 3d550a5e6840fd74eadd04e286e72bb4, type: 3}
   _ritualPanel: {fileID: 7264423470781314239, guid: aead1aac3a3bad74ebc9732087475583, type: 3}
   _shopPanel: {fileID: 8157977110538632174, guid: 36d55bbd7dd148b47a136c28a9a9e69a, type: 3}

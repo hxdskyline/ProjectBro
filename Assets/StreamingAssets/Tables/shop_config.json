@@ -6,33 +6,28 @@
   "startRound": 5,
   "items": {
     "artifact": {
-      "basePrice": 500,
-      "priceVariation": 0.0
+      "basePrice": 500
     },
     "consumable": {
       "basePriceMin": 50,
-      "basePriceMax": 100,
-      "priceVariation": 0.0
+      "basePriceMax": 100
     },
     "cat": {
       "basePrices": {
-        "0": 100,
-        "1": 80,
-        "2": 120,
-        "3": 100,
-        "4": 90,
-        "5": 110
+        "Maine": 80,
+        "Tabby": 90,
+        "Orange": 70,
+        "Cow": 100,
+        "Siamese": 110,
+        "Ragdoll": 120
       },
       "qualityBonusMultipliers": {
-        "0": 1.0,
-        "1": 2.0,
-        "2": 4.0,
-        "3": 8.0
+        "White": 1.0,
+        "Blue": 1.3,
+        "Purple": 1.6,
+        "Gold": 2.0
       },
       "priceVariation": 0.5
     }
-  },
-  "sellPrices": {
-    "consumable": 0.5
   }
 }

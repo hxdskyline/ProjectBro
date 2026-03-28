@@ -64,19 +64,21 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 计算小猫的实际属性（基于族长属性）
+        /// 计算小猫的实际属性（基于小猫基础属性和品质乘数）
+        /// 注：小猫现在有独立的catBaseStats配置，而不是基于族长属性
         /// </summary>
-        public static CatStats CalculateCatStats(CatData cat, LeaderStats leaderStats)
+        public static CatStats CalculateCatStats(CatData cat, LeaderStats catBaseStats)
         {
             if (cat == null)
             {
                 return new CatStats(0, 0, 0, 0);
             }
 
-            int attack = Mathf.RoundToInt(leaderStats.attack * cat.attackMultiplier);
-            int defense = Mathf.RoundToInt(leaderStats.defense * cat.defenseMultiplier);
-            int hp = Mathf.RoundToInt(leaderStats.hp * cat.hpMultiplier);
-            int speed = Mathf.RoundToInt(leaderStats.speed * cat.speedMultiplier);
+            // 使用小猫的基础属性（从tribe_config.json的catBaseStats）
+            int attack = Mathf.RoundToInt(catBaseStats.attack * cat.attackMultiplier);
+            int defense = Mathf.RoundToInt(catBaseStats.defense * cat.defenseMultiplier);
+            int hp = Mathf.RoundToInt(catBaseStats.hp * cat.hpMultiplier);
+            int speed = Mathf.RoundToInt(catBaseStats.speed * cat.speedMultiplier);
 
             // 确保属性不低于1
             attack = Mathf.Max(1, attack);
@@ -119,9 +121,10 @@ namespace TribeSystem
         /// <summary>
         /// 计算小猫在实战中的实际速度（考虑统帅惩罚）
         /// </summary>
-        public static int CalculateCatEffectiveSpeed(CatData cat, LeaderStats leaderStats, int totalCatCount, int command)
+        public static int CalculateCatEffectiveSpeed(CatData cat, LeaderStats catBaseStats, int totalCatCount, int command)
         {
-            CatStats catStats = CalculateCatStats(cat, leaderStats);
+            // 使用小猫的基础属性计算速度
+            CatStats catStats = CalculateCatStats(cat, catBaseStats);
             return ApplyCommandPenaltyToSpeed(catStats.speed, totalCatCount, command);
         }
 

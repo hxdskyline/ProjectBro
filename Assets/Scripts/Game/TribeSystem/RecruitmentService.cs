@@ -132,10 +132,10 @@ namespace TribeSystem
 
             int catsToAdd = config.initialCatCount;
 
-            // 添加白色品质小猫
+            // 随机品质（白40% 蓝30% 紫20% 金10%）
             for (int i = 0; i < catsToAdd; i++)
             {
-                tribe.cats.Add(CatData.CreateWithQuality(CatQuality.White));
+                tribe.cats.Add(CatData.CreateWithRandomQuality());
             }
 
             _dataManager.SavePlayerData();
@@ -309,6 +309,7 @@ namespace TribeSystem
                 cost = config.leaderBoost.cost,
                 targetTribeType = null,
                 targetTribeId = randomTribe.tribeId,
+                targetStatType = randomStat,
                 description = $"{GetTribeTypeName(randomTribe.tribeType)}{GetStatTypeName(randomStat)}+20%（消耗{config.leaderBoost.cost}猫粮）"
             };
         }

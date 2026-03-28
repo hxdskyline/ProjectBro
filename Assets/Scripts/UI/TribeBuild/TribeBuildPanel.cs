@@ -46,6 +46,7 @@ namespace TribeSystem.UI
         private TribeSaveManager _saveManager;
 
         private List<TribeRecord> _tribes;
+        // 注：族群部署选择已移至BattlePreparePanel，以下代码保留以兼容旧系统
         private List<TribeRecord> _deployedTribes;
         private Dictionary<int, bool> _tribeDeployStates;
 
@@ -128,13 +129,15 @@ namespace TribeSystem.UI
 
         private void OnBackButtonClicked()
         {
-            Debug.Log("[TribeBuildPanel] Back button clicked");
+            Debug.Log("[TribeBuildPanel] Back button clicked - returning to main menu");
 
             // 隐藏当前界面
             gameObject.SetActive(false);
 
-            // 返回主界面
+            // 返回主界面（游戏暂停，数据已保存）
             GameManager.Instance.UIManager.ShowPanel<MainPanel>("ui/mainpanel", UIManager.UILayer.Normal);
+
+            // 注：游戏状态保留在GameFlowController中，用户可从主菜单点击开始游戏继续
         }
 
         public override void Initialize()
@@ -149,6 +152,13 @@ namespace TribeSystem.UI
             _recruitmentPanel = InstantiatePanelIfNeeded(_recruitmentPanel, "RecruitmentPanel");
             _ritualPanel = InstantiatePanelIfNeeded(_ritualPanel, "RitualPanel");
             _shopPanel = InstantiatePanelIfNeeded(_shopPanel, "ShopPanel");
+
+            // 先设置外部根节点，再初始化（确保运行时 UI 构建在正确的父节点内）
+            if (_forcedPopupRoot != null)
+            {
+                _recruitmentPanel?.SetExternalRoot(_forcedPopupRoot);
+                _ritualPanel?.SetExternalRoot(_forcedPopupRoot);
+            }
 
             // 初始化并隐藏子面板（按需显示）
             if (_recruitmentPanel != null)
@@ -167,13 +177,6 @@ namespace TribeSystem.UI
             {
                 _shopPanel.Initialize();
                 _shopPanel.Hide();
-            }
-
-            // 设置外部根节点
-            if (_forcedPopupRoot != null)
-            {
-                _recruitmentPanel?.SetExternalRoot(_forcedPopupRoot);
-                _ritualPanel?.SetExternalRoot(_forcedPopupRoot);
             }
         }
 
@@ -210,16 +213,9 @@ namespace TribeSystem.UI
                 _tribes = new List<TribeRecord>();
             }
 
-            // 如果是第一回合且没有族群，显示初始选择界面
-            if (_roundManager.CurrentRound == 1 && _tribes.Count == 0)
-            {
-                ShowInitialTribeSelection();
-            }
-            else
-            {
-                // 开始正常回合流程
-                StartRoundPreparation();
-            }
+            // 注：初始族群选择由GameFlowController处理（InitialTribeSelectionPanel）
+            // TribeBuildPanel只负责回合流程
+            StartRoundPreparation();
 
             // 回合开始前存档
             _saveManager?.SaveBeforeRound(_roundManager.CurrentRound);
@@ -241,10 +237,24 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 处理招募&练兵（强制）
+        /// 处理招募&练兵（第2-10关强制）
         /// </summary>
         private void ProcessRecruitment()
         {
+            if (!_roundManager.CanDoRecruitment())
+            {
+                // 第1关无招募，直接进入后续流程
+                OnRecruitmentOptionSelected(null);
+                return;
+            }
+
+            // 本回合已完成过招募，跳过
+            if (_dataManager.IsRecruitmentCompletedForRound(_roundManager.CurrentRound))
+            {
+                OnRecruitmentOptionSelected(null);
+                return;
+            }
+
             _isProcessingRecruitment = true;
 
             var options = _recruitmentService.GenerateOptions();
@@ -262,7 +272,12 @@ namespace TribeSystem.UI
 
         private void OnRecruitmentOptionSelected(RecruitmentOption option)
         {
-            ExecuteRecruitmentOption(option);
+            if(option != null)
+            {
+                ExecuteRecruitmentOption(option);
+                // 玩家做出选择并拿到奖励，标记本回合招募已完成
+                _dataManager.SetRecruitmentCompletedForRound(_roundManager.CurrentRound);
+            }
 
             _isProcessingRecruitment = false;
 
@@ -317,9 +332,7 @@ namespace TribeSystem.UI
                     tribe = FindTribeById(option.targetTribeId);
                     if (tribe != null)
                     {
-                        // 暂时随机选择一个属性提升
-                        StatType randomStat = (StatType)UnityEngine.Random.Range(0, 5);
-                        _recruitmentService.ExecuteLeaderBoost(tribe, randomStat, option.cost);
+                        _recruitmentService.ExecuteLeaderBoost(tribe, option.targetStatType, option.cost);
                     }
                     break;
             }
@@ -334,13 +347,21 @@ namespace TribeSystem.UI
         /// </summary>
         private void ProcessRitual()
         {
-            _isProcessingRitual = true;
+            // 本回合已完成过祭祀，跳过
+            if (_dataManager.IsRitualCompletedForRound(_roundManager.CurrentRound))
+            {
+                CheckShopAvailability();
+                return;
+            }
 
-            var tribeOptions = _ritualService.GetRitualRaceOptions();
+            _isProcessingRitual = true;
 
             if (_ritualPanel != null)
             {
-                _ritualPanel.StartRitual(tribeOptions, OnRitualConfirmed);
+                _ritualPanel.StartRitual(
+                    _ritualService.GetTiers(),
+                    (tier) => _ritualService.DrawBlessings(tier),
+                    OnRitualConfirmed);
             }
             else
             {
@@ -350,9 +371,13 @@ namespace TribeSystem.UI
             }
         }
 
-        private void OnRitualConfirmed(TribeRecord tribe, int cost)
+        private void OnRitualConfirmed(RitualTier tier, RitualRewardItem blessing)
         {
-            _ritualService.ExecuteRitual(tribe, cost);
+            if (tier == null) { CheckShopAvailability(); return; } // 玩家跳过祭祀
+            _ritualService.ExecuteRitual(tier, blessing);
+
+            // 玩家选择了祝福并获得奖励，标记本回合祭祀已完成
+            _dataManager.SetRitualCompletedForRound(_roundManager.CurrentRound);
 
             _isProcessingRitual = false;
 
@@ -481,13 +506,9 @@ namespace TribeSystem.UI
         /// </summary>
         public void OnStartBattleButtonClicked()
         {
-            if (_deployedTribes.Count == 0)
-            {
-                Debug.LogWarning("[TribeBuildPanel] 请至少选择一个族群上阵");
-                return;
-            }
+            Debug.Log("[TribeBuildPanel] 开始战斗 - 进入战斗准备界面");
 
-            // 打开战斗准备界面
+            // 打开战斗准备界面（族群部署在该界面进行）
             var uiManager = GameManager.Instance?.UIManager;
             if (uiManager == null)
             {
@@ -502,14 +523,14 @@ namespace TribeSystem.UI
             var battlePreparePanel = uiManager.ShowPanel<BattlePreparePanel>("ui/BattlePreparePanel", UIManager.UILayer.Normal);
             if (battlePreparePanel != null)
             {
-                // 获取所有族群
+                // 获取所有族群供BattlePreparePanel进行部署选择
                 List<TribeRecord> allTribes = _dataManager.GetTribes();
 
-                // 设置战斗准备
+                // 设置战斗准备（族群部署选择在BattlePreparePanel中进行）
                 battlePreparePanel.SetupBattle(
                     _dataManager.GetCurrentRound(),
                     allTribes,
-                    new List<TribeRecord>(_deployedTribes),
+                    new List<TribeRecord>(), // 初始无已选择族群
                     6 // 最多上阵6个族群
                 );
             }
@@ -542,12 +563,19 @@ namespace TribeSystem.UI
             {
                 Debug.Log("[TribeBuildPanel] 战斗胜利！");
 
+                // 通知GameFlowController战斗结束
+                GameFlowController.Instance?.OnBattleEnded(victory);
+
                 // 战斗胜利后推进回合
                 AdvanceRound();
             }
             else
             {
                 Debug.Log("[TribeBuildPanel] 战斗失败，可以重新挑战");
+
+                // 通知GameFlowController战斗失败
+                GameFlowController.Instance?.OnBattleEnded(victory);
+
                 // 失败不推进回合，允许重新调整阵容
             }
 
@@ -578,12 +606,19 @@ namespace TribeSystem.UI
             if (_roundManager.IsGameOver)
             {
                 Debug.Log("[TribeBuildPanel] ===== 游戏通关！=====");
+
+                // 通知GameFlowController游戏即将结束
+                GameFlowController.Instance?.NotifyGameEnding();
+
                 ShowGameClearScreen();
                 return;
             }
 
             // 更新存档中的回合数
             _dataManager.SetCurrentRound(_roundManager.CurrentRound);
+
+            // 通知GameFlowController回合推进
+            GameFlowController.Instance?.RaiseRoundChanged(_roundManager.CurrentRound);
 
             // 处理限时buff和休息状态
             ProcessRoundTransition();
@@ -690,16 +725,12 @@ namespace TribeSystem.UI
                 _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
             }
 
-            // 更新上阵消耗
-            if (_deployCostText != null)
-            {
-                _deployCostText.text = $"上阵消耗: {CalculateDeployCost()}";
-            }
+            // 注：上阵选择和消耗计算在BattlePreparePanel中进行，此处不需要处理
 
-            // 更新开始战斗按钮
+            // 开始战斗按钮始终可用
             if (_startBattleButton != null)
             {
-                _startBattleButton.interactable = _deployedTribes.Count > 0;
+                _startBattleButton.interactable = true;
             }
 
             // 刷新族群列表
@@ -721,10 +752,9 @@ namespace TribeSystem.UI
             {
                 foreach (var tribe in _tribes)
                 {
-                    bool isDeployed = _tribeDeployStates.ContainsKey(tribe.tribeId) && _tribeDeployStates[tribe.tribeId];
-
                     TribeCard card = Instantiate(_tribeCardPrefab, _tribeListContainer, false);
-                    card.Setup(tribe, isDeployed, OnTribeToggleChanged, OnShowTribeDetail);
+                    // 注：族群部署在BattlePreparePanel中进行，此处仅展示族群信息
+                    card.Setup(tribe, false, null, OnShowTribeDetail);
                 }
             }
             else

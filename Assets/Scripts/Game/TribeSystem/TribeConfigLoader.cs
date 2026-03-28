@@ -231,7 +231,7 @@ namespace TribeSystem
                 string jsonText = File.ReadAllText(filePath);
                 var json = JsonUtility.FromJson<RitualConfigWrapper>(jsonText);
                 Debug.Log($"[TribeConfigLoader] Loaded ritual config with {json.tiers.Count} tiers");
-                return new RitualConfig { tiers = json.tiers, ritualInterval = json.ritualInterval, startRound = json.startRound };
+                return new RitualConfig { tiers = json.tiers };
             }
             catch (System.Exception e)
             {
@@ -285,7 +285,15 @@ namespace TribeSystem
                     tribeType = type,
                     tribeName = type.ToString(),
                     initialCatCount = 3,
-                    leaderBaseStats = new LeaderBaseStats()
+                    leaderBaseStats = new LeaderBaseStats(),
+                    catBaseStats = new LeaderBaseStats
+                    {
+                        attack = 70,
+                        defense = 55,
+                        hp = 600,
+                        speed = 700,
+                        command = 0
+                    }
                 });
             }
             return configs;
@@ -436,9 +444,10 @@ namespace TribeSystem
     public class RitualTier
     {
         public string tierName;
-        public int[] costRange;
-        public int[] rewardCount;
-        public List<RitualRewardConfig> rewards;
+        public string displayName;
+        public int cost;
+        public int drawCount;
+        public List<RitualRewardConfig> blessings;
     }
 
     [System.Serializable]

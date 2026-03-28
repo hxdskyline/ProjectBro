@@ -23,6 +23,39 @@ public class BattlePanel : UIPanel
     private readonly Dictionary<string, AvatarAnimationDefinition> _playerAvatarDefinitionsByAddress
         = new Dictionary<string, AvatarAnimationDefinition>();
 
+    // 族群类型 → 品种名前缀（对应 avatartemp/{breed}1 和 {breed}2）
+    private static readonly Dictionary<TribeType, string> s_tribeBreedNames = new Dictionary<TribeType, string>
+    {
+        { TribeType.Maine,   "mianyin" },
+        { TribeType.Tabby,   "lihua"   },
+        { TribeType.Orange,  "daju"    },
+        { TribeType.Cow,     "nainiu"  },
+        { TribeType.Siamese, "xianluo" },
+        { TribeType.Ragdoll, "buou"    },
+    };
+
+    // 每个族群类型的运行时 AvatarAnimationDefinition 缓存
+    private readonly Dictionary<TribeType, AvatarAnimationDefinition> _tribeAvatarCache
+        = new Dictionary<TribeType, AvatarAnimationDefinition>();
+
+    private AvatarAnimationDefinition GetTribeAvatarDefinition(TribeType tribeType)
+    {
+        if (_tribeAvatarCache.TryGetValue(tribeType, out var cached))
+            return cached;
+
+        if (!s_tribeBreedNames.TryGetValue(tribeType, out string breed))
+        {
+            Debug.LogWarning($"[BattlePanel] 未找到族群 {tribeType} 的品种名，使用默认avatar");
+            return _playerAvatarDefinition;
+        }
+
+        string idleAddr   = $"avatartemp/{breed}1";
+        string attackAddr = $"avatartemp/{breed}2";
+        var definition = AvatarAnimationDefinition.CreateRuntime(breed, idleAddr, attackAddr);
+        _tribeAvatarCache[tribeType] = definition;
+        return definition;
+    }
+
     public override void Initialize()
     {
         base.Initialize();
@@ -111,7 +144,9 @@ public class BattlePanel : UIPanel
             }
 
             // 添加小猫（N个）
-            if (tribe.cats != null)
+            int catCount = tribe.cats?.Count ?? 0;
+            Debug.Log($"[BattlePanel] {tribe.tribeType} 族群小猫数量: {catCount}");
+            if (tribe.cats != null && tribe.cats.Count > 0)
             {
                 foreach (CatData cat in tribe.cats)
                 {
@@ -120,6 +155,10 @@ public class BattlePanel : UIPanel
                         definitions.Add(catDef);
                     }
                 }
+            }
+            else
+            {
+                Debug.LogWarning($"[BattlePanel] {tribe.tribeType} 族群没有小猫！请检查存档是否为旧版本。如果是，请删除存档重新开始。");
             }
         }
 
@@ -144,7 +183,7 @@ public class BattlePanel : UIPanel
             MaxHp = Mathf.Max(1, leaderStats.hp),
             Attack = Mathf.Max(1, leaderStats.attack),
             Defense = Mathf.Max(0, leaderStats.defense),
-            MoveSpeed = Mathf.Max(0.1f, leaderStats.speed),
+            MoveSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed),
             AttackRange = Mathf.Max(0.1f, 1.5f) // 族长攻击范围略大
         };
 
@@ -154,7 +193,7 @@ public class BattlePanel : UIPanel
         definition = new BattleFighterSpawnDefinition(
             leaderName,
             staticAttributes,
-            ResolveAvatarDefinition(null)); // 族长使用默认avatar
+            GetTribeAvatarDefinition(tribe.tribeType));
 
         return true;
     }
@@ -169,11 +208,26 @@ public class BattlePanel : UIPanel
         if (tribe.leader == null)
             return false;
 
-        // 计算族长属性（作为基数）
-        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader);
+        // 获取小猫的基础属性配置
+        var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+        if (tribeConfig?.catBaseStats == null)
+        {
+            Debug.LogError($"[BattlePanel] 无法获取 {tribe.tribeType} 的小猫基础属性配置");
+            return false;
+        }
 
-        // 计算小猫属性（基于品质比例）
-        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, leaderStats);
+        // 转换catBaseStats为LeaderStats格式（供TribeStatsCalculator使用）
+        // 注：小猫的command设为0（小猫不使用统帅力）
+        LeaderStats catBaseStatsAsLeader = new LeaderStats(
+            tribeConfig.catBaseStats.attack,
+            tribeConfig.catBaseStats.defense,
+            tribeConfig.catBaseStats.hp,
+            tribeConfig.catBaseStats.speed,
+            0  // 小猫的command为0
+        );
+
+        // 计算小猫属性（基于小猫基础属性和品质比例）
+        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, catBaseStatsAsLeader);
 
         // 应用统帅惩罚（小猫数量影响速度）
         int catCount = tribe.cats?.Count ?? 0;
@@ -185,7 +239,7 @@ public class BattlePanel : UIPanel
             MaxHp = Mathf.Max(1, catStats.hp),
             Attack = Mathf.Max(1, catStats.attack),
             Defense = Mathf.Max(0, catStats.defense),
-            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            MoveSpeed = TribeStatsCalculator.CalculateMovementSpeed(finalSpeed),
             AttackRange = Mathf.Max(0.1f, 1.0f) // 小猫攻击范围正常
         };
 
@@ -195,7 +249,8 @@ public class BattlePanel : UIPanel
         definition = new BattleFighterSpawnDefinition(
             catName,
             staticAttributes,
-            ResolveAvatarDefinition(null)); // 小猫使用默认avatar
+            GetTribeAvatarDefinition(tribe.tribeType),
+            0.65f);
 
         return true;
     }
@@ -273,8 +328,8 @@ public class BattlePanel : UIPanel
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
 
-        // 回调TribeBuildPanel处理战斗结束
-        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/TribeBuildPanel");
+        // 回调TribeBuildPanel处理战斗结束（地址须与 ShowPanel 时完全一致）
+        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
         if (tribeBuildPanel != null)
         {
             tribeBuildPanel.OnBattleEnded(victory);

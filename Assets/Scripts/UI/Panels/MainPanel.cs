@@ -90,8 +90,31 @@ public class MainPanel : UIPanel
     {
         Debug.Log("[MainPanel] Start button clicked");
 
-        GameManager.Instance.UIManager.HidePanel("ui/MainPanel");
-        GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel", UIManager.UILayer.Normal);
+        // 隐藏主菜单
+        GameManager.Instance.UIManager.HidePanel("ui/mainpanel");
+
+        // 获取GameFlowController（由GameManager管理，总是存在）
+        var gameFlowController = GameFlowController.Instance;
+        if (gameFlowController == null)
+        {
+            Debug.LogError("[MainPanel] GameFlowController not found");
+            GameManager.Instance.UIManager.ShowPanel<MainPanel>("ui/mainpanel", UIManager.UILayer.Normal);
+            return;
+        }
+
+        // 通过GameFlowController进入游戏（或继续游戏）
+        if (gameFlowController.IsGameStarted)
+        {
+            // 游戏已启动，进入当前回合
+            Debug.Log("[MainPanel] Resuming game from round " + gameFlowController.CurrentRound);
+            gameFlowController.EnterGameRound();
+        }
+        else
+        {
+            // 新游戏，初始化流程
+            Debug.Log("[MainPanel] Starting new game");
+            gameFlowController.Initialize();
+        }
     }
 
     private void OnSettingsButtonClicked()

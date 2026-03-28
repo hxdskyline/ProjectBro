@@ -311,6 +311,11 @@ public class DataManager : MonoBehaviour
     {
         if (_playerData == null) return 1;
         EnsurePlayerDataDefaults();
+        // 确保currentRound不为0（处理旧存档或未初始化的情况）
+        if (_playerData.currentRound <= 0)
+        {
+            _playerData.currentRound = 1;
+        }
         return _playerData.currentRound;
     }
 
@@ -411,6 +416,32 @@ public class DataManager : MonoBehaviour
         if (saveImmediately) SavePlayerData();
     }
 
+    public bool IsRecruitmentCompletedForRound(int round)
+    {
+        if (_playerData == null) return false;
+        return _playerData.recruitmentCompletedRound == round;
+    }
+
+    public void SetRecruitmentCompletedForRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        _playerData.recruitmentCompletedRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public bool IsRitualCompletedForRound(int round)
+    {
+        if (_playerData == null) return false;
+        return _playerData.ritualCompletedRound == round;
+    }
+
+    public void SetRitualCompletedForRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        _playerData.ritualCompletedRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
     public int GetLastStandCount()
     {
         if (_playerData == null) return 0;
@@ -447,6 +478,15 @@ public class DataManager : MonoBehaviour
         if (_playerData.tribes == null)
         {
             _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
+        }
+
+        // 修复旧存档：确保每个族群的cats列表不为null
+        foreach (var tribe in _playerData.tribes)
+        {
+            if (tribe != null && tribe.cats == null)
+            {
+                tribe.cats = new System.Collections.Generic.List<TribeSystem.CatData>();
+            }
         }
 
         if (_playerData.unlockedAccessories == null)
@@ -543,6 +583,10 @@ public class PlayerData
     public System.Collections.Generic.List<string> unlockedAccessories;
     public int shopRefreshCount;
     public int lastShopRound;
+
+    // 本回合事件完成标记（存回合号；与currentRound相同则表示本回合已完成）
+    public int recruitmentCompletedRound;
+    public int ritualCompletedRound;
 
     // Legacy Cat system persistent fields (kept for compatibility, marked obsolete)
     [System.Obsolete("Use TribeSystem instead")]

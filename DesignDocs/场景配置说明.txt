@@ -1,0 +1,118 @@
+《猫猫部落》场景配置说明
+========================================
+
+【必需的GameObject和组件】
+
+你的主游戏场景中必须包含以下元素：
+
+1. GameManager GameObject
+   ├─ 脚本: Assets/Scripts/Framework/GameManager.cs
+   ├─ 状态: 必须被启用 (enabled)
+   └─ 说明: 初始化所有游戏系统（GameFlowController、DataManager、UIManager等）
+
+2. GameInitializer GameObject
+   ├─ 脚本: Assets/Scripts/Game/GameInitializer.cs
+   ├─ 状态: 必须被启用 (enabled)
+   └─ 说明: 负责加载玩家数据和配置，然后启动GameFlowController
+
+3. Canvas GameObject (用于UI)
+   ├─ UIManager 脚本: Assets/Scripts/UI/UIManager.cs
+   ├─ EventSystem
+   └─ 说明: 管理所有UI面板的显示/隐藏
+
+4. MainPanel (作为Canvas的子物体)
+   ├─ 脚本: Assets/Scripts/UI/Panels/MainPanel.cs
+   ├─ 初始状态: 应该在开始时显示
+   └─ 说明: 游戏主菜单
+
+【场景Hierarchy示例】
+
+Main (场景名)
+├── GameManager
+│   └── (各种Manager组件会被自动添加)
+├── GameInitializer
+├── Canvas (带UIManager脚本)
+│   ├── MainPanel
+│   ├── TribeBuildPanel (预制体或动态创建)
+│   ├── BattlePreparePanel (预制体或动态创建)
+│   ├── BattlePanel (预制体或动态创建)
+│   └── EventSystem
+└── (其他场景物体)
+
+【重要检查清单】
+
+□ GameManager GameObject存在于场景中
+□ GameManager脚本已绑定
+□ GameInitializer GameObject存在于场景中
+□ GameInitializer脚本已绑定
+□ Canvas和UIManager已配置
+□ MainPanel已被正确设置并在Canvas中
+□ Canvas有EventSystem（Unity自动创建）
+□ 所有GameObject都被启用 (enabled=true)
+
+【初始化流程】
+
+1. 游戏启动 (Play)
+   ↓
+2. GameManager.Awake()
+   - 设置单例
+   - 调用InitializeManagers()
+   ↓
+3. GameManager.InitializeManagers()
+   - 创建ResourceManager
+   - 创建DataManager ← 关键
+   - 创建UIManager
+   - 创建GameFlowController ← 关键
+   ↓
+4. GameFlowController.Awake()
+   - 设置单例
+   ↓
+5. GameFlowController.Start() / GameInitializer.Start()
+   - 初始化引用
+   ↓
+6. GameInitializer.InitializeGame()
+   - 加载玩家数据
+   - 调用GameFlowController.Initialize()
+   ↓
+7. GameFlowController.Initialize()
+   - 检查新游戏或继续
+   - 显示InitialTribeSelectionPanel 或 TribeBuildPanel
+   ↓
+8. 游戏开始！
+
+【常见问题排查】
+
+问题1: "[GameFlowController] DataManager not found"
+解决: 确保GameManager在场景中且被启用，查看Console中GameManager的初始化日志
+
+问题2: GameManager的Awake没有被调用
+解决: 确保GameManager GameObject在游戏启动时就存在于场景中，并且enabled=true
+
+问题3: 无法从MainPanel进入TribeBuildPanel
+解决: 检查GameFlowController和UIManager是否被正确初始化
+
+【调试技巧】
+
+在Console中查看以下日志来确认初始化顺序：
+[GameManager] Awake called
+[GameManager] Initializing Game Framework...
+[GameManager] DataManager initialized: ✓
+[GameManager] GameFlowController Initialized
+[GameManager] Game Framework Initialized Successfully!
+[GameFlowController] Awake - initializing references
+[GameFlowController] Start - getting references
+[GameFlowController] Start - all references initialized successfully
+[GameInitializer] 开始初始化游戏
+[GameInitializer] 初始化完成，交由GameFlowController接管游戏流程
+[GameFlowController] 初始化游戏流程控制器
+
+如果日志中某个步骤缺失，说明该初始化阶段没有被执行，需要检查GameObject或脚本配置。
+
+【重要提示】
+
+⚠️ 不要在编辑器中删除或禁用GameManager和GameInitializer
+⚠️ 不要手动创建GameFlowController（由GameManager自动创建）
+⚠️ MainPanel必须设置为Canvas的子物体
+⚠️ Canvas需要GraphicRaycaster用于UI交互
+
+最后更新: 2026-03-28

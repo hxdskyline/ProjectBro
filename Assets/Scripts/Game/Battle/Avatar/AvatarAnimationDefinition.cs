@@ -24,6 +24,24 @@ public class AvatarAnimationDefinition : ScriptableObject
         return null;
     }
 
+    /// <summary>
+    /// 运行时创建 AvatarAnimationDefinition（用于族群战斗单位）
+    /// idleAddress: 站立帧地址, attackAddress: 攻击帧地址
+    /// </summary>
+    public static AvatarAnimationDefinition CreateRuntime(string avatarId, string idleAddress, string attackAddress)
+    {
+        var def = CreateInstance<AvatarAnimationDefinition>();
+        def._avatarId = avatarId;
+        def._actions = new List<ActionDefinition>
+        {
+            new ActionDefinition(AvatarActionType.Idle,   new List<string> { idleAddress },   4f, true),
+            new ActionDefinition(AvatarActionType.Run,    new List<string> { idleAddress },   4f, true),
+            new ActionDefinition(AvatarActionType.Attack, new List<string> { attackAddress, idleAddress }, 8f, false),
+            new ActionDefinition(AvatarActionType.Death,  new List<string> { attackAddress, idleAddress }, 4f, false),
+        };
+        return def;
+    }
+
     [Serializable]
     public class ActionDefinition
     {
@@ -36,5 +54,13 @@ public class AvatarAnimationDefinition : ScriptableObject
         public IReadOnlyList<string> FrameAddresses => _frameAddresses;
         public float FPS => Mathf.Max(1f, _fps);
         public bool Loop => _loop;
+
+        public ActionDefinition(AvatarActionType actionType, List<string> frameAddresses, float fps, bool loop)
+        {
+            _actionType = actionType;
+            _frameAddresses = frameAddresses;
+            _fps = fps;
+            _loop = loop;
+        }
     }
 }

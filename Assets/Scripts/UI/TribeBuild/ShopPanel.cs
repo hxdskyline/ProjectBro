@@ -124,6 +124,16 @@ namespace TribeSystem.UI
             _refreshButton = transform.Find("RefreshButton")?.GetComponent<Button>();
             _refreshCostText = _refreshButton?.transform.Find("CostText")?.GetComponent<Text>();
             _closeButton = transform.Find("CloseButton")?.GetComponent<Button>();
+
+            if (_itemsContainer == null)
+            {
+                if (_cachedFont == null)
+                    _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+                RectTransform parent = transform.parent as RectTransform;
+                if (parent == null) parent = transform as RectTransform;
+                EnsureRuntimeUI(parent, _cachedFont);
+            }
         }
 
         private void EnsureRuntimeUI(RectTransform parent, Font font)
@@ -164,7 +174,7 @@ namespace TribeSystem.UI
             titleRect.anchoredPosition = new Vector2(0f, -10f);
             _titleText = titleGo.GetComponent<Text>();
             _titleText.font = font;
-            _titleText.fontSize = 24;
+            _titleText.fontSize = 36;
             _titleText.alignment = TextAnchor.MiddleCenter;
             _titleText.color = Color.white;
 
@@ -178,7 +188,7 @@ namespace TribeSystem.UI
             catFoodRect.offsetMax = Vector2.zero;
             _catFoodText = catFoodGo.GetComponent<Text>();
             _catFoodText.font = font;
-            _catFoodText.fontSize = 16;
+            _catFoodText.fontSize = 18;
             _catFoodText.alignment = TextAnchor.MiddleLeft;
             _catFoodText.color = new Color(1f, 0.9f, 0.3f, 1f);
 
@@ -227,7 +237,7 @@ namespace TribeSystem.UI
             refreshLabelRect.offsetMax = Vector2.zero;
             Text refreshLabel = refreshLabelGo.GetComponent<Text>();
             refreshLabel.font = font;
-            refreshLabel.fontSize = 16;
+            refreshLabel.fontSize = 32;
             refreshLabel.alignment = TextAnchor.MiddleCenter;
             refreshLabel.color = Color.white;
             refreshLabel.text = "刷新";
@@ -321,7 +331,7 @@ namespace TribeSystem.UI
             nameRect.offsetMax = Vector2.zero;
             Text nameText = nameGo.GetComponent<Text>();
             nameText.font = font;
-            nameText.fontSize = 14;
+            nameText.fontSize = 36;
             nameText.alignment = TextAnchor.MiddleCenter;
             nameText.color = Color.white;
             nameText.text = item.name;
@@ -336,7 +346,7 @@ namespace TribeSystem.UI
             priceRect.offsetMax = Vector2.zero;
             Text priceText = priceGo.GetComponent<Text>();
             priceText.font = font;
-            priceText.fontSize = 12;
+            priceText.fontSize = 32;
             priceText.alignment = TextAnchor.MiddleCenter;
             priceText.color = new Color(1f, 0.9f, 0.3f, 1f);
             priceText.text = $"{item.GetActualPrice()} 猫粮";
@@ -366,7 +376,7 @@ namespace TribeSystem.UI
             descRect.offsetMax = Vector2.zero;
             Text descText = descGo.GetComponent<Text>();
             descText.font = font;
-            descText.fontSize = 10;
+            descText.fontSize = 18;
             descText.alignment = TextAnchor.UpperCenter;
             descText.color = new Color(0.7f, 0.7f, 0.7f, 1f);
             descText.text = TruncateText(item.description, 30);

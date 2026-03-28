@@ -15,13 +15,13 @@ namespace TribeSystem
     }
 
     /// <summary>
-    /// 回合管理器 - 管理20回合游戏循环
+    /// 回合管理器 - 管理游戏关卡循环
+    /// 各关卡的事件（招募/祭祀/商店）由 battle_campaign_levels.json 配置，
+    /// 通过 BattleCampaignRuntime 查询，不在代码中硬编码。
     /// </summary>
     public class RoundManager
     {
-        public const int MAX_ROUNDS = 20;
-        public const int RITUAL_INTERVAL = 3;  // 每3回合一次祭祀
-        public const int SHOP_INTERVAL = 5;    // 每5回合开放商店
+        public const int MAX_ROUNDS = 10;
 
         private int _currentRound = 1;
 
@@ -59,6 +59,8 @@ namespace TribeSystem
             }
         }
 
+        private BattleCampaignRuntime Campaign => GameManager.Instance?.BattleCampaignRuntime;
+
         /// <summary>
         /// 获取当前回合的事件列表
         /// </summary>
@@ -66,77 +68,30 @@ namespace TribeSystem
         {
             List<RoundEventType> events = new List<RoundEventType>();
 
-            // 每回合都有招募
-            events.Add(RoundEventType.Recruitment);
-
-            // 每3回合有祭祀
-            if (CanDoRitual())
-            {
-                events.Add(RoundEventType.Ritual);
-            }
-
-            // 每5回合开放商店
-            if (CanOpenShop())
-            {
-                events.Add(RoundEventType.Shop);
-            }
-
-            // 第20回合是Boss战
-            if (IsFinalRound)
-            {
-                events.Add(RoundEventType.BossBattle);
-            }
+            if (CanDoRecruitment()) events.Add(RoundEventType.Recruitment);
+            if (CanDoRitual())      events.Add(RoundEventType.Ritual);
+            if (CanOpenShop())      events.Add(RoundEventType.Shop);
+            if (IsFinalRound)       events.Add(RoundEventType.BossBattle);
 
             return events;
         }
 
-        /// <summary>
-        /// 检查是否可以祭祀（每3回合）
-        /// </summary>
-        public bool CanDoRitual()
-        {
-            return _currentRound % RITUAL_INTERVAL == 0;
-        }
-
-        /// <summary>
-        /// 检查是否可以开放商店（每5回合）
-        /// </summary>
-        public bool CanOpenShop()
-        {
-            return _currentRound % SHOP_INTERVAL == 0;
-        }
-
-        /// <summary>
-        /// 检查是否是Boss战回合
-        /// </summary>
-        public bool IsBossBattleRound()
-        {
-            return _currentRound == MAX_ROUNDS;
-        }
+        public bool CanDoRecruitment() => Campaign?.HasRecruitmentForBattle(_currentRound) ?? false;
+        public bool CanDoRitual()      => Campaign?.HasRitualForBattle(_currentRound)      ?? false;
+        public bool CanOpenShop()      => Campaign?.HasShopForBattle(_currentRound)        ?? false;
+        public bool IsBossBattleRound() => IsFinalRound;
 
         /// <summary>
         /// 获取回合描述文本
         /// </summary>
         public string GetRoundDescription()
         {
-            string desc = $"第 {_currentRound}/{MAX_ROUNDS} 回合";
+            string desc = $"第 {_currentRound}/{MAX_ROUNDS} 关";
 
-            if (IsFinalRound)
-            {
-                desc += " [最终战]";
-            }
-            else if (CanDoRitual() && CanOpenShop())
-            {
-                desc += " [祭祀+商店]";
-            }
-            else if (CanDoRitual())
-            {
-                desc += " [祭祀]";
-            }
-            else if (CanOpenShop())
-            {
-                desc += " [商店]";
-            }
+            if (IsFinalRound)                          desc += " [最终战]";
+            else if (CanDoRitual() && CanOpenShop())   desc += " [祭祀+商店]";
+            else if (CanDoRitual())                    desc += " [祭祀]";
+            else if (CanOpenShop())                    desc += " [商店]";
 
             return desc;
         }
@@ -170,30 +125,19 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 获取下一回合的预告信息
+        /// 获取下一关的预告信息
         /// </summary>
         public string GetNextRoundPreview()
         {
-            if (IsGameOver)
-            {
-                return "游戏已结束";
-            }
+            if (IsGameOver) return "游戏已结束";
 
-            int nextRound = Mathf.Min(_currentRound + 1, MAX_ROUNDS);
-            string preview = $"下回合预告: 第{nextRound}回";
+            int next = Mathf.Min(_currentRound + 1, MAX_ROUNDS);
+            string preview = $"下一关预告: 第{next}关";
 
-            if (nextRound % RITUAL_INTERVAL == 0)
-            {
-                preview += " 有祭祀";
-            }
-            if (nextRound % SHOP_INTERVAL == 0)
-            {
-                preview += " 有商店";
-            }
-            if (nextRound == MAX_ROUNDS)
-            {
-                preview += " [最终Boss战！]";
-            }
+            var c = Campaign;
+            if (c?.HasRitualForBattle(next) == true)  preview += " 有祭祀";
+            if (c?.HasShopForBattle(next) == true)    preview += " 有商店";
+            if (next == MAX_ROUNDS)                   preview += " [最终战！]";
 
             return preview;
         }

@@ -37,15 +37,13 @@ public class VictoryPanel : UIPanel
             _victoryText.text = "VICTORY!";
         }
 
-        int goldReward = 100 * levelId;
-        int expReward = 50 * levelId;
-
         BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        int catFoodReward = battleCampaignRuntime?.GetCatFoodRewardForBattle(levelId) ?? 200;
         string battleProgressText = BuildBattleProgressText(levelId, battleCampaignRuntime);
 
         if (_rewardText != null)
         {
-            _rewardText.text = $"Gold: +{goldReward}\nExp: +{expReward}\n{battleProgressText}";
+            _rewardText.text = $"猫粮: +{catFoodReward}\n{battleProgressText}";
         }
 
         if (_starRating != null)
@@ -54,7 +52,7 @@ public class VictoryPanel : UIPanel
         }
 
         StartCoroutine(PlayVictoryAnimation());
-        UpdatePlayerData(levelId, goldReward);
+        UpdatePlayerData(levelId, catFoodReward);
 
         Debug.Log("[VictoryPanel] Victory rewards shown for level: " + levelId);
     }
@@ -96,7 +94,7 @@ public class VictoryPanel : UIPanel
         }
     }
 
-    private void UpdatePlayerData(int levelId, int goldReward)
+    private void UpdatePlayerData(int levelId, int catFoodReward)
     {
         BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
         if (battleCampaignRuntime != null)
@@ -104,12 +102,11 @@ public class VictoryPanel : UIPanel
             battleCampaignRuntime.AdvanceAfterVictory(levelId);
         }
 
-        CurrencyManager currencyManager = GameManager.Instance.CurrencyManager;
-        if (currencyManager != null)
+        DataManager dataManager = GameManager.Instance.DataManager;
+        if (dataManager != null)
         {
-            currencyManager.AddCurrency(CurrencyType.Gold, goldReward);
-
-            Debug.Log("[VictoryPanel] Player data updated");
+            dataManager.AddCatFood(catFoodReward);
+            Debug.Log($"[VictoryPanel] Added {catFoodReward} cat food for battle {levelId}");
         }
     }
 
@@ -118,6 +115,13 @@ public class VictoryPanel : UIPanel
         Debug.Log("[VictoryPanel] Continue button clicked");
 
         GameManager.Instance.UIManager.ClosePanel("ui/VictoryPanel");
-        GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/TribeBuildPanel", UIManager.UILayer.Normal);
+
+        // TribeBuildPanel.OnBattleEnded 已经调用了 AdvanceRound 和 SetActive(true)
+        // 直接激活已有实例，不重新创建（重新创建会触发 Start→LoadPlayerData，重置回合）
+        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
+        if (tribeBuildPanel != null)
+        {
+            tribeBuildPanel.gameObject.SetActive(true);
+        }
     }
 }

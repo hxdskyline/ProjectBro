@@ -185,6 +185,20 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 创建随机品质的小猫（白40% 蓝30% 紫20% 金10%）
+        /// </summary>
+        public static CatData CreateWithRandomQuality()
+        {
+            float roll = UnityEngine.Random.value;
+            CatQuality quality;
+            if (roll < 0.4f)       quality = CatQuality.White;
+            else if (roll < 0.7f)  quality = CatQuality.Blue;
+            else if (roll < 0.9f)  quality = CatQuality.Purple;
+            else                   quality = CatQuality.Gold;
+            return CreateWithQuality(quality);
+        }
+
+        /// <summary>
         /// 尝试进化到下一品质（50%概率）
         /// </summary>
         public bool TryEvolve()
@@ -296,6 +310,7 @@ namespace TribeSystem
         public int cost;
         public TribeType? targetTribeType; // 目标族群类型（新增族群时）
         public int targetTribeId;          // 目标族群ID（已有族群操作时）
+        public StatType targetStatType;    // 目标属性类型（族长强化时）
         public string description;
 
         public RecruitmentOption()
@@ -343,13 +358,14 @@ namespace TribeSystem
     public class RitualRewardItem
     {
         public RitualRewardType rewardType;
-        public StatType? statType; // 属性类型
-        public int amount;         // 数值
-        public int catCount;       // 小猫数量
-        public TribeType catTribeType; // 小猫族群
-        public CatQuality? catQuality; // 小猫品质（可选）
-        public int consumableId;   // 道具ID
-        public int accessoryId;    // 饰品ID
+        public StatType? statType;         // 属性类型
+        public int amount;                 // 数值
+        public int catCount;               // 小猫数量
+        public TribeType catTribeType;     // 小猫族群
+        public CatQuality? catQuality;     // 小猫品质
+        public int consumableId;           // 道具ID
+        public int accessoryId;            // 饰品ID
+        public string displayName;         // UI 显示文本（在 DrawBlessings 时生成）
 
         public RitualRewardItem()
         {
@@ -361,6 +377,7 @@ namespace TribeSystem
             catQuality = null;
             consumableId = -1;
             accessoryId = -1;
+            displayName = "";
         }
     }
 
@@ -424,6 +441,7 @@ namespace TribeSystem
         public string tribeName;
         public int initialCatCount;
         public LeaderBaseStats leaderBaseStats;
+        public LeaderBaseStats catBaseStats;  // 小猫的基础属性（command属性不使用）
 
         public TribeConfig()
         {
@@ -431,6 +449,7 @@ namespace TribeSystem
             tribeName = "";
             initialCatCount = 3;
             leaderBaseStats = new LeaderBaseStats();
+            catBaseStats = new LeaderBaseStats();
         }
     }
 
