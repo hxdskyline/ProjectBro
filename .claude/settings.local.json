@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(mkdir -p \"Assets/Scripts/UI/CardBuild\")",
-      "Bash(mkdir -p \"Assets/Bundle/UI/CardBuild\")"
+      "Bash(mkdir -p \"Assets/Bundle/UI/CardBuild\")",
+      "Bash(ls -la Assets/Scripts/Game/*.cs)",
+      "Bash(python combat_power_analysis.py)",
+      "Bash(py -3 --version)",
+      "Bash(python combat_power_analysis2.py)",
+      "Bash(python combat_power_analysis3.py)",
+      "Bash(python combat_power_analysis4.py)",
+      "Bash(python combat_power_analysis5.py)",
+      "Bash(sed -n '/^{$/,/^}$/p')",
+      "Read(//tmp/**)",
+      "Bash(sed -n '/^{/,/^}/p')",
+      "Bash(python -c \" import subprocess, json out = subprocess.check_output\\(['python', 'combat_power_analysis5.py'], stderr=subprocess.STDOUT\\) text = out.decode\\('utf-8'\\) start = text.index\\('{'\\) json_str = text[start:] data = json.loads\\(json_str\\) print\\(json.dumps\\(data, indent=2, ensure_ascii=False\\)\\) \")"
     ]
   }
 }

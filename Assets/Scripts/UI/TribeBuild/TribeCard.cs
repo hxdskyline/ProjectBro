@@ -24,6 +24,9 @@ namespace TribeSystem.UI
         private bool _isDeployed;
         private System.Action<int, bool> _onToggleChanged;
         private System.Action<TribeRecord, bool> _onShowDetail;
+        private int _currentVariant = 1;
+        private TribeType _tribeType;
+        private AsyncOperationHandle<Sprite> _portraitHandle;
 
         /// <summary>
         /// 设置卡片数据
@@ -57,21 +60,37 @@ namespace TribeSystem.UI
             }
 
             // 加载头像
-            LoadPortrait(tribe.tribeType);
+            _tribeType = tribe.tribeType;
+            _currentVariant = 1;
+            LoadPortrait(_tribeType, _currentVariant);
 
             // 更新文本内容
             UpdateTexts();
         }
 
-        private void LoadPortrait(TribeType tribeType)
+        /// <summary>
+        /// 切换头像 variant
+        /// </summary>
+        public void SetPortraitVariant(int variant)
+        {
+            if (_currentVariant == variant) return;
+            _currentVariant = variant;
+            LoadPortrait(_tribeType, _currentVariant);
+        }
+
+        private void LoadPortrait(TribeType tribeType, int variant)
         {
             if (_portraitImage == null) return;
 
-            string address = GetTribePortraitAddress(tribeType);
+            string address = GetTribePortraitAddress(tribeType, variant);
             if (!string.IsNullOrEmpty(address))
             {
-                var handle = Addressables.LoadAssetAsync<Sprite>(address);
-                handle.Completed += (op) =>
+                if (_portraitHandle.IsValid())
+                {
+                    Addressables.Release(_portraitHandle);
+                }
+                _portraitHandle = Addressables.LoadAssetAsync<Sprite>(address);
+                _portraitHandle.Completed += (op) =>
                 {
                     if (op.Status == AsyncOperationStatus.Succeeded && _portraitImage != null)
                     {
@@ -81,11 +100,8 @@ namespace TribeSystem.UI
             }
         }
 
-        private string GetTribePortraitAddress(TribeType tribeType)
+        private string GetTribePortraitAddress(TribeType tribeType, int variant)
         {
-            // 根据 TribeType 返回头像的 Addressable 地址
-            // 随机选择 variant 1 或 2
-            int variant = UnityEngine.Random.Range(1, 3);
             switch (tribeType)
             {
                 case TribeType.Maine: return $"avatartemp/mianyin{variant}";
@@ -163,6 +179,14 @@ namespace TribeSystem.UI
                 case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 1f);
                 case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 1f);
                 default: return new Color(0.5f, 0.5f, 0.5f, 1f);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_portraitHandle.IsValid())
+            {
+                Addressables.Release(_portraitHandle);
             }
         }
 

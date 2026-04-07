@@ -35,6 +35,7 @@ public class BattleManager : MonoBehaviour
     private BattleSimulation _simulation;
     private BattleFighterSpawnDefinition[] _playerFighterDefinitions;
     private int _enemyFighterCount;
+    private UnitStaticAttributes? _enemyStaticAttributes;
 
     public System.Action<bool> BattleEnded;
 
@@ -66,6 +67,11 @@ public class BattleManager : MonoBehaviour
     public void ConfigureEnemyFighterCount(int enemyFighterCount)
     {
         _enemyFighterCount = Mathf.Max(1, enemyFighterCount);
+    }
+
+    public void ConfigureEnemyStats(UnitStaticAttributes stats)
+    {
+        _enemyStaticAttributes = stats;
     }
 
     public void StartBattle()
@@ -115,6 +121,9 @@ public class BattleManager : MonoBehaviour
         {
             Debug.Log("[BattleManager] Battle ended - Defeat!");
         }
+
+        // Battle summary log
+        LogBattleSummary(victory);
 
         // Ensure settlement UI appears over a clean battlefield.
         ClearBattlefield();
@@ -170,7 +179,8 @@ public class BattleManager : MonoBehaviour
                 EnemyTint = _enemyTint,
                 PlayerFighterDefinitions = _playerFighterDefinitions,
                 PlayerUnitType = _playerUnitType,
-                EnemyUnitType = _enemyUnitType
+                EnemyUnitType = _enemyUnitType,
+                EnemyStaticAttributes = _enemyStaticAttributes
             });
 
         _playerFighters = result.PlayerFighters;
@@ -214,5 +224,63 @@ public class BattleManager : MonoBehaviour
         _playerFighters = null;
         _enemyFighters = null;
         ClearOldAvatars();
+    }
+
+    private void LogBattleSummary(bool victory)
+    {
+        if (_playerFighters == null || _enemyFighters == null) return;
+
+        int pAlive = 0, pDead = 0;
+        int pTotalHp = 0, pMaxHp = 0;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null) continue;
+            pMaxHp += f.StaticAttributes.MaxHp;
+            if (f.IsRemoved || f.IsDying)
+            {
+                pDead++;
+            }
+            else
+            {
+                pAlive++;
+                pTotalHp += f.CurrentHp;
+            }
+        }
+
+        int eAlive = 0, eDead = 0;
+        int eTotalHp = 0, eMaxHp = 0;
+        for (int i = 0; i < _enemyFighters.Length; i++)
+        {
+            var f = _enemyFighters[i];
+            if (f == null) continue;
+            eMaxHp += f.StaticAttributes.MaxHp;
+            if (f.IsRemoved || f.IsDying)
+            {
+                eDead++;
+            }
+            else
+            {
+                eAlive++;
+                eTotalHp += f.CurrentHp;
+            }
+        }
+
+        string firstPlayerStats = "";
+        if (_playerFighters.Length > 0 && _playerFighters[0] != null)
+        {
+            var s = _playerFighters[0].StaticAttributes;
+            firstPlayerStats = $" | Leader: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed:F1}";
+        }
+        string firstEnemyStats = "";
+        if (_enemyFighters.Length > 0 && _enemyFighters[0] != null)
+        {
+            var s = _enemyFighters[0].StaticAttributes;
+            firstEnemyStats = $" | Enemy: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed:F1}";
+        }
+
+        Debug.Log($"[BattleSummary] {(victory ? "WIN" : "LOSE")} | " +
+            $"Player: {pAlive}/{_playerFighters.Length} alive, {pTotalHp}/{pMaxHp} HP{firstPlayerStats} | " +
+            $"Enemy: {eAlive}/{_enemyFighters.Length} alive, {eTotalHp}/{eMaxHp} HP{firstEnemyStats}");
     }
 }

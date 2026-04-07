@@ -236,7 +236,7 @@ public class BattleSimulation
             int damage = Mathf.Max(1, attackerRuntime.Attack - defenderRuntime.Defense);
             int newHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
             defenderRuntime.CurrentHp = newHp;
-            // Debug.Log($"[BattleManager] {attacker.Camp} attacks {defender.Camp}, damage={damage}, targetHP={defenderRuntime.CurrentHp}");
+            // Debug.Log($"[DMG] {attacker.Name}(ATK={attackerRuntime.Attack}) -> {defender.Name}(DEF={defenderRuntime.Defense}) = {damage} dmg, HP: {newHp}/{defenderRuntime.MaxHp}");
 
             // Show damage popup and update HUD if present
             if (defender != null && defender.Transform != null)

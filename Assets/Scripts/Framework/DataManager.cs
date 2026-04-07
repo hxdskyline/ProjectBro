@@ -442,6 +442,19 @@ public class DataManager : MonoBehaviour
         if (saveImmediately) SavePlayerData();
     }
 
+    public bool IsNewTribeEventCompletedForRound(int round)
+    {
+        if (_playerData == null) return false;
+        return _playerData.newTribeEventCompletedRound == round;
+    }
+
+    public void SetNewTribeEventCompletedForRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        _playerData.newTribeEventCompletedRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
     public int GetLastStandCount()
     {
         if (_playerData == null) return 0;
@@ -480,12 +493,24 @@ public class DataManager : MonoBehaviour
             _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
         }
 
-        // 修复旧存档：确保每个族群的cats列表不为null
+        // 修复旧存档：确保每个族群的cats列表不为null，并刷新族长baseSpeed
         foreach (var tribe in _playerData.tribes)
         {
-            if (tribe != null && tribe.cats == null)
+            if (tribe == null) continue;
+
+            if (tribe.cats == null)
             {
                 tribe.cats = new System.Collections.Generic.List<TribeSystem.CatData>();
+            }
+
+            // 旧存档族长baseSpeed可能是默认值1000，从配置表刷新
+            if (tribe.leader != null)
+            {
+                var config = TribeSystem.TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+                if (config != null && config.leaderBaseStats != null)
+                {
+                    tribe.leader.baseSpeed = config.leaderBaseStats.speed;
+                }
             }
         }
 
@@ -587,6 +612,7 @@ public class PlayerData
     // 本回合事件完成标记（存回合号；与currentRound相同则表示本回合已完成）
     public int recruitmentCompletedRound;
     public int ritualCompletedRound;
+    public int newTribeEventCompletedRound;
 
     // Legacy Cat system persistent fields (kept for compatibility, marked obsolete)
     [System.Obsolete("Use TribeSystem instead")]

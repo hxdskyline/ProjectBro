@@ -211,7 +211,41 @@ namespace TribeSystem
 
         #region Option Creation Methods
 
-        private RecruitmentOption CreateNewTribeOption()
+        /// <summary>
+        /// 获取玩家尚未拥有的族群类型列表
+        /// </summary>
+        public List<TribeType> GetAvailableTribeTypes()
+        {
+            var playerData = _dataManager?.PlayerData;
+            var available = new List<TribeType>();
+            if (playerData?.tribes == null) return available;
+
+            foreach (TribeType type in System.Enum.GetValues(typeof(TribeType)))
+            {
+                bool hasType = false;
+                foreach (var tribe in playerData.tribes)
+                {
+                    if (tribe.tribeType == type)
+                    {
+                        hasType = true;
+                        break;
+                    }
+                }
+                if (!hasType)
+                    available.Add(type);
+            }
+            return available;
+        }
+
+        /// <summary>
+        /// 免费执行新增族群（用于新部族事件，不消耗猫粮）
+        /// </summary>
+        public TribeRecord ExecuteFreeNewTribeRecruitment(TribeType tribeType)
+        {
+            return ExecuteNewTribeRecruitment(tribeType, 0);
+        }
+
+        public RecruitmentOption CreateNewTribeOption()
         {
             var config = TribeConfigLoader.Instance.GetRecruitmentConfig();
             var playerData = _dataManager.PlayerData;

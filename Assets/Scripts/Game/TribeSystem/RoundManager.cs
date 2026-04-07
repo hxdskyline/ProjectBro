@@ -76,10 +76,19 @@ namespace TribeSystem
             return events;
         }
 
-        public bool CanDoRecruitment() => Campaign?.HasRecruitmentForBattle(_currentRound) ?? false;
-        public bool CanDoRitual()      => Campaign?.HasRitualForBattle(_currentRound)      ?? false;
-        public bool CanOpenShop()      => Campaign?.HasShopForBattle(_currentRound)        ?? false;
+        public bool CanDoRecruitment()  => Campaign?.HasRecruitmentForBattle(_currentRound)   ?? false;
+        public bool CanDoRitual()       => Campaign?.HasRitualForBattle(_currentRound)        ?? false;
+        public bool CanOpenShop()       => Campaign?.HasShopForBattle(_currentRound)          ?? false;
+        public bool CanDoNewTribeEvent()=> Campaign?.HasNewTribeEventForBattle(_currentRound) ?? false;
         public bool IsBossBattleRound() => IsFinalRound;
+
+        /// <summary>
+        /// 获取本回合所有需要弹出的事件，按配置优先级从高到低排序
+        /// </summary>
+        public System.Collections.Generic.List<string> GetSortedPopupEvents()
+        {
+            return Campaign?.GetSortedPopupEvents(_currentRound) ?? new System.Collections.Generic.List<string>();
+        }
 
         /// <summary>
         /// 获取回合描述文本

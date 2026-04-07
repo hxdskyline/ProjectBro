@@ -8,6 +8,7 @@ public struct BattleSpawnConfig
     public BattleFighterSpawnDefinition[] PlayerFighterDefinitions;
     public BattleUnitTypeConfig PlayerUnitType;
     public BattleUnitTypeConfig EnemyUnitType;
+    public UnitStaticAttributes? EnemyStaticAttributes;
 
     public int FightersPerCamp;
     public int EnemyFighterCount;

@@ -15,7 +15,7 @@
         "attack": 70,
         "defense": 55,
         "hp": 600,
-        "speed": 700,
+        "speed": 3000,
         "command": 0
       }
     },
@@ -34,7 +34,7 @@
         "attack": 85,
         "defense": 50,
         "hp": 550,
-        "speed": 800,
+        "speed": 1100,
         "command": 0
       }
     },
@@ -53,7 +53,7 @@
         "attack": 78,
         "defense": 65,
         "hp": 680,
-        "speed": 630,
+        "speed": 2500,
         "command": 0
       }
     },
@@ -72,7 +72,7 @@
         "attack": 60,
         "defense": 72,
         "hp": 750,
-        "speed": 660,
+        "speed": 950,
         "command": 0
       }
     },
@@ -91,7 +91,7 @@
         "attack": 92,
         "defense": 52,
         "hp": 510,
-        "speed": 890,
+        "speed": 1200,
         "command": 0
       }
     },
@@ -110,7 +110,7 @@
         "attack": 74,
         "defense": 60,
         "hp": 580,
-        "speed": 730,
+        "speed": 1050,
         "command": 0
       }
     }

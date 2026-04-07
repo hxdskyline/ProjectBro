@@ -1,82 +1,289 @@
-[
-  {
-    "battleNumber": 1,
-    "enemyUnitIds": [1, 1, 1],
-    "catFoodReward": 200,
-    "hasRecruitment": false,
-    "hasRitual": false,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 2,
-    "enemyUnitIds": [1, 1, 1, 1],
-    "catFoodReward": 250,
-    "hasRecruitment": true,
-    "hasRitual": false,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 3,
-    "enemyUnitIds": [1, 1, 2, 2, 2],
-    "catFoodReward": 300,
-    "hasRecruitment": true,
-    "hasRitual": true,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 4,
-    "enemyUnitIds": [1, 1, 2, 2, 2, 2],
-    "catFoodReward": 350,
-    "hasRecruitment": true,
-    "hasRitual": false,
-    "hasShop": true
-  },
-  {
-    "battleNumber": 5,
-    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3],
-    "catFoodReward": 400,
-    "hasRecruitment": true,
-    "hasRitual": true,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 6,
-    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3],
-    "catFoodReward": 450,
-    "hasRecruitment": true,
-    "hasRitual": false,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 7,
-    "enemyUnitIds": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3],
-    "catFoodReward": 500,
-    "hasRecruitment": true,
-    "hasRitual": true,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 8,
-    "enemyUnitIds": [1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3],
-    "catFoodReward": 550,
-    "hasRecruitment": true,
-    "hasRitual": false,
-    "hasShop": true
-  },
-  {
-    "battleNumber": 9,
-    "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3],
-    "catFoodReward": 600,
-    "hasRecruitment": true,
-    "hasRitual": true,
-    "hasShop": false
-  },
-  {
-    "battleNumber": 10,
-    "enemyUnitIds": [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3],
-    "catFoodReward": 650,
-    "hasRecruitment": true,
-    "hasRitual": false,
-    "hasShop": false
+{
+  "levels": [
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": false, 
+      "battleNumber": 1, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.0, 
+        "attack": 85, 
+        "defense": 3, 
+        "hp": 400
+      }, 
+      "catFoodReward": 100, 
+      "hasShop": false, 
+      "hasRecruitment": false
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        1, 
+        1
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": false, 
+      "battleNumber": 2, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.05, 
+        "attack": 90, 
+        "defense": 4, 
+        "hp": 450
+      }, 
+      "catFoodReward": 120, 
+      "hasShop": true, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": true, 
+      "battleNumber": 3, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.1, 
+        "attack": 95, 
+        "defense": 5, 
+        "hp": 500
+      }, 
+      "catFoodReward": 140, 
+      "hasShop": false, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2
+      ], 
+      "hasNewTribeEvent": true, 
+      "hasRitual": false, 
+      "battleNumber": 4, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.15, 
+        "attack": 100, 
+        "defense": 5, 
+        "hp": 550
+      }, 
+      "catFoodReward": 160, 
+      "hasShop": true, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": true, 
+      "battleNumber": 5, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.2, 
+        "attack": 105, 
+        "defense": 6, 
+        "hp": 600
+      }, 
+      "catFoodReward": 180, 
+      "hasShop": false, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": false, 
+      "battleNumber": 6, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.25, 
+        "attack": 110, 
+        "defense": 6, 
+        "hp": 650
+      }, 
+      "catFoodReward": 200, 
+      "hasShop": true, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": true, 
+      "battleNumber": 7, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.3, 
+        "attack": 115, 
+        "defense": 7, 
+        "hp": 700
+      }, 
+      "catFoodReward": 220, 
+      "hasShop": false, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": true, 
+      "hasRitual": false, 
+      "battleNumber": 8, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.35, 
+        "attack": 120, 
+        "defense": 7, 
+        "hp": 750
+      }, 
+      "catFoodReward": 240, 
+      "hasShop": true, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": true, 
+      "battleNumber": 9, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.4, 
+        "attack": 125, 
+        "defense": 8, 
+        "hp": 800
+      }, 
+      "catFoodReward": 260, 
+      "hasShop": false, 
+      "hasRecruitment": true
+    }, 
+    {
+      "enemyUnitIds": [
+        1, 
+        1, 
+        1, 
+        1, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        2, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3, 
+        3
+      ], 
+      "hasNewTribeEvent": false, 
+      "hasRitual": false, 
+      "battleNumber": 10, 
+      "enemyStats": {
+        "attackRange": 1.0, 
+        "moveSpeed": 2.45, 
+        "attack": 130, 
+        "defense": 8, 
+        "hp": 850
+      }, 
+      "catFoodReward": 280, 
+      "hasShop": true, 
+      "hasRecruitment": true
+    }
+  ], 
+  "popupPriorities": {
+    "shop": 0, 
+    "recruitment": 20, 
+    "newTribeEvent": 30, 
+    "ritual": 10
   }
-]
+}

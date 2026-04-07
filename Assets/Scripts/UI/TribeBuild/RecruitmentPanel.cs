@@ -19,6 +19,7 @@ namespace TribeSystem.UI
         [SerializeField] private Text _hintText;
         [SerializeField] private RectTransform _optionsContainer;
         [SerializeField] private Button _confirmButton;
+        [SerializeField] private GameObject _optionCardPrefab;
 
         private RectTransform _externalRoot;
         private Font _cachedFont;
@@ -230,29 +231,58 @@ namespace TribeSystem.UI
         {
             if (_optionsContainer == null || options == null) return;
 
-            foreach (var option in options)
+            for (int i = 0; i < options.Count; i++)
             {
-                GameObject cardGo = new GameObject("OptionCard", typeof(RectTransform), typeof(Image), typeof(Button));
-                cardGo.transform.SetParent(_optionsContainer, false);
+                var option = options[i];
+                int optionIndex = i;
 
-                RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-                cardRect.sizeDelta = new Vector2(200f, 250f);
+                GameObject cardGo;
+                RecruitmentOptionCard cardComponent;
 
-                Image cardImg = cardGo.GetComponent<Image>();
-                cardImg.color = GetOptionCardColor(option.optionType);
+                if (_optionCardPrefab != null)
+                {
+                    // 使用预制体实例化
+                    cardGo = Instantiate(_optionCardPrefab, _optionsContainer);
+                    cardComponent = cardGo.GetComponent<RecruitmentOptionCard>();
+                    if (cardComponent != null)
+                    {
+                        cardComponent.Setup(option, optionIndex);
+                    }
 
-                Button cardBtn = cardGo.GetComponent<Button>();
-                int optionIndex = options.IndexOf(option);
-                cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
+                    Image cardImg = cardGo.GetComponent<Image>();
+                    if (cardImg != null)
+                    {
+                        cardImg.color = GetOptionCardColor(option.optionType);
+                    }
 
-                // 创建卡片内容
-                CreateOptionCardContent(cardRect, option);
+                    Button cardBtn = cardGo.GetComponent<Button>();
+                    if (cardBtn != null)
+                    {
+                        cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
+                    }
+                }
+                else
+                {
+                    // Fallback: 运行时创建
+                    cardGo = new GameObject("OptionCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                    cardGo.transform.SetParent(_optionsContainer, false);
 
-                // 存储选项索引
-                RecruitmentOptionCard cardComponent = cardGo.AddComponent<RecruitmentOptionCard>();
-                cardComponent.Option = option;
-                cardComponent.Index = optionIndex;
-                cardComponent.BackgroundImage = cardImg;
+                    RectTransform cardRect = cardGo.GetComponent<RectTransform>();
+                    cardRect.sizeDelta = new Vector2(200f, 250f);
+
+                    Image cardImg = cardGo.GetComponent<Image>();
+                    cardImg.color = GetOptionCardColor(option.optionType);
+
+                    Button cardBtn = cardGo.GetComponent<Button>();
+                    cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
+
+                    CreateOptionCardContent(cardRect, option);
+
+                    cardComponent = cardGo.AddComponent<RecruitmentOptionCard>();
+                    cardComponent.Option = option;
+                    cardComponent.Index = optionIndex;
+                    cardComponent.BackgroundImage = cardImg;
+                }
             }
         }
 
@@ -430,13 +460,4 @@ namespace TribeSystem.UI
         }
     }
 
-    /// <summary>
-    /// 招募选项卡片组件
-    /// </summary>
-    public class RecruitmentOptionCard : MonoBehaviour
-    {
-        public RecruitmentOption Option { get; set; }
-        public int Index { get; set; }
-        public Image BackgroundImage { get; set; }
-    }
 }

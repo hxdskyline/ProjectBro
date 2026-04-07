@@ -21,6 +21,9 @@ namespace TribeSystem.UI
         [SerializeField] private Text _refreshCostText;
         [SerializeField] private Button _closeButton;
 
+        [Header("子卡片预制体")]
+        [SerializeField] private GameObject _shopItemCardPrefab;
+
         private RectTransform _externalRoot;
         private Font _cachedFont;
         private RectTransform _cachedParent;
@@ -34,6 +37,13 @@ namespace TribeSystem.UI
         private Action<ShopItem> _onItemBuy;
         private Action _onRefresh;
         private Action _onClose;
+        private Action<TribeRecord, CatData> _onCatSell;
+
+        // 出售模式
+        private bool _isSellMode = false;
+        private Button _sellButton;
+        private Button _backToShopButton;
+        private RectTransform _sellContainer;
 
         /// <summary>
         /// 设置外部根节点（用于弹窗场景）
@@ -70,13 +80,15 @@ namespace TribeSystem.UI
         /// <summary>
         /// 显示商店
         /// </summary>
-        public void ShowShop(List<ShopItem> items, int refreshCost, Action<ShopItem> onBuy, Action onRefresh, Action onClose)
+        public void ShowShop(List<ShopItem> items, int refreshCost, Action<ShopItem> onBuy, Action onRefresh, Action onClose, Action<TribeRecord, CatData> onCatSell = null)
         {
             _currentItems = items;
             _refreshCost = refreshCost;
             _onItemBuy = onBuy;
             _onRefresh = onRefresh;
             _onClose = onClose;
+            _onCatSell = onCatSell;
+            _isSellMode = false;
 
             // 清空并重新生成商品
             ClearShopItems();
@@ -95,6 +107,7 @@ namespace TribeSystem.UI
                 _closeButton.onClick.AddListener(OnCloseClicked);
             }
 
+            ShowSellView(false);
             Show();
         }
 
@@ -269,6 +282,54 @@ namespace TribeSystem.UI
             closeImg.color = new Color(0.5f, 0.25f, 0.2f, 1f);
             _closeButton.targetGraphic = closeImg;
             CreateButtonLabel(closeRect, font, "关闭");
+
+            // 出售按钮（放在刷新和关闭之间）
+            GameObject sellGo = new GameObject("SellButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            sellGo.transform.SetParent(panelRect, false);
+            RectTransform sellRect = sellGo.GetComponent<RectTransform>();
+            sellRect.anchorMin = new Vector2(0.35f, 0.08f);
+            sellRect.anchorMax = new Vector2(0.65f, 0.15f);
+            sellRect.offsetMin = Vector2.zero;
+            sellRect.offsetMax = Vector2.zero;
+            _sellButton = sellGo.GetComponent<Button>();
+            Image sellImg = sellGo.GetComponent<Image>();
+            sellImg.color = new Color(0.6f, 0.45f, 0.2f, 1f);
+            _sellButton.targetGraphic = sellImg;
+            CreateButtonLabel(sellRect, font, "出售小猫");
+            _sellButton.onClick.AddListener(OnSellButtonClicked);
+
+            // 出售容器（ScrollView样式，复用商品容器位置）
+            GameObject sellGo2 = new GameObject("SellContainer", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            sellGo2.transform.SetParent(panelRect, false);
+            RectTransform sellRect2 = sellGo2.GetComponent<RectTransform>();
+            sellRect2.anchorMin = new Vector2(0.05f, 0.20f);
+            sellRect2.anchorMax = new Vector2(0.95f, 0.75f);
+            sellRect2.offsetMin = Vector2.zero;
+            sellRect2.offsetMax = Vector2.zero;
+            _sellContainer = sellRect2;
+            Image sellBg = sellGo2.GetComponent<Image>();
+            sellBg.color = new Color(0f, 0f, 0f, 0.15f);
+            ScrollRect scrollRect = sellGo2.GetComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+
+            // 出售内容节点（VerticalLayoutGroup）
+            GameObject sellContent = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup));
+            sellContent.transform.SetParent(sellRect2, false);
+            RectTransform contentRect = sellContent.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 0f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+            scrollRect.content = contentRect;
+            VerticalLayoutGroup vlg = sellContent.GetComponent<VerticalLayoutGroup>();
+            vlg.spacing = 5f;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = false;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+
+            _sellContainer.gameObject.SetActive(false);
         }
 
         private void CreateButtonLabel(RectTransform parent, Font font, string text)
@@ -294,25 +355,42 @@ namespace TribeSystem.UI
 
             foreach (var item in items)
             {
-                GameObject itemGo = new GameObject("ShopItem", typeof(RectTransform), typeof(Image), typeof(Button));
-                itemGo.transform.SetParent(_itemsContainer, false);
+                GameObject itemGo;
+                ShopItemCard cardComponent;
 
-                RectTransform itemRect = itemGo.GetComponent<RectTransform>();
-                itemRect.sizeDelta = new Vector2(140f, 170f);
+                if (_shopItemCardPrefab != null)
+                {
+                    itemGo = Instantiate(_shopItemCardPrefab, _itemsContainer);
+                    cardComponent = itemGo.GetComponent<ShopItemCard>();
+                    if (cardComponent != null) cardComponent.Setup(item);
 
-                Image itemImg = itemGo.GetComponent<Image>();
-                itemImg.color = GetShopItemColor(item.itemType);
+                    Image cardImg = itemGo.GetComponent<Image>();
+                    if (cardImg != null) cardImg.color = GetShopItemColor(item.itemType);
 
-                Button itemBtn = itemGo.GetComponent<Button>();
-                itemBtn.onClick.AddListener(() => OnItemClicked(item));
+                    Button cardBtn = itemGo.GetComponent<Button>();
+                    if (cardBtn != null) cardBtn.onClick.AddListener(() => OnItemClicked(item));
+                }
+                else
+                {
+                    // Fallback: 运行时创建
+                    itemGo = new GameObject("ShopItem", typeof(RectTransform), typeof(Image), typeof(Button));
+                    itemGo.transform.SetParent(_itemsContainer, false);
 
-                // 创建商品内容
-                CreateShopItemContent(itemRect, item);
+                    RectTransform itemRect = itemGo.GetComponent<RectTransform>();
+                    itemRect.sizeDelta = new Vector2(140f, 170f);
 
-                // 存储引用
-                ShopItemCard cardComponent = itemGo.AddComponent<ShopItemCard>();
-                cardComponent.Item = item;
-                cardComponent.BackgroundImage = itemImg;
+                    Image itemImg = itemGo.GetComponent<Image>();
+                    itemImg.color = GetShopItemColor(item.itemType);
+
+                    Button itemBtn = itemGo.GetComponent<Button>();
+                    itemBtn.onClick.AddListener(() => OnItemClicked(item));
+
+                    CreateShopItemContent(itemRect, item);
+
+                    cardComponent = itemGo.AddComponent<ShopItemCard>();
+                    cardComponent.Item = item;
+                    cardComponent.BackgroundImage = itemImg;
+                }
             }
         }
 
@@ -444,6 +522,213 @@ namespace TribeSystem.UI
             _onClose?.Invoke();
         }
 
+        private void OnSellButtonClicked()
+        {
+            _isSellMode = true;
+            ShowSellView(true);
+        }
+
+        private void ShowSellView(bool showSell)
+        {
+            if (_itemsContainer != null) _itemsContainer.gameObject.SetActive(!showSell);
+            if (_refreshButton != null) _refreshButton.gameObject.SetActive(!showSell);
+            if (_sellContainer != null) _sellContainer.gameObject.SetActive(showSell);
+
+            if (_sellButton != null)
+            {
+                // 按钮文字切换
+                Text label = _sellButton.GetComponentInChildren<Text>();
+                if (label != null) label.text = showSell ? "返回商店" : "出售小猫";
+                _sellButton.onClick.RemoveAllListeners();
+                if (showSell)
+                    _sellButton.onClick.AddListener(OnBackToShopClicked);
+                else
+                    _sellButton.onClick.AddListener(OnSellButtonClicked);
+            }
+
+            if (showSell)
+            {
+                GenerateSellList();
+            }
+        }
+
+        private void OnBackToShopClicked()
+        {
+            _isSellMode = false;
+            ShowSellView(false);
+        }
+
+        private void GenerateSellList()
+        {
+            if (_sellContainer == null) return;
+
+            Transform content = _sellContainer.Find("Content");
+            if (content == null) return;
+
+            // 清空现有列表
+            for (int i = content.childCount - 1; i >= 0; i--)
+            {
+                Destroy(content.GetChild(i).gameObject);
+            }
+
+            var dataManager = GameManager.Instance?.DataManager;
+            if (dataManager == null) return;
+
+            var tribes = dataManager.GetTribes();
+            if (tribes == null) return;
+
+            Font font = _cachedFont ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var shopService = new ShopService();
+
+            bool hasAnyCats = false;
+            foreach (var tribe in tribes)
+            {
+                if (tribe.cats == null || tribe.cats.Count == 0) continue;
+
+                // 族群标题
+                GameObject tribeHeader = new GameObject($"Tribe_{tribe.tribeType}", typeof(RectTransform), typeof(LayoutElement));
+                tribeHeader.transform.SetParent(content, false);
+                LayoutElement headerLayout = tribeHeader.GetComponent<LayoutElement>();
+                headerLayout.preferredHeight = 25f;
+
+                GameObject headerLabel = new GameObject("Label", typeof(RectTransform), typeof(Text));
+                headerLabel.transform.SetParent(tribeHeader.transform, false);
+                RectTransform hlRect = headerLabel.GetComponent<RectTransform>();
+                hlRect.anchorMin = Vector2.zero;
+                hlRect.anchorMax = Vector2.one;
+                hlRect.offsetMin = Vector2.zero;
+                hlRect.offsetMax = Vector2.zero;
+                Text hlText = headerLabel.GetComponent<Text>();
+                hlText.font = font;
+                hlText.fontSize = 14;
+                hlText.alignment = TextAnchor.MiddleLeft;
+                hlText.color = new Color(1f, 0.85f, 0.4f, 1f);
+                hlText.text = $"  {GetTribeTypeName(tribe.tribeType)}族 ({tribe.cats.Count}只)";
+
+                for (int i = 0; i < tribe.cats.Count; i++)
+                {
+                    hasAnyCats = true;
+                    var cat = tribe.cats[i];
+                    int sellPrice = shopService.GetCatSellPrice(tribe.tribeType, cat.quality);
+
+                    GameObject row = new GameObject("CatRow", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+                    row.transform.SetParent(content, false);
+                    LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+                    rowLayout.preferredHeight = 35f;
+                    Image rowBg = row.GetComponent<Image>();
+                    rowBg.color = GetQualityColor(cat.quality) * 0.4f;
+
+                    // 品质+属性文本
+                    GameObject infoGo = new GameObject("Info", typeof(RectTransform), typeof(Text));
+                    infoGo.transform.SetParent(row.transform, false);
+                    RectTransform infoRect = infoGo.GetComponent<RectTransform>();
+                    infoRect.anchorMin = new Vector2(0.02f, 0f);
+                    infoRect.anchorMax = new Vector2(0.7f, 1f);
+                    infoRect.offsetMin = Vector2.zero;
+                    infoRect.offsetMax = Vector2.zero;
+                    Text infoText = infoGo.GetComponent<Text>();
+                    infoText.font = font;
+                    infoText.fontSize = 12;
+                    infoText.alignment = TextAnchor.MiddleLeft;
+                    infoText.color = Color.white;
+                    infoText.text = $"  {GetQualityName(cat.quality)}  攻{cat.attackMultiplier:P0} 防{cat.defenseMultiplier:P0} 血{cat.hpMultiplier:P0} 速{cat.speedMultiplier:P0}";
+
+                    // 出售按钮
+                    GameObject sellBtnGo = new GameObject("SellBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+                    sellBtnGo.transform.SetParent(row.transform, false);
+                    RectTransform sellBtnRect = sellBtnGo.GetComponent<RectTransform>();
+                    sellBtnRect.anchorMin = new Vector2(0.72f, 0.1f);
+                    sellBtnRect.anchorMax = new Vector2(0.98f, 0.9f);
+                    sellBtnRect.offsetMin = Vector2.zero;
+                    sellBtnRect.offsetMax = Vector2.zero;
+                    Image sellBtnImg = sellBtnGo.GetComponent<Image>();
+                    sellBtnImg.color = new Color(0.5f, 0.3f, 0.2f, 1f);
+                    Button sellBtn = sellBtnGo.GetComponent<Button>();
+                    sellBtn.targetGraphic = sellBtnImg;
+
+                    // 按钮文本
+                    GameObject btnLabel = new GameObject("Label", typeof(RectTransform), typeof(Text));
+                    btnLabel.transform.SetParent(sellBtnRect, false);
+                    RectTransform blRect = btnLabel.GetComponent<RectTransform>();
+                    blRect.anchorMin = Vector2.zero;
+                    blRect.anchorMax = Vector2.one;
+                    blRect.offsetMin = Vector2.zero;
+                    blRect.offsetMax = Vector2.zero;
+                    Text blText = btnLabel.GetComponent<Text>();
+                    blText.font = font;
+                    blText.fontSize = 12;
+                    blText.alignment = TextAnchor.MiddleCenter;
+                    blText.color = new Color(1f, 0.9f, 0.5f, 1f);
+                    blText.text = $"出售 +{sellPrice}";
+
+                    // 捕获闭包变量
+                    TribeRecord capturedTribe = tribe;
+                    CatData capturedCat = cat;
+                    sellBtn.onClick.AddListener(() => OnSellCatClicked(capturedTribe, capturedCat));
+                }
+            }
+
+            if (!hasAnyCats)
+            {
+                GameObject emptyLabel = new GameObject("EmptyLabel", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
+                emptyLabel.transform.SetParent(content, false);
+                LayoutElement el = emptyLabel.GetComponent<LayoutElement>();
+                el.preferredHeight = 60f;
+                Text emptyText = emptyLabel.GetComponent<Text>();
+                emptyText.font = font;
+                emptyText.fontSize = 18;
+                emptyText.alignment = TextAnchor.MiddleCenter;
+                emptyText.color = new Color(0.7f, 0.7f, 0.7f, 1f);
+                emptyText.text = "没有可出售的小猫";
+            }
+        }
+
+        private void OnSellCatClicked(TribeRecord tribe, CatData cat)
+        {
+            _onCatSell?.Invoke(tribe, cat);
+            // 刷新出售列表和猫粮
+            UpdateCatFoodDisplay();
+            GenerateSellList();
+        }
+
+        private Color GetQualityColor(CatQuality quality)
+        {
+            switch (quality)
+            {
+                case CatQuality.White: return new Color(0.8f, 0.8f, 0.8f, 1f);
+                case CatQuality.Blue: return new Color(0.3f, 0.5f, 0.9f, 1f);
+                case CatQuality.Purple: return new Color(0.6f, 0.3f, 0.8f, 1f);
+                case CatQuality.Gold: return new Color(0.9f, 0.75f, 0.2f, 1f);
+                default: return Color.gray;
+            }
+        }
+
+        private string GetQualityName(CatQuality quality)
+        {
+            switch (quality)
+            {
+                case CatQuality.White: return "菜鸟";
+                case CatQuality.Blue: return "老手";
+                case CatQuality.Purple: return "精英";
+                case CatQuality.Gold: return "大师";
+                default: return quality.ToString();
+            }
+        }
+
+        private string GetTribeTypeName(TribeType type)
+        {
+            switch (type)
+            {
+                case TribeType.Maine: return "缅因";
+                case TribeType.Tabby: return "狸花";
+                case TribeType.Orange: return "大橘";
+                case TribeType.Cow: return "奶牛";
+                case TribeType.Siamese: return "暹罗";
+                case TribeType.Ragdoll: return "布偶";
+                default: return type.ToString();
+            }
+        }
+
         private void ClearShopItems()
         {
             if (_itemsContainer == null) return;
@@ -452,6 +737,16 @@ namespace TribeSystem.UI
             {
                 Destroy(_itemsContainer.GetChild(i).gameObject);
             }
+        }
+
+        /// <summary>
+        /// 刷新商品显示（移除售罄物品）
+        /// </summary>
+        public void RefreshItems(List<ShopItem> items)
+        {
+            _currentItems = items;
+            ClearShopItems();
+            GenerateShopItems(items);
         }
 
         public void Show()
@@ -487,12 +782,4 @@ namespace TribeSystem.UI
         }
     }
 
-    /// <summary>
-    /// 商店物品卡片组件
-    /// </summary>
-    public class ShopItemCard : MonoBehaviour
-    {
-        public ShopItem Item { get; set; }
-        public Image BackgroundImage { get; set; }
-    }
 }

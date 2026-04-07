@@ -719,6 +719,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _titleText: {fileID: 9154327599025184121}
+  _tierCardPrefab: {fileID: 1000000000000000001, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 3}
+  _blessingCardPrefab: {fileID: 1000000000000000001, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7, type: 3}
   _step1ContainerObj: {fileID: 2555195582146750699}
   _step2ContainerObj: {fileID: 6913404139340136221}
   _tribesContainer: {fileID: 3426124371979152797}

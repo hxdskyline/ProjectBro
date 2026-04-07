@@ -22,7 +22,6 @@ namespace TribeSystem.UI
         [SerializeField] private Button _startBattleButton;
         [SerializeField] private Button _shopButton;
         [SerializeField] private Button _backButton;
-        [SerializeField] private Text _deployCostText;
 
         [Header("预制体引用")]
         [SerializeField] private TribeCard _tribeCardPrefab;
@@ -32,6 +31,8 @@ namespace TribeSystem.UI
         [SerializeField] private RecruitmentPanel _recruitmentPanel;
         [SerializeField] private RitualPanel _ritualPanel;
         [SerializeField] private ShopPanel _shopPanel;
+        [SerializeField] private NewTribeEventPanel _newTribeEventPanel;
+        private AccessoryCodexPanel _codexPanel;
 
         [Header("强制弹窗根节点")]
         [SerializeField] private RectTransform _forcedPopupRoot;
@@ -53,8 +54,15 @@ namespace TribeSystem.UI
         private bool _isProcessingRecruitment = false;
         private bool _isProcessingRitual = false;
         private bool _isShopOpen = false;
+        private List<ShopItem> _currentShopItems;
+
+        // 优先级弹窗队列
+        private List<string> _popupEventQueue;
+        private int _popupQueueIndex;
 
         private TribeDetailTips _currentDetailTips;
+        private Dictionary<int, TribeCard> _tribeCardMap = new Dictionary<int, TribeCard>();
+        private TribeCard _currentDetailCard;
 
         private Font _cachedFont;
 
@@ -178,6 +186,22 @@ namespace TribeSystem.UI
                 _shopPanel.Initialize();
                 _shopPanel.Hide();
             }
+
+            // 新部族事件面板（支持预制体，fallback 运行时创建）
+            _newTribeEventPanel = InstantiatePanelIfNeeded(_newTribeEventPanel, "NewTribeEventPanel");
+            if (_newTribeEventPanel == null)
+            {
+                CreateNewTribeEventPanel();
+            }
+            else if (_forcedPopupRoot != null)
+            {
+                _newTribeEventPanel.SetExternalRoot(_forcedPopupRoot);
+                _newTribeEventPanel.Initialize();
+                _newTribeEventPanel.Hide();
+            }
+
+            // 图鉴面板（运行时创建）
+            CreateCodexPanel();
         }
 
         /// <summary>
@@ -222,7 +246,7 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 开始回合准备流程
+        /// 开始回合准备流程 - 按配置优先级依次弹出事件
         /// </summary>
         public void StartRoundPreparation()
         {
@@ -232,26 +256,56 @@ namespace TribeSystem.UI
             // 开始新回合
             _roundManager?.StartRound();
 
-            // 先处理强制招募
-            ProcessRecruitment();
+            // 获取按优先级排序的弹窗事件列表
+            _popupEventQueue = _roundManager.GetSortedPopupEvents();
+            _popupQueueIndex = 0;
+
+            // 依次处理弹窗事件
+            ProcessNextPopupEvent();
         }
 
         /// <summary>
-        /// 处理招募&练兵（第2-10关强制）
+        /// 处理弹窗队列中的下一个事件
+        /// </summary>
+        private void ProcessNextPopupEvent()
+        {
+            while (_popupEventQueue != null && _popupQueueIndex < _popupEventQueue.Count)
+            {
+                string eventType = _popupEventQueue[_popupQueueIndex];
+                _popupQueueIndex++;
+
+                switch (eventType)
+                {
+                    case "newTribeEvent":
+                        ProcessNewTribeEvent();
+                        return;
+                    case "recruitment":
+                        ProcessRecruitment();
+                        return;
+                    case "ritual":
+                        ProcessRitual();
+                        return;
+                    case "shop":
+                        ShowShopAvailableHint();
+                        return;
+                    default:
+                        continue;
+                }
+            }
+
+            // 所有弹窗事件处理完毕，进入自由阶段
+            EnterFreeActionPhase();
+        }
+
+        /// <summary>
+        /// 处理招募&练兵
         /// </summary>
         private void ProcessRecruitment()
         {
-            if (!_roundManager.CanDoRecruitment())
-            {
-                // 第1关无招募，直接进入后续流程
-                OnRecruitmentOptionSelected(null);
-                return;
-            }
-
             // 本回合已完成过招募，跳过
             if (_dataManager.IsRecruitmentCompletedForRound(_roundManager.CurrentRound))
             {
-                OnRecruitmentOptionSelected(null);
+                ProcessNextPopupEvent();
                 return;
             }
 
@@ -265,8 +319,7 @@ namespace TribeSystem.UI
             }
             else
             {
-                // 如果没有面板，直接执行第一个选项
-                OnRecruitmentOptionSelected(options[0]);
+                OnRecruitmentOptionSelected(options.Count > 0 ? options[0] : null);
             }
         }
 
@@ -275,30 +328,14 @@ namespace TribeSystem.UI
             if(option != null)
             {
                 ExecuteRecruitmentOption(option);
-                // 玩家做出选择并拿到奖励，标记本回合招募已完成
                 _dataManager.SetRecruitmentCompletedForRound(_roundManager.CurrentRound);
             }
 
             _isProcessingRecruitment = false;
-
-            // 招募结束存档
             _saveManager?.SaveAfterRecruitment(_roundManager.CurrentRound);
 
-            // 招募完成后，检查是否需要祭祀
-            if (_roundManager.CanDoRitual())
-            {
-                ProcessRitual();
-            }
-            else if (_roundManager.CanOpenShop())
-            {
-                // 商店不是强制的，只提示
-                ShowShopAvailableHint();
-            }
-            else
-            {
-                // 进入自由操作阶段
-                EnterFreeActionPhase();
-            }
+            // 继续处理下一个弹窗事件
+            ProcessNextPopupEvent();
         }
 
         private void ExecuteRecruitmentOption(RecruitmentOption option)
@@ -343,14 +380,14 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 处理祭祀（强制）
+        /// 处理祭祀
         /// </summary>
         private void ProcessRitual()
         {
             // 本回合已完成过祭祀，跳过
             if (_dataManager.IsRitualCompletedForRound(_roundManager.CurrentRound))
             {
-                CheckShopAvailability();
+                ProcessNextPopupEvent();
                 return;
             }
 
@@ -365,50 +402,133 @@ namespace TribeSystem.UI
             }
             else
             {
-                // 如果没有面板，跳过祭祀
                 _isProcessingRitual = false;
-                CheckShopAvailability();
+                ProcessNextPopupEvent();
             }
         }
 
         private void OnRitualConfirmed(RitualTier tier, RitualRewardItem blessing)
         {
-            if (tier == null) { CheckShopAvailability(); return; } // 玩家跳过祭祀
+            if (tier == null) { ProcessNextPopupEvent(); return; } // 玩家跳过祭祀
             _ritualService.ExecuteRitual(tier, blessing);
 
-            // 玩家选择了祝福并获得奖励，标记本回合祭祀已完成
             _dataManager.SetRitualCompletedForRound(_roundManager.CurrentRound);
-
             _isProcessingRitual = false;
-
-            // 祭祀结束存档
             _saveManager?.SaveAfterRitual(_roundManager.CurrentRound);
 
-            // 只刷新本地数据，不重新触发回合流程
             _tribes = _dataManager.GetTribes();
             RefreshUI();
 
-            // 祭祀完成后，检查是否需要商店
-            CheckShopAvailability();
-        }
-
-        private void CheckShopAvailability()
-        {
-            if (_roundManager.CanOpenShop())
-            {
-                ShowShopAvailableHint();
-            }
-            else
-            {
-                EnterFreeActionPhase();
-            }
+            // 继续处理下一个弹窗事件
+            ProcessNextPopupEvent();
         }
 
         private void ShowShopAvailableHint()
         {
             Debug.Log("[TribeBuildPanel] 商店已开放，可点击商店按钮进入");
-            // TODO: 显示商店开放提示
-            EnterFreeActionPhase();
+            ProcessNextPopupEvent();
+        }
+
+        /// <summary>
+        /// 处理新部族事件
+        /// </summary>
+        private void ProcessNewTribeEvent()
+        {
+            // 本回合已完成过新部族事件，跳过
+            if (_dataManager.IsNewTribeEventCompletedForRound(_roundManager.CurrentRound))
+            {
+                ProcessNextPopupEvent();
+                return;
+            }
+
+            // 部族数>=6时不再触发
+            int tribeCount = _tribes != null ? _tribes.Count : 0;
+            if (tribeCount >= 6)
+            {
+                ProcessNextPopupEvent();
+                return;
+            }
+
+            // 检查是否还有未拥有的部族类型
+            var availableTypes = _recruitmentService.GetAvailableTribeTypes();
+
+            // 构造二选一选项
+            var options = new List<NewTribeEventOption>();
+            if (availableTypes.Count > 0)
+            {
+                options.Add(new NewTribeEventOption
+                {
+                    optionType = NewTribeEventOptionType.NewRandomTribe,
+                    description = $"获得一个随机新部族（可选：{availableTypes.Count}种）"
+                });
+            }
+            options.Add(new NewTribeEventOption
+            {
+                optionType = NewTribeEventOptionType.CatFoodReward,
+                description = "获得1000猫粮"
+            });
+
+            if (_newTribeEventPanel != null)
+            {
+                _newTribeEventPanel.ShowOptions(options, OnNewTribeEventConfirmed);
+            }
+            else
+            {
+                ProcessNextPopupEvent();
+            }
+        }
+
+        private void OnNewTribeEventConfirmed(NewTribeEventOption option)
+        {
+            if (option != null)
+            {
+                switch (option.optionType)
+                {
+                    case NewTribeEventOptionType.NewRandomTribe:
+                        var availableTypes = _recruitmentService.GetAvailableTribeTypes();
+                        if (availableTypes.Count > 0)
+                        {
+                            TribeType selected = availableTypes[UnityEngine.Random.Range(0, availableTypes.Count)];
+                            _recruitmentService.ExecuteFreeNewTribeRecruitment(selected);
+                            Debug.Log($"[TribeBuildPanel] 新部族事件：免费获得 {selected} 部族");
+                        }
+                        break;
+
+                    case NewTribeEventOptionType.CatFoodReward:
+                        _dataManager.AddCatFood(1000);
+                        Debug.Log("[TribeBuildPanel] 新部族事件：获得1000猫粮");
+                        break;
+                }
+
+                _dataManager.SetNewTribeEventCompletedForRound(_roundManager.CurrentRound);
+                _tribes = _dataManager.GetTribes();
+                RefreshUI();
+            }
+
+            // 继续处理下一个弹窗事件
+            ProcessNextPopupEvent();
+        }
+
+        private void CreateNewTribeEventPanel()
+        {
+            if (_newTribeEventPanel != null) return;
+
+            GameObject go = new GameObject("NewTribeEventPanel", typeof(RectTransform));
+            go.transform.SetParent(_forcedPopupRoot != null ? _forcedPopupRoot : transform, false);
+
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            _newTribeEventPanel = go.AddComponent<NewTribeEventPanel>();
+            if (_forcedPopupRoot != null)
+            {
+                _newTribeEventPanel.SetExternalRoot(_forcedPopupRoot);
+            }
+            _newTribeEventPanel.Initialize();
+            _newTribeEventPanel.Hide();
         }
 
         /// <summary>
@@ -419,6 +539,34 @@ namespace TribeSystem.UI
             // 玩家可以自由操作：查看族群、打开商店、准备战斗
         }
 
+        private void CreateCodexPanel()
+        {
+            if (_codexPanel != null) return;
+
+            GameObject go = new GameObject("AccessoryCodexPanel", typeof(RectTransform));
+            go.transform.SetParent(transform, false);
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            _codexPanel = go.AddComponent<AccessoryCodexPanel>();
+            _codexPanel.Initialize();
+            _codexPanel.Hide();
+        }
+
+        /// <summary>
+        /// 打开图鉴面板（可由UI按钮调用）
+        /// </summary>
+        public void OpenCodex()
+        {
+            if (_codexPanel != null)
+            {
+                _codexPanel.Show();
+            }
+        }
+
         /// <summary>
         /// 打开商店
         /// </summary>
@@ -426,21 +574,38 @@ namespace TribeSystem.UI
         {
             if (_shopPanel == null) return;
 
-            var items = _shopService.GenerateShopItems();
+            _currentShopItems = _shopService.GenerateShopItems();
             int refreshCost = _shopService.CalculateRefreshCost();
 
-            _shopPanel.ShowShop(items, refreshCost, OnShopItemBuy, OnShopRefresh, OnShopClose);
+            _shopPanel.ShowShop(_currentShopItems, refreshCost, OnShopItemBuy, OnShopRefresh, OnShopClose, OnCatToSellSelected);
             _isShopOpen = true;
+        }
+
+        private void OnCatToSellSelected(TribeRecord tribe, CatData cat)
+        {
+            _shopService.SellCat(tribe, cat);
+            _tribes = _dataManager.GetTribes();
+            RefreshUI();
         }
 
         private void OnShopItemBuy(ShopItem item)
         {
-            _shopService.BuyItem(item);
-            RefreshUI();
-            _shopPanel.UpdateCatFoodDisplay();
+            int result = _shopService.BuyItem(item);
+            if (result == 1)
+            {
+                RefreshUI();
+                _shopPanel.UpdateCatFoodDisplay();
 
-            // 商店购买后存档
-            _saveManager?.SaveAfterShopPurchase(_roundManager.CurrentRound);
+                // 售罄物品从列表移除
+                if (item.stock <= 0)
+                {
+                    _currentShopItems.Remove(item);
+                }
+                _shopPanel.RefreshItems(_currentShopItems);
+
+                // 商店购买后存档
+                _saveManager?.SaveAfterShopPurchase(_roundManager.CurrentRound);
+            }
         }
 
         private void OnShopRefresh()
@@ -448,8 +613,9 @@ namespace TribeSystem.UI
             var newItems = _shopService.RefreshShop();
             if (newItems != null)
             {
+                _currentShopItems = newItems;
                 int newRefreshCost = _shopService.CalculateRefreshCost();
-                _shopPanel.ShowShop(newItems, newRefreshCost, OnShopItemBuy, OnShopRefresh, OnShopClose);
+                _shopPanel.ShowShop(_currentShopItems, newRefreshCost, OnShopItemBuy, OnShopRefresh, OnShopClose, OnCatToSellSelected);
             }
             RefreshUI();
             _shopPanel.UpdateCatFoodDisplay();
@@ -750,11 +916,13 @@ namespace TribeSystem.UI
             // 使用预制体生成族群卡片
             if (_tribeCardPrefab != null)
             {
+                _tribeCardMap.Clear();
                 foreach (var tribe in _tribes)
                 {
                     TribeCard card = Instantiate(_tribeCardPrefab, _tribeListContainer, false);
                     // 注：族群部署在BattlePreparePanel中进行，此处仅展示族群信息
                     card.Setup(tribe, false, null, OnShowTribeDetail);
+                    _tribeCardMap[tribe.tribeId] = card;
                 }
             }
             else
@@ -904,15 +1072,47 @@ namespace TribeSystem.UI
                 return;
             }
 
-            // 如果已有详情面板，先销毁
+            // 如果已打开同一张卡的详情，关闭它
+            if (_currentDetailTips != null && _currentDetailCard != null && _tribeCardMap.TryGetValue(tribe.tribeId, out var existing) && existing == _currentDetailCard)
+            {
+                OnDetailTipsClosed();
+                Destroy(_currentDetailTips.gameObject);
+                _currentDetailTips = null;
+                return;
+            }
+
+            // 如果已有详情面板（其他卡），先清回调再销毁，避免销毁时触发旧的 OnDetailTipsClosed
             if (_currentDetailTips != null)
             {
+                _currentDetailTips.ClearOnClosed();
                 Destroy(_currentDetailTips.gameObject);
+            }
+
+            // 恢复上一张卡的头像
+            if (_currentDetailCard != null)
+            {
+                _currentDetailCard.SetPortraitVariant(1);
+            }
+
+            // 切换当前卡的头像为 variant 2
+            if (_tribeCardMap.TryGetValue(tribe.tribeId, out var card))
+            {
+                _currentDetailCard = card;
+                card.SetPortraitVariant(2);
             }
 
             // 实例化详情面板
             _currentDetailTips = Instantiate(_tribeDetailTipsPrefab, transform, false);
-            _currentDetailTips.Show(tribe, isDeployed, OnTribeRestClicked, OnTribeDeployChanged);
+            _currentDetailTips.Show(tribe, isDeployed, OnTribeRestClicked, OnTribeDeployChanged, OnDetailTipsClosed);
+        }
+
+        private void OnDetailTipsClosed()
+        {
+            if (_currentDetailCard != null)
+            {
+                _currentDetailCard.SetPortraitVariant(1);
+                _currentDetailCard = null;
+            }
         }
 
         private void OnTribeRestClicked(TribeRecord tribe)

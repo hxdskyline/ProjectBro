@@ -69,6 +69,7 @@ MonoBehaviour:
   _refreshButton: {fileID: 3389494923257418032}
   _refreshCostText: {fileID: 979147511368118843}
   _closeButton: {fileID: 473510567859128148}
+  _shopItemCardPrefab: {fileID: 1000000000000000001, guid: c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8, type: 3}
 --- !u!114 &4280370882101407579
 MonoBehaviour:
   m_ObjectHideFlags: 0

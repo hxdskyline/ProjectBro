@@ -44,7 +44,8 @@ public static class BattleSpawner
             occupiedPositions,
             false,
             config.EnemyTint,
-            config);
+            config,
+            config.EnemyStaticAttributes);
 
         LoadGroupIdle(playerFighters);
         LoadGroupIdle(enemyFighters);
@@ -113,9 +114,11 @@ public static class BattleSpawner
         List<Vector3> occupiedPositions,
         bool faceRight,
         Color tint,
-        BattleSpawnConfig config)
+        BattleSpawnConfig config,
+        UnitStaticAttributes? overrideAttributes = null)
     {
         BattleFighter[] fighters = new BattleFighter[count];
+        UnitStaticAttributes resolvedAttrs = overrideAttributes ?? ResolveStaticAttributes(unitType);
 
         for (int i = 0; i < count; i++)
         {
@@ -126,7 +129,7 @@ public static class BattleSpawner
                 name,
                 camp,
                 unitType,
-                ResolveStaticAttributes(unitType),
+                resolvedAttrs,
                 definition,
                 spawnPosition,
                 faceRight,
@@ -240,20 +243,10 @@ public static class BattleSpawner
         {
             hud = go.AddComponent<FighterHUD>();
         }
-        int maxHp = 60;
-        if (unitType != null)
-        {
-            maxHp = Mathf.Max(1, unitType.BaseAttributes.MaxHp);
-        }
-        else
-        {
-            maxHp = Mathf.Max(1, staticAttributes.MaxHp);
-        }
-        hud.Initialize(maxHp);
+        int maxHp = Mathf.Max(1, staticAttributes.MaxHp);
+        hud.Initialize(maxHp, camp == BattleCamp.Enemy);
 
-        UnitRuntimeAttributes runtimeAttributes = unitType != null
-            ? unitType.CreateRuntimeAttributes()
-            : new UnitRuntimeAttributes(staticAttributes);
+        UnitRuntimeAttributes runtimeAttributes = new UnitRuntimeAttributes(staticAttributes);
 
         return new BattleFighter
         {
@@ -275,14 +268,7 @@ public static class BattleSpawner
             return unitType.BaseAttributes;
         }
 
-        return new UnitStaticAttributes
-        {
-            MaxHp = 60,
-            Attack = 12,
-            Defense = 3,
-            MoveSpeed = 2.2f,
-            AttackRange = 1.0f
-        };
+        return UnitStaticAttributes.Default;
     }
 
     private static void LoadGroupIdle(BattleFighter[] fighters)

@@ -92,6 +92,11 @@ public class BattlePanel : UIPanel
             _battleInfoText.text = "Battle Running (Scene Avatar)";
         }
 
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        UnitStaticAttributes? enemyStats = campaign != null
+            ? campaign.GetEnemyStatsForBattle(levelId)
+            : (UnitStaticAttributes?)null;
+
         _flowController.StartBattle(
             levelId,
             _fighterPrefab,
@@ -99,9 +104,14 @@ public class BattlePanel : UIPanel
             _enemyAvatarDefinition,
             ResolveEnemyCount(levelId),
             BuildPlayerSpawnDefinitions(deployedTribes),
-            OnBattleEnded);
+            OnBattleEnded,
+            enemyStats);
 
-        Debug.Log($"[BattlePanel] Battle started for level: {levelId}, tribes: {deployedTribes?.Count ?? 0}");
+        if (enemyStats.HasValue)
+        {
+            var s = enemyStats.Value;
+            Debug.Log($"[BattlePanel] Battle Lv{levelId}: {deployedTribes?.Count ?? 0} tribes | Enemy stats ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed}");
+        }
     }
 
     private int ResolveEnemyCount(int levelId)

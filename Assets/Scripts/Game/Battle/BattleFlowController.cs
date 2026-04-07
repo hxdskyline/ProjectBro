@@ -18,7 +18,8 @@ public class BattleFlowController
         AvatarAnimationDefinition enemyDefinition,
         int enemyFighterCount,
         BattleFighterSpawnDefinition[] playerFighterDefinitions,
-        Action<bool> onBattleEnded)
+        Action<bool> onBattleEnded,
+        UnitStaticAttributes? enemyStats = null)
     {
         EnsureBattleManager();
 
@@ -28,6 +29,10 @@ public class BattleFlowController
         _battleManager.ConfigureDemoAvatars(playerDefinition, enemyDefinition);
         _battleManager.ConfigureEnemyFighterCount(enemyFighterCount);
         _battleManager.ConfigurePlayerFighters(playerFighterDefinitions);
+        if (enemyStats.HasValue)
+        {
+            _battleManager.ConfigureEnemyStats(enemyStats.Value);
+        }
         _battleManager.Initialize(levelId);
         _battleManager.StartBattle();
 

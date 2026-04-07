@@ -23,6 +23,7 @@ namespace TribeSystem.UI
         private bool _isDeployed;
         private Action<TribeRecord> _onRestClicked;
         private Action<TribeRecord, bool> _onDeployChanged;
+        private Action _onClosed;
 
         // 小猫卡片预制体（Addressables 缓存）
         private GameObject _littleCatCardPrefab;
@@ -41,12 +42,13 @@ namespace TribeSystem.UI
         /// <summary>
         /// 显示族群详细信息
         /// </summary>
-        public void Show(TribeRecord tribe, bool isDeployed, Action<TribeRecord> onRestClicked, Action<TribeRecord, bool> onDeployChanged)
+        public void Show(TribeRecord tribe, bool isDeployed, Action<TribeRecord> onRestClicked, Action<TribeRecord, bool> onDeployChanged, Action onClosed = null)
         {
             _tribe = tribe;
             _isDeployed = isDeployed;
             _onRestClicked = onRestClicked;
             _onDeployChanged = onDeployChanged;
+            _onClosed = onClosed;
 
             UpdateContent();
             gameObject.SetActive(true);
@@ -54,7 +56,14 @@ namespace TribeSystem.UI
 
         public void Hide()
         {
+            _onClosed?.Invoke();
+            _onClosed = null;
             gameObject.SetActive(false);
+        }
+
+        public void ClearOnClosed()
+        {
+            _onClosed = null;
         }
 
         private void UpdateContent()

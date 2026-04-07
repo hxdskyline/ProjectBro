@@ -15,6 +15,10 @@ namespace TribeSystem.UI
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;
 
+        [Header("子卡片预制体")]
+        [SerializeField] private GameObject _tierCardPrefab;
+        [SerializeField] private GameObject _blessingCardPrefab;
+
         [SerializeField] private GameObject _step1ContainerObj;
         [SerializeField] private GameObject _step2ContainerObj;
 
@@ -103,25 +107,56 @@ namespace TribeSystem.UI
 
             foreach (var tier in _availableTiers)
             {
-                var go = new GameObject("TierCard", typeof(RectTransform), typeof(Image), typeof(Button));
-                go.transform.SetParent(_tribesContainer, false);
-                go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
-
-                var img = go.GetComponent<Image>();
-                img.color = GetTierColor(tier.tierName);
-
                 bool canAfford = catFood >= tier.cost;
-                var btn = go.GetComponent<Button>();
-                btn.interactable = canAfford;
+                GameObject go;
+                RitualTierCard comp;
 
-                var captured = tier;
-                btn.onClick.AddListener(() => OnTierCardClicked(captured));
+                if (_tierCardPrefab != null)
+                {
+                    // 使用预制体实例化
+                    go = Instantiate(_tierCardPrefab, _tribesContainer);
+                    comp = go.GetComponent<RitualTierCard>();
+                    if (comp != null)
+                    {
+                        comp.Setup(tier, canAfford);
+                    }
 
-                CreateTierCardContent(go.GetComponent<RectTransform>(), tier, canAfford, font);
+                    Image img = go.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        img.color = GetTierColor(tier.tierName);
+                    }
 
-                var comp = go.AddComponent<RitualTierCard>();
-                comp.Tier = tier;
-                comp.Img  = img;
+                    Button btn = go.GetComponent<Button>();
+                    if (btn != null)
+                    {
+                        btn.interactable = canAfford;
+                        var captured = tier;
+                        btn.onClick.AddListener(() => OnTierCardClicked(captured));
+                    }
+                }
+                else
+                {
+                    // Fallback: 运行时创建
+                    go = new GameObject("TierCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                    go.transform.SetParent(_tribesContainer, false);
+                    go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
+
+                    var img = go.GetComponent<Image>();
+                    img.color = GetTierColor(tier.tierName);
+
+                    var btn = go.GetComponent<Button>();
+                    btn.interactable = canAfford;
+
+                    var captured = tier;
+                    btn.onClick.AddListener(() => OnTierCardClicked(captured));
+
+                    CreateTierCardContent(go.GetComponent<RectTransform>(), tier, canAfford, font);
+
+                    comp = go.AddComponent<RitualTierCard>();
+                    comp.Tier = tier;
+                    comp.BackgroundImage = img;
+                }
             }
         }
 
@@ -146,8 +181,8 @@ namespace TribeSystem.UI
             foreach (Transform child in _tribesContainer)
             {
                 var card = child.GetComponent<RitualTierCard>();
-                if (card?.Img != null)
-                    card.Img.color = card.Tier == tier
+                if (card?.BackgroundImage != null)
+                    card.BackgroundImage.color = card.Tier == tier
                         ? new Color(1f, 0.9f, 0.3f)
                         : GetTierColor(card.Tier.tierName);
             }
@@ -187,26 +222,56 @@ namespace TribeSystem.UI
 
             foreach (var blessing in _drawnBlessings)
             {
-                var go = new GameObject("BlessingCard", typeof(RectTransform), typeof(Image), typeof(Button));
-                go.transform.SetParent(_costOptionsContainer, false);
-                go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
+                GameObject go;
+                RitualBlessingCard comp;
 
-                var img = go.GetComponent<Image>();
-                img.color = GetBlessingColor(blessing.rewardType);
+                if (_blessingCardPrefab != null)
+                {
+                    // 使用预制体实例化
+                    go = Instantiate(_blessingCardPrefab, _costOptionsContainer);
+                    comp = go.GetComponent<RitualBlessingCard>();
+                    if (comp != null)
+                    {
+                        comp.Setup(blessing);
+                    }
 
-                var captured = blessing;
-                go.GetComponent<Button>().onClick.AddListener(() => OnBlessingCardClicked(captured));
+                    Image img = go.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        img.color = GetBlessingColor(blessing.rewardType);
+                    }
 
-                AddText(go.GetComponent<RectTransform>(), "Name", font, 16,
-                    new Vector2(0.05f, 0.70f), new Vector2(0.95f, 0.88f),
-                    GetRewardTypeName(blessing.rewardType), Color.white, TextAnchor.MiddleCenter);
-                AddText(go.GetComponent<RectTransform>(), "Desc", font, 14,
-                    new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.65f),
-                    blessing.displayName, new Color(0.9f, 0.9f, 0.9f), TextAnchor.UpperCenter);
+                    Button btn = go.GetComponent<Button>();
+                    if (btn != null)
+                    {
+                        var captured = blessing;
+                        btn.onClick.AddListener(() => OnBlessingCardClicked(captured));
+                    }
+                }
+                else
+                {
+                    // Fallback: 运行时创建
+                    go = new GameObject("BlessingCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                    go.transform.SetParent(_costOptionsContainer, false);
+                    go.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 250f);
 
-                var comp = go.AddComponent<RitualBlessingCard>();
-                comp.Blessing = blessing;
-                comp.Img      = img;
+                    var img = go.GetComponent<Image>();
+                    img.color = GetBlessingColor(blessing.rewardType);
+
+                    var captured = blessing;
+                    go.GetComponent<Button>().onClick.AddListener(() => OnBlessingCardClicked(captured));
+
+                    AddText(go.GetComponent<RectTransform>(), "Name", font, 16,
+                        new Vector2(0.05f, 0.70f), new Vector2(0.95f, 0.88f),
+                        GetRewardTypeName(blessing.rewardType), Color.white, TextAnchor.MiddleCenter);
+                    AddText(go.GetComponent<RectTransform>(), "Desc", font, 14,
+                        new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.65f),
+                        blessing.displayName, new Color(0.9f, 0.9f, 0.9f), TextAnchor.UpperCenter);
+
+                    comp = go.AddComponent<RitualBlessingCard>();
+                    comp.Blessing = blessing;
+                    comp.BackgroundImage = img;
+                }
             }
         }
 
@@ -216,8 +281,8 @@ namespace TribeSystem.UI
             foreach (Transform child in _costOptionsContainer)
             {
                 var card = child.GetComponent<RitualBlessingCard>();
-                if (card?.Img != null)
-                    card.Img.color = card.Blessing == blessing
+                if (card?.BackgroundImage != null)
+                    card.BackgroundImage.color = card.Blessing == blessing
                         ? new Color(1f, 0.9f, 0.3f)
                         : GetBlessingColor(card.Blessing.rewardType);
             }
@@ -460,17 +525,4 @@ namespace TribeSystem.UI
         }
     }
 
-    // ─── 辅助组件 ───────────────────────────────────────────────────────────────
-
-    public class RitualTierCard : MonoBehaviour
-    {
-        public RitualTier Tier { get; set; }
-        public Image Img { get; set; }
-    }
-
-    public class RitualBlessingCard : MonoBehaviour
-    {
-        public RitualRewardItem Blessing { get; set; }
-        public Image Img { get; set; }
-    }
 }

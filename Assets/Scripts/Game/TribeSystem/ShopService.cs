@@ -75,15 +75,26 @@ namespace TribeSystem
         /// <summary>
         /// 购买物品
         /// </summary>
-        public bool BuyItem(ShopItem item)
+        /// <summary>
+        /// 购买物品，返回 1=成功, 0=猫粮不足, -1=售罄
+        /// </summary>
+        public int BuyItem(ShopItem item)
         {
+            if (item.stock <= 0)
+            {
+                Debug.LogWarning($"[ShopService] Item sold out: {item.name}");
+                return -1;
+            }
+
             int actualPrice = item.GetActualPrice();
 
             if (!_dataManager.TrySpendCatFood(actualPrice))
             {
                 Debug.LogWarning($"[ShopService] Not enough cat food to buy {item.name}");
-                return false;
+                return 0;
             }
+
+            item.stock--;
 
             // 根据物品类型处理
             switch (item.itemType)
@@ -107,7 +118,7 @@ namespace TribeSystem
             }
 
             _dataManager.SavePlayerData();
-            return true;
+            return 1;
         }
 
         /// <summary>
@@ -129,14 +140,12 @@ namespace TribeSystem
         /// </summary>
         public int SellCat(TribeRecord tribe, CatData cat)
         {
-            var config = TribeConfigLoader.Instance.GetShopConfig();
-            // TODO: 根据品种和品质计算价格
-            int sellPrice = 50; // 暂时固定价格
+            int sellPrice = GetCatSellPrice(tribe.tribeType, cat.quality);
 
             _dataManager.AddCatFood(sellPrice);
             tribe.cats.Remove(cat);
 
-            Debug.Log($"[ShopService] Sold cat for {sellPrice} cat food");
+            Debug.Log($"[ShopService] Sold {cat.quality} cat for {sellPrice} cat food");
 
             return sellPrice;
         }
@@ -214,6 +223,16 @@ namespace TribeSystem
                 name = $"{GetTribeTypeName(tribeType)}({GetQualityName(quality)})",
                 description = $"一只{GetQualityName(quality)}品质的小猫"
             };
+        }
+
+        /// <summary>
+        /// 获取小猫出售价格（买入价的50%）
+        /// </summary>
+        public int GetCatSellPrice(TribeType tribeType, CatQuality quality)
+        {
+            var config = TribeConfigLoader.Instance.GetShopConfig();
+            int buyPrice = CalculateCatPrice(config, tribeType, quality);
+            return Mathf.RoundToInt(buyPrice * 0.5f);
         }
 
         private int CalculateCatPrice(ShopConfig config, TribeType tribeType, CatQuality quality)

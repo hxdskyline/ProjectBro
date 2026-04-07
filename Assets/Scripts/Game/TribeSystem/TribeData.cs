@@ -179,7 +179,7 @@ namespace TribeSystem
             cat.attackMultiplier = ratio;
             cat.defenseMultiplier = ratio;
             cat.hpMultiplier = ratio;
-            cat.speedMultiplier = ratio;
+            cat.speedMultiplier = 1.0f; // 移动速度全继承族长
 
             return cat;
         }
@@ -214,7 +214,7 @@ namespace TribeSystem
                     attackMultiplier = newCat.attackMultiplier;
                     defenseMultiplier = newCat.defenseMultiplier;
                     hpMultiplier = newCat.hpMultiplier;
-                    speedMultiplier = newCat.speedMultiplier;
+                    speedMultiplier = 1.0f; // 移动速度始终全继承
                     return true;
                 }
             }
@@ -404,6 +404,7 @@ namespace TribeSystem
         public int basePrice;
         public string name;
         public string description;
+        public int stock;               // 库存，买完后从商店移除
 
         public ShopItem()
         {
@@ -414,6 +415,7 @@ namespace TribeSystem
             basePrice = 0;
             name = "";
             description = "";
+            stock = 1;
         }
 
         /// <summary>
@@ -534,6 +536,31 @@ namespace TribeSystem
             defense = def;
             this.hp = hp;
             speed = spd;
+        }
+    }
+
+    /// <summary>
+    /// 新部族事件选项类型
+    /// </summary>
+    public enum NewTribeEventOptionType
+    {
+        NewRandomTribe,   // 获得随机新部族
+        CatFoodReward     // 获得1000猫粮
+    }
+
+    /// <summary>
+    /// 新部族事件选项
+    /// </summary>
+    [Serializable]
+    public class NewTribeEventOption
+    {
+        public NewTribeEventOptionType optionType;
+        public string description;
+
+        public NewTribeEventOption()
+        {
+            optionType = NewTribeEventOptionType.NewRandomTribe;
+            description = "";
         }
     }
 }

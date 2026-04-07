@@ -478,6 +478,7 @@ MonoBehaviour:
   _hintText: {fileID: 6654608734845664138}
   _optionsContainer: {fileID: 5986700219437223996}
   _confirmButton: {fileID: 6067226051747404680}
+  _optionCardPrefab: {fileID: 1000000000000000001, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 3}
 --- !u!222 &1980649687102170226
 CanvasRenderer:
   m_ObjectHideFlags: 0

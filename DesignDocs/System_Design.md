@@ -72,11 +72,6 @@
 | 回合管理 | `TribeSystem/RoundManager.cs` | 20回合循环，事件检测 |
 | 存档管理 | `TribeSystem/TribeSaveManager.cs` | 关键时刻自动存档 |
 
-### 📋 待完成：Unity预制体
-| 模块 | 说明 | 指南文档 |
-|-----|---------|---------|
-| UI预制体 | 在Unity Editor中创建预制体 | `Scenes/UI_Prefabs_Creation_Guide.md` |
-
 ---
 
 ## 1. 核心玩法概述
@@ -1053,81 +1048,6 @@ public void IncrementShopRefreshCount(bool saveImmediately = true);
 public int GetLastShopRound();
 public void SetLastShopRound(int round, bool saveImmediately = true);
 ```
-```json
-{
-  "tribes": [
-    {
-      "tribeType": "Maine",
-      "name": "缅因猫族",
-      "initialCatCount": 3,
-      "leaderBaseStats": {
-        "attack": 100,
-        "defense": 80,
-        "hp": 1000,
-        "speed": 1000,
-        "command": 10
-      }
-    }
-  ]
-}
-```
-
-#### quality_config.json（品质配置）
-```json
-{
-  "qualities": [
-    {
-      "quality": "White",
-      "name": "菜鸟",
-      "minRatio": 0.1,
-      "maxRatio": 0.2,
-      "baseProbability": 0.4
-    }
-  ]
-}
-```
-
-#### ritual_reward_pools.json（祭祀奖励池）
-```json
-{
-  "tiers": [
-    {
-      "tier": "free",
-      "costRange": [0, 0],
-      "rewards": [...]
-    }
-  ]
-}
-```
-
-#### shop_config.json（商店配置）
-```json
-{
-  "baseRefreshCost": 50,
-  "refreshIncrement": 50,
-  "slotCount": 5,
-  "itemPools": {...}
-}
-```
-
-### 13.2 存档数据结构
-
-#### save_data.json
-```json
-{
-  "currentRound": 1,
-  "catFood": 1000,
-  "tribes": [...],
-  "inventory": {
-    "consumables": [...],
-    "accessories": [...],
-    "unlockedAccessories": [...]
-  },
-  "shopRefreshCount": 0,
-  "lastShopRound": 0,
-  "tribeMoods": {...}
-}
-```
 
 ---
 
@@ -1200,64 +1120,39 @@ public void SetLastShopRound(int round, bool saveImmediately = true);
 
 ---
 
-## 实现总结
+---
 
-### 已完成内容
+## 关键文件索引
 
-#### 数据层 (Phase 1)
-- ✅ 完整的族群数据结构定义（TribeRecord, LeaderData, CatData等）
-- ✅ 六大族群配置表
-- ✅ 品质系统配置表
-- ✅ 招募/祭祀/商店配置表
-- ✅ DataManager扩展，支持族群数据持久化
-
-#### 逻辑层 (Phase 2)
-- ✅ 属性计算系统（族长/小猫属性、统帅惩罚、伤害公式）
-- ✅ 招募服务（三选一选项生成、执行招募）
-- ✅ 祭祀服务（种族选择、奖励生成和应用）
-- ✅ 商店服务（商品生成、买卖逻辑）
-- ✅ 配置加载器（统一管理配置数据）
-
-### 待实现内容
-
-#### UI层 (Phase 3)
-- ⏳ 招募面板（强制弹窗，三选一）
-- ⏳ 祭祀面板（两步选择）
-- ⏳ 商店面板（可选）
-- ⏳ 主界面（回合管理、族群列表）
-- ⏳ 族群详情面板
-
-#### 战斗适配 (Phase 4)
-- ⏳ 战斗单位生成（族长+小猫模式）
-- ⏳ 族长/小猫标识
-- ⏳ 阵亡恢复机制
-
-#### 流程整合 (Phase 5)
-- ⏳ 回合管理器（20回合循环）
-- ⏳ 存档管理（关键时刻存档）
-
-### 关键文件索引
-
-#### 数据结构
+### 数据结构
 - `Assets/Scripts/Game/TribeSystem/TribeData.cs` - 核心数据类定义
 
-#### 服务类
+### 服务类
 - `Assets/Scripts/Game/TribeSystem/TribeStatsCalculator.cs` - 属性计算
 - `Assets/Scripts/Game/TribeSystem/TribeConfigLoader.cs` - 配置加载
 - `Assets/Scripts/Game/TribeSystem/RecruitmentService.cs` - 招募服务
 - `Assets/Scripts/Game/TribeSystem/RitualService.cs` - 祭祀服务
 - `Assets/Scripts/Game/TribeSystem/ShopService.cs` - 商店服务
 
-#### 数据管理
+### 数据管理
 - `Assets/Scripts/Framework/DataManager.cs` - 持久化管理
 
-#### 配置文件
-- `StreamingAssets/Tables/tribe_config.json`
-- `StreamingAssets/Tables/quality_config.json`
-- `StreamingAssets/Tables/recruitment_config.json`
-- `StreamingAssets/Tables/ritual_config.json`
-- `StreamingAssets/Tables/shop_config.json`
+### UI面板
+- `Assets/Scripts/UI/TribeBuild/TribeBuildPanel.cs` - 主面板
+- `Assets/Scripts/UI/TribeBuild/RecruitmentPanel.cs` - 招募面板
+- `Assets/Scripts/UI/TribeBuild/RitualPanel.cs` - 祭祀面板
+- `Assets/Scripts/UI/TribeBuild/ShopPanel.cs` - 商店面板
+- `Assets/Scripts/UI/Panels/BattlePanel.cs` - 战斗面板
+- `Assets/Scripts/UI/Panels/BattlePreparePanel.cs` - 战斗准备
+
+### 配置文件
+- `StreamingAssets/Tables/tribe_config.json` - 族群配置
+- `StreamingAssets/Tables/quality_config.json` - 品质配置
+- `StreamingAssets/Tables/recruitment_config.json` - 招募配置
+- `StreamingAssets/Tables/ritual_config.json` - 祭祀配置
+- `StreamingAssets/Tables/shop_config.json` - 商店配置
+- `StreamingAssets/battle_campaign_levels.json` - 战斗关卡配置
 
 ---
 
-本文档将随开发进度持续更新。
+需求以 `DesignDocs/新需求/新的需求改动很大.txt` 为准，本文档为系统设计参考。

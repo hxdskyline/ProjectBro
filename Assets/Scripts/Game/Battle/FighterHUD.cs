@@ -12,6 +12,7 @@ public class FighterHUD : MonoBehaviour
     private GameObject _fgQuad;
     private int _maxHp = 1;
     private int _currentHp = 1;
+    private bool _isEnemy;
 
     private void Awake()
     {
@@ -55,11 +56,23 @@ public class FighterHUD : MonoBehaviour
         var fgCol = _fgQuad.GetComponent<Collider>(); if (fgCol != null) Object.Destroy(fgCol);
     }
 
-    public void Initialize(int maxHp)
+    public void Initialize(int maxHp, bool isEnemy = false)
     {
         _maxHp = Mathf.Max(1, maxHp);
         _currentHp = _maxHp;
+        _isEnemy = isEnemy;
+        ApplyBarColor();
         UpdateBar();
+    }
+
+    private void ApplyBarColor()
+    {
+        if (_fgQuad == null) return;
+        var fgRenderer = _fgQuad.GetComponent<MeshRenderer>();
+        if (fgRenderer == null || fgRenderer.material == null) return;
+        fgRenderer.material.color = _isEnemy
+            ? new Color(0.85f, 0.2f, 0.15f, 0.95f)   // 红色 — 敌人
+            : new Color(0.18f, 0.8f, 0.22f, 0.95f);   // 绿色 — 己方
     }
 
     public void UpdateHp(int newHp)

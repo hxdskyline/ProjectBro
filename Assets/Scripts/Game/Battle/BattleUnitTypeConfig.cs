@@ -8,6 +8,15 @@ public struct UnitStaticAttributes
     [Min(0)] public int Defense;
     [Min(0.1f)] public float MoveSpeed;
     [Min(0.1f)] public float AttackRange;
+
+    public static UnitStaticAttributes Default => new UnitStaticAttributes
+    {
+        MaxHp = 60,
+        Attack = 12,
+        Defense = 3,
+        MoveSpeed = 2.2f,
+        AttackRange = 1.0f
+    };
 }
 
 [System.Serializable]
@@ -34,14 +43,7 @@ public class BattleUnitTypeConfig : ScriptableObject
 {
     [SerializeField] private int _unitTypeId;
     [SerializeField] private string _unitTypeName = "Unit";
-    [SerializeField] private UnitStaticAttributes _baseAttributes = new UnitStaticAttributes
-    {
-        MaxHp = 60,
-        Attack = 12,
-        Defense = 3,
-        MoveSpeed = 2.2f,
-        AttackRange = 1.0f
-    };
+    [SerializeField] private UnitStaticAttributes _baseAttributes = UnitStaticAttributes.Default;
 
     public int UnitTypeId => _unitTypeId;
     public string UnitTypeName => string.IsNullOrEmpty(_unitTypeName) ? name : _unitTypeName;
