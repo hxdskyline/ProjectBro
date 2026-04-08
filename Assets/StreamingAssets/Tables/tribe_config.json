@@ -6,15 +6,16 @@
       "initialCatCount": 3,
       "leaderBaseStats": {
         "attack": 100,
-        "defense": 80,
-        "hp": 1000,
+        "defense": 20,
+        "hp": 1700,
         "speed": 3000,
         "command": 10
       },
+      "deployCostPerCat": 10,
       "catBaseStats": {
-        "attack": 70,
-        "defense": 55,
-        "hp": 600,
+        "attack": 62,
+        "defense": 42,
+        "hp": 1600,
         "speed": 3000,
         "command": 0
       }
@@ -23,17 +24,18 @@
       "tribeType": 1,
       "tribeName": "狸花猫族",
       "initialCatCount": 5,
+      "deployCostPerCat": 10,
       "leaderBaseStats": {
         "attack": 120,
-        "defense": 70,
-        "hp": 900,
+        "defense": 15,
+        "hp": 1500,
         "speed": 1100,
         "command": 8
       },
       "catBaseStats": {
-        "attack": 85,
-        "defense": 50,
-        "hp": 550,
+        "attack": 68,
+        "defense": 36,
+        "hp": 1400,
         "speed": 1100,
         "command": 0
       }
@@ -42,17 +44,18 @@
       "tribeType": 2,
       "tribeName": "大橘猫族",
       "initialCatCount": 2,
+      "deployCostPerCat": 10,
       "leaderBaseStats": {
         "attack": 110,
-        "defense": 90,
-        "hp": 1100,
+        "defense": 25,
+        "hp": 1900,
         "speed": 2500,
         "command": 12
       },
       "catBaseStats": {
-        "attack": 78,
-        "defense": 65,
-        "hp": 680,
+        "attack": 65,
+        "defense": 48,
+        "hp": 1800,
         "speed": 2500,
         "command": 0
       }
@@ -61,17 +64,18 @@
       "tribeType": 3,
       "tribeName": "奶牛猫族",
       "initialCatCount": 4,
+      "deployCostPerCat": 8,
       "leaderBaseStats": {
-        "attack": 85,
-        "defense": 100,
-        "hp": 1200,
+        "attack": 88,
+        "defense": 30,
+        "hp": 2100,
         "speed": 950,
         "command": 11
       },
       "catBaseStats": {
-        "attack": 60,
-        "defense": 72,
-        "hp": 750,
+        "attack": 55,
+        "defense": 52,
+        "hp": 2000,
         "speed": 950,
         "command": 0
       }
@@ -80,17 +84,18 @@
       "tribeType": 4,
       "tribeName": "暹罗猫族",
       "initialCatCount": 4,
+      "deployCostPerCat": 12,
       "leaderBaseStats": {
         "attack": 130,
-        "defense": 75,
-        "hp": 850,
+        "defense": 12,
+        "hp": 1400,
         "speed": 1200,
         "command": 9
       },
       "catBaseStats": {
-        "attack": 92,
-        "defense": 52,
-        "hp": 510,
+        "attack": 72,
+        "defense": 33,
+        "hp": 1300,
         "speed": 1200,
         "command": 0
       }
@@ -99,17 +104,18 @@
       "tribeType": 5,
       "tribeName": "布偶猫族",
       "initialCatCount": 3,
+      "deployCostPerCat": 10,
       "leaderBaseStats": {
-        "attack": 105,
-        "defense": 85,
-        "hp": 950,
+        "attack": 108,
+        "defense": 18,
+        "hp": 1600,
         "speed": 1050,
         "command": 10
       },
       "catBaseStats": {
-        "attack": 74,
-        "defense": 60,
-        "hp": 580,
+        "attack": 60,
+        "defense": 40,
+        "hp": 1550,
         "speed": 1050,
         "command": 0
       }

@@ -2,22 +2,47 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using LitJson;
+using TribeSystem;
 
 public class BattleCampaignRuntime
 {
     private const string BattleLevelConfigFileName = "battle_campaign_levels.json";
 
     private readonly int[][] _enemyUnitIdsByBattle;
-    private readonly bool[] _blessingEnabledByBattle;
-    private readonly bool[] _attributeBoostEnabledByBattle;
+
+    // Backward-compatible single-value enemy stats (fallback)
+    private readonly UnitStaticAttributes[] _enemyStatsByBattle;
+
+    // New: per-difficulty enemy stats [battleIndex][difficultyIndex]
+    private readonly Dictionary<int, Dictionary<DifficultyLevel, UnitStaticAttributes>> _enemyStatsMap
+        = new Dictionary<int, Dictionary<DifficultyLevel, UnitStaticAttributes>>();
+
+    // New: per-formation enemy unit ids [battleIndex][formationType]
+    private readonly Dictionary<int, Dictionary<EnemyFormationType, int[]>> _enemyUnitIdsMap
+        = new Dictionary<int, Dictionary<EnemyFormationType, int[]>>();
+
+    // New: scenario options per battle
+    private readonly Dictionary<int, List<BattleScenarioOption>> _scenarioOptionsMap
+        = new Dictionary<int, List<BattleScenarioOption>>();
+
+    // New: difficulty options per battle
+    private readonly Dictionary<int, List<DifficultyLevel>> _difficultyOptionsMap
+        = new Dictionary<int, List<DifficultyLevel>>();
+
+    // New: per-difficulty cat food reward
+    private readonly Dictionary<int, Dictionary<DifficultyLevel, int>> _catFoodRewardMap
+        = new Dictionary<int, Dictionary<DifficultyLevel, int>>();
+
+    // New: free deploy quota per battle
+    private readonly Dictionary<int, int> _freeDeployQuotaMap = new Dictionary<int, int>();
+
     private readonly bool[] _hasRecruitmentByBattle;
     private readonly bool[] _hasRitualByBattle;
     private readonly bool[] _hasShopByBattle;
     private readonly bool[] _hasNewTribeEventByBattle;
     private readonly int[] _catFoodRewardByBattle;
-    private readonly UnitStaticAttributes[] _enemyStatsByBattle;
 
-    // 弹窗优先级（数字越大越先弹出）
+    // Popup priorities
     private readonly Dictionary<string, int> _popupPriorities = new Dictionary<string, int>();
 
     private int _currentBattleIndex;
@@ -32,8 +57,6 @@ public class BattleCampaignRuntime
     public BattleCampaignRuntime()
     {
         _enemyUnitIdsByBattle = LoadConfig(
-            out _blessingEnabledByBattle,
-            out _attributeBoostEnabledByBattle,
             out _hasRecruitmentByBattle,
             out _hasRitualByBattle,
             out _hasShopByBattle,
@@ -49,20 +72,31 @@ public class BattleCampaignRuntime
         _isCompleted = false;
     }
 
+    // --- Legacy methods (backward compatible) ---
+
     public int GetEnemyCountForBattle(int battleNumber)
     {
-        int[] enemyUnitIds = GetEnemyUnitIdsForBattle(battleNumber);
-        return enemyUnitIds != null && enemyUnitIds.Length > 0
-            ? enemyUnitIds.Length
-            : 1;
+        int[] ids = GetEnemyUnitIdsForBattle(battleNumber);
+        return ids != null && ids.Length > 0 ? ids.Length : 1;
     }
 
+    /// <summary>
+    /// 获取敌方单位ID（兼容旧接口，默认返回 single 或 fallback）
+    /// </summary>
     public int[] GetEnemyUnitIdsForBattle(int battleNumber)
     {
+        // Try new format first: prefer single, then swarm
+        var ids = GetEnemyUnitIds(battleNumber, EnemyFormationType.Single);
+        if (ids != null && ids.Length > 0)
+            return ids;
+
+        ids = GetEnemyUnitIds(battleNumber, EnemyFormationType.Swarm);
+        if (ids != null && ids.Length > 0)
+            return ids;
+
+        // Fallback to legacy
         if (_enemyUnitIdsByBattle == null || _enemyUnitIdsByBattle.Length == 0)
-        {
             return null;
-        }
 
         int index = Mathf.Clamp(battleNumber - 1, 0, _enemyUnitIdsByBattle.Length - 1);
         return _enemyUnitIdsByBattle[index];
@@ -78,9 +112,7 @@ public class BattleCampaignRuntime
         int resolvedBattleNumber = Mathf.Clamp(battleNumber, 1, MaxBattleCount);
         int resolvedIndex = resolvedBattleNumber - 1;
         if (resolvedIndex != _currentBattleIndex)
-        {
             return;
-        }
 
         if (_currentBattleIndex >= MaxBattleCount - 1)
         {
@@ -91,21 +123,16 @@ public class BattleCampaignRuntime
         _currentBattleIndex++;
     }
 
+    // --- Legacy cat food reward (returns normal difficulty value) ---
     public int GetCatFoodRewardForBattle(int battleNumber)
     {
-        if (_catFoodRewardByBattle == null || _catFoodRewardByBattle.Length == 0) return 0;
-        int index = Mathf.Clamp(battleNumber - 1, 0, _catFoodRewardByBattle.Length - 1);
-        return _catFoodRewardByBattle[index];
+        return GetCatFoodReward(battleNumber, DifficultyLevel.Normal);
     }
 
+    // --- Legacy enemy stats (returns normal difficulty value) ---
     public UnitStaticAttributes GetEnemyStatsForBattle(int battleNumber)
     {
-        if (_enemyStatsByBattle == null || _enemyStatsByBattle.Length == 0)
-        {
-            return UnitStaticAttributes.Default;
-        }
-        int index = Mathf.Clamp(battleNumber - 1, 0, _enemyStatsByBattle.Length - 1);
-        return _enemyStatsByBattle[index];
+        return GetEnemyStats(battleNumber, DifficultyLevel.Normal);
     }
 
     public bool HasRecruitmentForBattle(int battleNumber)
@@ -136,27 +163,6 @@ public class BattleCampaignRuntime
         return _hasNewTribeEventByBattle[index];
     }
 
-    public bool IsBlessingEnabledForBattle(int battleNumber)
-    {
-        if (_blessingEnabledByBattle == null || _blessingEnabledByBattle.Length == 0)
-            return false;
-
-        int index = Mathf.Clamp(battleNumber - 1, 0, _blessingEnabledByBattle.Length - 1);
-        return _blessingEnabledByBattle[index];
-    }
-
-    public bool IsAttributeBoostEnabledForBattle(int battleNumber)
-    {
-        if (_attributeBoostEnabledByBattle == null || _attributeBoostEnabledByBattle.Length == 0)
-            return false;
-
-        int index = Mathf.Clamp(battleNumber - 1, 0, _attributeBoostEnabledByBattle.Length - 1);
-        return _attributeBoostEnabledByBattle[index];
-    }
-
-    /// <summary>
-    /// 获取弹窗事件类型的优先级（数字越大越先弹出）
-    /// </summary>
     public int GetPopupPriority(string eventType)
     {
         if (_popupPriorities.TryGetValue(eventType, out int priority))
@@ -164,9 +170,6 @@ public class BattleCampaignRuntime
         return 0;
     }
 
-    /// <summary>
-    /// 获取当前回合所有需要弹出的事件，按优先级从高到低排序
-    /// </summary>
     public List<string> GetSortedPopupEvents(int battleNumber)
     {
         var events = new List<System.Tuple<string, int>>();
@@ -180,7 +183,6 @@ public class BattleCampaignRuntime
         if (HasShopForBattle(battleNumber))
             events.Add(new System.Tuple<string, int>("shop", GetPopupPriority("shop")));
 
-        // 按优先级降序排列
         events.Sort((a, b) => b.Item2.CompareTo(a.Item2));
 
         var result = new List<string>();
@@ -189,9 +191,109 @@ public class BattleCampaignRuntime
         return result;
     }
 
+    // --- New methods for scenario/difficulty system ---
+
+    /// <summary>
+    /// 获取指定关卡的敌人情况选项卡列表
+    /// </summary>
+    public List<BattleScenarioOption> GetScenarioOptions(int battleNumber)
+    {
+        if (_scenarioOptionsMap.TryGetValue(battleNumber, out var options))
+            return options;
+
+        // Fallback: return a default plain/sunny/single scenario
+        return new List<BattleScenarioOption>
+        {
+            new BattleScenarioOption
+            {
+                terrain = TerrainType.Plain,
+                weather = WeatherType.Sunny,
+                formationType = EnemyFormationType.Single
+            }
+        };
+    }
+
+    /// <summary>
+    /// 获取指定关卡的难度选项列表
+    /// </summary>
+    public List<DifficultyLevel> GetDifficultyOptions(int battleNumber)
+    {
+        if (_difficultyOptionsMap.TryGetValue(battleNumber, out var options))
+            return options;
+
+        // Fallback: normal only
+        return new List<DifficultyLevel> { DifficultyLevel.Normal };
+    }
+
+    /// <summary>
+    /// 获取指定关卡指定难度的敌人属性
+    /// </summary>
+    public UnitStaticAttributes GetEnemyStats(int battleNumber, DifficultyLevel difficulty)
+    {
+        if (_enemyStatsMap.TryGetValue(battleNumber, out var byDifficulty))
+        {
+            if (byDifficulty.TryGetValue(difficulty, out var stats))
+                return stats;
+            // If this difficulty not available, fall to normal
+            if (byDifficulty.TryGetValue(DifficultyLevel.Normal, out var normalStats))
+                return normalStats;
+        }
+
+        // Fallback to legacy
+        if (_enemyStatsByBattle == null || _enemyStatsByBattle.Length == 0)
+            return UnitStaticAttributes.Default;
+
+        int index = Mathf.Clamp(battleNumber - 1, 0, _enemyStatsByBattle.Length - 1);
+        return _enemyStatsByBattle[index];
+    }
+
+    /// <summary>
+    /// 获取指定关卡指定难度的猫粮奖励
+    /// </summary>
+    public int GetCatFoodReward(int battleNumber, DifficultyLevel difficulty)
+    {
+        if (_catFoodRewardMap.TryGetValue(battleNumber, out var byDifficulty))
+        {
+            if (byDifficulty.TryGetValue(difficulty, out var reward))
+                return reward;
+            if (byDifficulty.TryGetValue(DifficultyLevel.Normal, out var normalReward))
+                return normalReward;
+        }
+
+        // Fallback to legacy
+        if (_catFoodRewardByBattle == null || _catFoodRewardByBattle.Length == 0)
+            return 0;
+
+        int index = Mathf.Clamp(battleNumber - 1, 0, _catFoodRewardByBattle.Length - 1);
+        return _catFoodRewardByBattle[index];
+    }
+
+    /// <summary>
+    /// 获取指定关卡的免费出战额度
+    /// </summary>
+    public int GetFreeDeployQuota(int battleNumber)
+    {
+        if (_freeDeployQuotaMap.TryGetValue(battleNumber, out var quota))
+            return quota;
+        return 0;
+    }
+
+    /// <summary>
+    /// 获取指定关卡指定敌人类别的单位ID
+    /// </summary>
+    public int[] GetEnemyUnitIds(int battleNumber, EnemyFormationType formation)
+    {
+        if (_enemyUnitIdsMap.TryGetValue(battleNumber, out var byFormation))
+        {
+            if (byFormation.TryGetValue(formation, out var ids))
+                return ids;
+        }
+        return null;
+    }
+
+    // --- Loading ---
+
     private int[][] LoadConfig(
-        out bool[] blessingEnabledByBattle,
-        out bool[] attributeBoostEnabledByBattle,
         out bool[] hasRecruitmentByBattle,
         out bool[] hasRitualByBattle,
         out bool[] hasShopByBattle,
@@ -204,8 +306,6 @@ public class BattleCampaignRuntime
         {
             Debug.LogError($"[BattleCampaignRuntime] Battle level config file not found: {configPath}");
             return LoadFallback(
-                out blessingEnabledByBattle,
-                out attributeBoostEnabledByBattle,
                 out hasRecruitmentByBattle,
                 out hasRitualByBattle,
                 out hasShopByBattle,
@@ -219,7 +319,7 @@ public class BattleCampaignRuntime
             string jsonContent = File.ReadAllText(configPath);
             JsonData rootJson = JsonMapper.ToObject(jsonContent);
 
-            // 加载弹窗优先级
+            // Load popup priorities
             if (rootJson != null && rootJson.Keys.Contains("popupPriorities"))
             {
                 JsonData prioritiesJson = rootJson["popupPriorities"];
@@ -230,17 +330,14 @@ public class BattleCampaignRuntime
                 }
             }
 
-            // 获取 levels 数组
             JsonData levelsJson = rootJson != null && rootJson.Keys.Contains("levels")
                 ? rootJson["levels"]
-                : rootJson; // 兼容旧格式（直接是数组）
+                : rootJson;
 
             if (levelsJson == null || !levelsJson.IsArray || levelsJson.Count == 0)
             {
                 Debug.LogError($"[BattleCampaignRuntime] Battle level config format is invalid: {configPath}");
                 return LoadFallback(
-                    out blessingEnabledByBattle,
-                    out attributeBoostEnabledByBattle,
                     out hasRecruitmentByBattle,
                     out hasRitualByBattle,
                     out hasShopByBattle,
@@ -251,27 +348,153 @@ public class BattleCampaignRuntime
 
             int count = levelsJson.Count;
             int[][] enemyUnitIdsByBattle = new int[count][];
-            blessingEnabledByBattle    = new bool[count];
-            attributeBoostEnabledByBattle = new bool[count];
-            hasRecruitmentByBattle     = new bool[count];
-            hasRitualByBattle          = new bool[count];
-            hasShopByBattle            = new bool[count];
-            hasNewTribeEventByBattle   = new bool[count];
-            catFoodRewardByBattle      = new int[count];
-            enemyStatsByBattle         = new UnitStaticAttributes[count];
+            hasRecruitmentByBattle = new bool[count];
+            hasRitualByBattle = new bool[count];
+            hasShopByBattle = new bool[count];
+            hasNewTribeEventByBattle = new bool[count];
+            catFoodRewardByBattle = new int[count];
+            enemyStatsByBattle = new UnitStaticAttributes[count];
 
             for (int i = 0; i < count; i++)
             {
                 JsonData levelJson = levelsJson[i];
-                enemyUnitIdsByBattle[i] = ReadIntArray(levelJson, "enemyUnitIds");
-                blessingEnabledByBattle[i]    = ReadBool(levelJson, "blessingEntry");
-                attributeBoostEnabledByBattle[i] = ReadBool(levelJson, "attributeBoostEntry");
-                hasRecruitmentByBattle[i]     = ReadBool(levelJson, "hasRecruitment");
-                hasRitualByBattle[i]          = ReadBool(levelJson, "hasRitual");
-                hasShopByBattle[i]            = ReadBool(levelJson, "hasShop");
-                hasNewTribeEventByBattle[i]   = ReadBool(levelJson, "hasNewTribeEvent");
-                catFoodRewardByBattle[i]      = ReadInt(levelJson, "catFoodReward");
-                enemyStatsByBattle[i]         = ReadEnemyStats(levelJson);
+                int battleNumber = ReadInt(levelJson, "battleNumber", i + 1);
+
+                // Parse legacy enemyUnitIds (int array) or new format (object with formation keys)
+                if (levelJson.Keys.Contains("enemyUnitIds"))
+                {
+                    JsonData idsData = levelJson["enemyUnitIds"];
+                    if (idsData.IsArray)
+                    {
+                        // Legacy format: flat int array
+                        enemyUnitIdsByBattle[i] = ReadIntArray(levelJson, "enemyUnitIds");
+                    }
+                    else if (idsData.IsObject)
+                    {
+                        // New format: { "single": [...], "swarm": [...] }
+                        var formationMap = new Dictionary<EnemyFormationType, int[]>();
+                        int[] fallbackIds = null;
+
+                        foreach (string key in idsData.Keys)
+                        {
+                            EnemyFormationType fmt = ParseFormationType(key);
+                            int[] ids = ReadIntArrayFromJsonData(idsData[key]);
+                            formationMap[fmt] = ids;
+                            if (fallbackIds == null) fallbackIds = ids;
+                        }
+
+                        _enemyUnitIdsMap[battleNumber] = formationMap;
+                        enemyUnitIdsByBattle[i] = fallbackIds ?? new[] { 1 };
+                    }
+                }
+                else
+                {
+                    enemyUnitIdsByBattle[i] = new[] { 1 };
+                }
+
+                hasRecruitmentByBattle[i] = ReadBool(levelJson, "hasRecruitment");
+                hasRitualByBattle[i] = ReadBool(levelJson, "hasRitual");
+                hasShopByBattle[i] = ReadBool(levelJson, "hasShop");
+                hasNewTribeEventByBattle[i] = ReadBool(levelJson, "hasNewTribeEvent");
+
+                // Parse enemyStats: could be legacy (object with attack/defense/hp) or new (object with difficulty keys)
+                if (levelJson.Keys.Contains("enemyStats"))
+                {
+                    JsonData statsData = levelJson["enemyStats"];
+                    if (statsData.IsObject && statsData.Keys.Contains("attack"))
+                    {
+                        // Legacy format: single enemy stats object
+                        enemyStatsByBattle[i] = ReadEnemyStats(statsData);
+                    }
+                    else if (statsData.IsObject)
+                    {
+                        // New format: { "normal": {...}, "hard": {...}, "bloodbath": {...} }
+                        var statsMap = new Dictionary<DifficultyLevel, UnitStaticAttributes>();
+
+                        foreach (string key in statsData.Keys)
+                        {
+                            DifficultyLevel dl = ParseDifficulty(key);
+                            statsMap[dl] = ReadEnemyStats(statsData[key]);
+                        }
+
+                        _enemyStatsMap[battleNumber] = statsMap;
+
+                        // Set legacy fallback to normal
+                        if (statsMap.TryGetValue(DifficultyLevel.Normal, out var normalStats))
+                            enemyStatsByBattle[i] = normalStats;
+                        else
+                            enemyStatsByBattle[i] = UnitStaticAttributes.Default;
+                    }
+                }
+                else
+                {
+                    enemyStatsByBattle[i] = UnitStaticAttributes.Default;
+                }
+
+                // Parse catFoodReward: could be int or object with difficulty keys
+                if (levelJson.Keys.Contains("catFoodReward"))
+                {
+                    JsonData rewardData = levelJson["catFoodReward"];
+                    if (rewardData.IsInt || rewardData.IsLong)
+                    {
+                        // Legacy format: single int
+                        catFoodRewardByBattle[i] = ReadInt(levelJson, "catFoodReward");
+                    }
+                    else if (rewardData.IsObject)
+                    {
+                        // New format: { "normal": 100, "hard": 150, "bloodbath": 250 }
+                        var rewardMap = new Dictionary<DifficultyLevel, int>();
+
+                        foreach (string key in rewardData.Keys)
+                        {
+                            DifficultyLevel dl = ParseDifficulty(key);
+                            int val = int.TryParse(rewardData[key].ToString(), out int rv) ? rv : 0;
+                            rewardMap[dl] = val;
+                        }
+
+                        _catFoodRewardMap[battleNumber] = rewardMap;
+
+                        // Set legacy fallback to normal
+                        if (rewardMap.TryGetValue(DifficultyLevel.Normal, out var normalReward))
+                            catFoodRewardByBattle[i] = normalReward;
+                    }
+                }
+
+                // Parse scenarioOptions
+                if (levelJson.Keys.Contains("scenarioOptions") && levelJson["scenarioOptions"].IsArray)
+                {
+                    JsonData scenariosData = levelJson["scenarioOptions"];
+                    var scenarios = new List<BattleScenarioOption>();
+                    for (int s = 0; s < scenariosData.Count; s++)
+                    {
+                        JsonData scenarioData = scenariosData[s];
+                        scenarios.Add(new BattleScenarioOption
+                        {
+                            terrain = ParseTerrain(ReadString(scenarioData, "terrain", "plain")),
+                            weather = ParseWeather(ReadString(scenarioData, "weather", "sunny")),
+                            formationType = ParseFormationType(ReadString(scenarioData, "formationType", "single"))
+                        });
+                    }
+                    _scenarioOptionsMap[battleNumber] = scenarios;
+                }
+
+                // Parse difficultyOptions
+                if (levelJson.Keys.Contains("difficultyOptions") && levelJson["difficultyOptions"].IsArray)
+                {
+                    JsonData diffData = levelJson["difficultyOptions"];
+                    var difficulties = new List<DifficultyLevel>();
+                    for (int d = 0; d < diffData.Count; d++)
+                    {
+                        difficulties.Add(ParseDifficulty(diffData[d].ToString()));
+                    }
+                    _difficultyOptionsMap[battleNumber] = difficulties;
+                }
+
+                // Parse freeDeployQuota
+                if (levelJson.Keys.Contains("freeDeployQuota"))
+                {
+                    _freeDeployQuotaMap[battleNumber] = ReadInt(levelJson, "freeDeployQuota");
+                }
             }
 
             return enemyUnitIdsByBattle;
@@ -280,8 +503,6 @@ public class BattleCampaignRuntime
         {
             Debug.LogError($"[BattleCampaignRuntime] Failed to load battle level config: {exception.Message}");
             return LoadFallback(
-                out blessingEnabledByBattle,
-                out attributeBoostEnabledByBattle,
                 out hasRecruitmentByBattle,
                 out hasRitualByBattle,
                 out hasShopByBattle,
@@ -292,8 +513,6 @@ public class BattleCampaignRuntime
     }
 
     private int[][] LoadFallback(
-        out bool[] blessingEnabledByBattle,
-        out bool[] attributeBoostEnabledByBattle,
         out bool[] hasRecruitmentByBattle,
         out bool[] hasRitualByBattle,
         out bool[] hasShopByBattle,
@@ -301,8 +520,6 @@ public class BattleCampaignRuntime
         out int[] catFoodRewardByBattle,
         out UnitStaticAttributes[] enemyStatsByBattle)
     {
-        blessingEnabledByBattle = new[] { false };
-        attributeBoostEnabledByBattle = new[] { false };
         hasRecruitmentByBattle = new[] { false };
         hasRitualByBattle = new[] { false };
         hasShopByBattle = new[] { false };
@@ -311,6 +528,8 @@ public class BattleCampaignRuntime
         enemyStatsByBattle = new[] { UnitStaticAttributes.Default };
         return new[] { new[] { 1 } };
     }
+
+    // --- Parsing helpers ---
 
     private static int ReadInt(JsonData json, string key)
     {
@@ -334,18 +553,24 @@ public class BattleCampaignRuntime
             && v;
     }
 
+    private static string ReadString(JsonData json, string key, string defaultValue)
+    {
+        return json.Keys.Contains(key) ? json[key].ToString() : defaultValue;
+    }
+
     private static int[] ReadIntArray(JsonData json, string key)
     {
         if (json == null || !json.Keys.Contains(key))
-        {
             return new[] { 1 };
-        }
 
         JsonData valuesJson = json[key];
+        return ReadIntArrayFromJsonData(valuesJson);
+    }
+
+    private static int[] ReadIntArrayFromJsonData(JsonData valuesJson)
+    {
         if (valuesJson == null || !valuesJson.IsArray || valuesJson.Count == 0)
-        {
             return new[] { 1 };
-        }
 
         int[] values = new int[valuesJson.Count];
         for (int i = 0; i < valuesJson.Count; i++)
@@ -362,24 +587,55 @@ public class BattleCampaignRuntime
     {
         var stats = UnitStaticAttributes.Default;
 
-        if (json == null || !json.Keys.Contains("enemyStats"))
-        {
+        if (json == null)
             return stats;
-        }
-
-        JsonData statsJson = json["enemyStats"];
-        if (statsJson == null)
-        {
-            return stats;
-        }
 
         var defaults = UnitStaticAttributes.Default;
-        stats.Attack = ReadInt(statsJson, "attack", defaults.Attack);
-        stats.Defense = ReadInt(statsJson, "defense", defaults.Defense);
-        stats.MaxHp = ReadInt(statsJson, "hp", defaults.MaxHp);
-        stats.MoveSpeed = ReadFloat(statsJson, "moveSpeed", defaults.MoveSpeed);
-        stats.AttackRange = ReadFloat(statsJson, "attackRange", defaults.AttackRange);
+        stats.Attack = ReadInt(json, "attack", defaults.Attack);
+        stats.Defense = ReadInt(json, "defense", defaults.Defense);
+        stats.MaxHp = ReadInt(json, "hp", defaults.MaxHp);
+        stats.MoveSpeed = ReadFloat(json, "moveSpeed", defaults.MoveSpeed);
+        stats.AttackRange = ReadFloat(json, "attackRange", defaults.AttackRange);
 
         return stats;
+    }
+
+    private static DifficultyLevel ParseDifficulty(string s)
+    {
+        switch (s.ToLowerInvariant())
+        {
+            case "hard": return DifficultyLevel.Hard;
+            case "bloodbath": return DifficultyLevel.Bloodbath;
+            default: return DifficultyLevel.Normal;
+        }
+    }
+
+    private static TerrainType ParseTerrain(string s)
+    {
+        switch (s.ToLowerInvariant())
+        {
+            case "brush": return TerrainType.Brush;
+            default: return TerrainType.Plain;
+        }
+    }
+
+    private static WeatherType ParseWeather(string s)
+    {
+        switch (s.ToLowerInvariant())
+        {
+            case "rainy": return WeatherType.Rainy;
+            case "night": return WeatherType.Night;
+            case "windy": return WeatherType.Windy;
+            default: return WeatherType.Sunny;
+        }
+    }
+
+    private static EnemyFormationType ParseFormationType(string s)
+    {
+        switch (s.ToLowerInvariant())
+        {
+            case "swarm": return EnemyFormationType.Swarm;
+            default: return EnemyFormationType.Single;
+        }
     }
 }

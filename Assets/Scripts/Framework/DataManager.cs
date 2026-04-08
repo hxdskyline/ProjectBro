@@ -401,6 +401,38 @@ public class DataManager : MonoBehaviour
         if (saveImmediately) SavePlayerData();
     }
 
+    // --- Consumable inventory ---
+
+    public System.Collections.Generic.List<TribeSystem.ConsumableItem> GetConsumables()
+    {
+        if (_playerData == null) return new System.Collections.Generic.List<TribeSystem.ConsumableItem>();
+        EnsurePlayerDataDefaults();
+        return _playerData.consumables;
+    }
+
+    public void AddConsumable(TribeSystem.ConsumableItem item)
+    {
+        if (_playerData == null || item == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.consumables.Add(item);
+        SavePlayerData();
+    }
+
+    public void RemoveConsumable(int id)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.consumables.RemoveAll(c => c.id == id);
+        SavePlayerData();
+    }
+
+    public int GetConsumableCount()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.consumables.Count;
+    }
+
     public int GetLastShopRound()
     {
         if (_playerData == null) return 0;
@@ -519,6 +551,11 @@ public class DataManager : MonoBehaviour
             _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
         }
 
+        if (_playerData.consumables == null)
+        {
+            _playerData.consumables = new System.Collections.Generic.List<TribeSystem.ConsumableItem>();
+        }
+
         // Ensure new persistent collections exist for CatSystem integration (legacy)
         if (_playerData.catRoster == null)
         {
@@ -608,6 +645,7 @@ public class PlayerData
     public System.Collections.Generic.List<string> unlockedAccessories;
     public int shopRefreshCount;
     public int lastShopRound;
+    public System.Collections.Generic.List<TribeSystem.ConsumableItem> consumables;
 
     // 本回合事件完成标记（存回合号；与currentRound相同则表示本回合已完成）
     public int recruitmentCompletedRound;

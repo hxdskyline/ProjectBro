@@ -1,4 +1,5 @@
 using UnityEngine;
+using TribeSystem;
 
 public struct BattleSimulationConfig
 {
@@ -15,6 +16,8 @@ public class BattleSimulation
     private readonly BattleSimulationConfig _config;
 
     private float _battleElapsed;
+    private float _attackBuffTimer;
+    private float _defenseBuffTimer;
 
     public bool IsReady =>
         _playerFighters != null && _enemyFighters != null &&
@@ -26,6 +29,157 @@ public class BattleSimulation
         _enemyFighters = enemyFighters;
         _config = config;
         _battleElapsed = 0f;
+        _attackBuffTimer = 0f;
+        _defenseBuffTimer = 0f;
+    }
+
+    /// <summary>
+    /// 施放消耗品效果（对全体目标生效，无需选位）
+    /// </summary>
+    public void ApplyConsumable(ConsumableEffectType effectType)
+    {
+        switch (effectType)
+        {
+            case ConsumableEffectType.Bomb:
+                ApplyBomb();
+                break;
+            case ConsumableEffectType.FreezeTrap:
+                ApplyFreezeTrap();
+                break;
+            case ConsumableEffectType.HealPotion:
+                ApplyHealPotion();
+                break;
+            case ConsumableEffectType.AttackBuff:
+                ApplyAttackBuff();
+                break;
+            case ConsumableEffectType.DefenseBuff:
+                ApplyDefenseBuff();
+                break;
+        }
+    }
+
+    private void ApplyBomb()
+    {
+        if (_enemyFighters == null) return;
+        for (int i = 0; i < _enemyFighters.Length; i++)
+        {
+            var f = _enemyFighters[i];
+            if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            f.RuntimeAttributes.CurrentHp = Mathf.Max(0, f.RuntimeAttributes.CurrentHp - 200);
+            if (f.RuntimeAttributes.CurrentHp <= 0) StartDeath(f);
+        }
+        Debug.Log("[Consumable] Bomb: 200 damage to all enemies");
+    }
+
+    private void ApplyFreezeTrap()
+    {
+        if (_enemyFighters == null) return;
+        for (int i = 0; i < _enemyFighters.Length; i++)
+        {
+            var f = _enemyFighters[i];
+            if (f == null || !f.IsAlive) continue;
+            f.FreezeTimer = 3f;
+        }
+        Debug.Log("[Consumable] FreezeTrap: all enemies frozen for 3s");
+    }
+
+    private void ApplyHealPotion()
+    {
+        if (_playerFighters == null) return;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            int heal = Mathf.RoundToInt(f.RuntimeAttributes.MaxHp * 0.5f);
+            f.RuntimeAttributes.CurrentHp = Mathf.Min(f.RuntimeAttributes.CurrentHp + heal, f.RuntimeAttributes.MaxHp);
+        }
+        Debug.Log("[Consumable] HealPotion: healed all allies for 50% MaxHp");
+    }
+
+    private void ApplyAttackBuff()
+    {
+        if (_playerFighters == null) return;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            f.RuntimeAttributes.AttackPercentBuff += 0.3f;
+            f.RuntimeAttributes.Recalculate();
+        }
+        _attackBuffTimer = 15f;
+        Debug.Log("[Consumable] AttackBuff: +30% ATK for 15s");
+    }
+
+    private void ApplyDefenseBuff()
+    {
+        if (_playerFighters == null) return;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            f.RuntimeAttributes.DefensePercentBuff += 0.3f;
+            f.RuntimeAttributes.Recalculate();
+        }
+        _defenseBuffTimer = 15f;
+        Debug.Log("[Consumable] DefenseBuff: +30% DEF for 15s");
+    }
+
+    private void UpdateTimers(float deltaTime)
+    {
+        // Freeze timers
+        UpdateFreezeTimers(_playerFighters, deltaTime);
+        UpdateFreezeTimers(_enemyFighters, deltaTime);
+
+        // Attack buff expiry
+        if (_attackBuffTimer > 0f)
+        {
+            _attackBuffTimer -= deltaTime;
+            if (_attackBuffTimer <= 0f)
+            {
+                RemoveBuffFromFighters(_playerFighters, buffType: 0);
+                Debug.Log("[Consumable] AttackBuff expired");
+            }
+        }
+
+        // Defense buff expiry
+        if (_defenseBuffTimer > 0f)
+        {
+            _defenseBuffTimer -= deltaTime;
+            if (_defenseBuffTimer <= 0f)
+            {
+                RemoveBuffFromFighters(_playerFighters, buffType: 1);
+                Debug.Log("[Consumable] DefenseBuff expired");
+            }
+        }
+    }
+
+    private void UpdateFreezeTimers(BattleFighter[] fighters, float deltaTime)
+    {
+        if (fighters == null) return;
+        for (int i = 0; i < fighters.Length; i++)
+        {
+            var f = fighters[i];
+            if (f != null && f.FreezeTimer > 0f)
+                f.FreezeTimer -= deltaTime;
+        }
+    }
+
+    /// <summary>
+    /// buffType: 0=Attack, 1=Defense
+    /// </summary>
+    private void RemoveBuffFromFighters(BattleFighter[] fighters, int buffType)
+    {
+        if (fighters == null) return;
+        for (int i = 0; i < fighters.Length; i++)
+        {
+            var f = fighters[i];
+            if (f == null || f.RuntimeAttributes == null) continue;
+            if (buffType == 0)
+                f.RuntimeAttributes.AttackPercentBuff -= 0.3f;
+            else
+                f.RuntimeAttributes.DefensePercentBuff -= 0.3f;
+            f.RuntimeAttributes.Recalculate();
+        }
     }
 
     public bool Tick(float deltaTime, out bool playerVictory)
@@ -33,6 +187,7 @@ public class BattleSimulation
         playerVictory = false;
         _battleElapsed += deltaTime;
 
+        UpdateTimers(deltaTime);
         UpdatePendingHits(_playerFighters, deltaTime);
         UpdatePendingHits(_enemyFighters, deltaTime);
         UpdateDeathStates(_playerFighters, deltaTime);
@@ -137,6 +292,13 @@ public class BattleSimulation
             return;
         }
 
+        // Frozen: cannot move or attack
+        if (self.FreezeTimer > 0f)
+        {
+            self.Avatar?.PlayIdle();
+            return;
+        }
+
         if (self.AttackCooldownTimer > 0f)
         {
             self.AttackCooldownTimer -= deltaTime;
@@ -233,10 +395,15 @@ public class BattleSimulation
             return;
         }
 
-            int damage = Mathf.Max(1, attackerRuntime.Attack - defenderRuntime.Defense);
+            // New damage formula: FDMG = MAX(DMG * DR * SKILLMULT, 1) + TD
+            // DMG = MAX(CATK - CDEF, 0), DR = MAX(1 - CDEF/(CDEF+100), 0.2)
+            int rawDmg = Mathf.Max(0, attackerRuntime.Attack - defenderRuntime.Defense);
+            float dr = Mathf.Max(0.2f, 1f - (float)defenderRuntime.Defense / (defenderRuntime.Defense + 100f));
+            float skillMult = attackerRuntime.SkillMultiplier;
+            float finalF = rawDmg * dr * skillMult;
+            int damage = Mathf.Max(1, Mathf.RoundToInt(finalF)) + attackerRuntime.TrueDamage;
             int newHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
             defenderRuntime.CurrentHp = newHp;
-            // Debug.Log($"[DMG] {attacker.Name}(ATK={attackerRuntime.Attack}) -> {defender.Name}(DEF={defenderRuntime.Defense}) = {damage} dmg, HP: {newHp}/{defenderRuntime.MaxHp}");
 
             // Show damage popup and update HUD if present
             if (defender != null && defender.Transform != null)

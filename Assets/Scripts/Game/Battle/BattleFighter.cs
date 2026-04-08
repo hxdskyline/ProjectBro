@@ -16,6 +16,7 @@ public class BattleFighter
     public bool IsDying;
     public bool IsRemoved;
     public float DeathTimer;
+    public float FreezeTimer; // >0 时不攻击
 
     public int CurrentHp => RuntimeAttributes?.CurrentHp ?? 0;
     public bool IsDead => CurrentHp <= 0;

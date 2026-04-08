@@ -253,6 +253,10 @@ namespace TribeSystem.UI
             _deployedTribes.Clear();
             _tribeDeployStates.Clear();
 
+            // 新回合：清空商店商品缓存和刷新次数，下次打开商店时重新生成
+            _currentShopItems = null;
+            _dataManager.SetShopRefreshCount(0);
+
             // 开始新回合
             _roundManager?.StartRound();
 
@@ -574,7 +578,11 @@ namespace TribeSystem.UI
         {
             if (_shopPanel == null) return;
 
-            _currentShopItems = _shopService.GenerateShopItems();
+            // 本回合首次打开时才生成商品，关闭再打开不会刷新
+            if (_currentShopItems == null || _currentShopItems.Count == 0)
+            {
+                _currentShopItems = _shopService.GenerateShopItems();
+            }
             int refreshCost = _shopService.CalculateRefreshCost();
 
             _shopPanel.ShowShop(_currentShopItems, refreshCost, OnShopItemBuy, OnShopRefresh, OnShopClose, OnCatToSellSelected);

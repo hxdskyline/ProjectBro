@@ -5,6 +5,45 @@ using UnityEngine;
 namespace TribeSystem
 {
     /// <summary>
+    /// 地形类型
+    /// </summary>
+    public enum TerrainType
+    {
+        Plain = 0,   // 平地
+        Brush = 1    // 灌木
+    }
+
+    /// <summary>
+    /// 天气类型
+    /// </summary>
+    public enum WeatherType
+    {
+        Sunny = 0,   // 晴天
+        Rainy = 1,   // 雨天
+        Night = 2,   // 夜晚
+        Windy = 3    // 大风
+    }
+
+    /// <summary>
+    /// 难度等级
+    /// </summary>
+    public enum DifficultyLevel
+    {
+        Normal = 0,      // 普通
+        Hard = 1,        // 困难
+        Bloodbath = 2    // 血战
+    }
+
+    /// <summary>
+    /// 敌人类别
+    /// </summary>
+    public enum EnemyFormationType
+    {
+        Single = 0,  // 强力单体怪
+        Swarm = 1    // 大量小怪
+    }
+
+    /// <summary>
     /// 六大族群类型
     /// </summary>
     public enum TribeType
@@ -131,10 +170,10 @@ namespace TribeSystem
         {
             catId = -1;
             quality = CatQuality.White;
-            attackMultiplier = 0.15f;
-            defenseMultiplier = 0.15f;
-            hpMultiplier = 0.15f;
-            speedMultiplier = 0.15f;
+            attackMultiplier = 0.35f;
+            defenseMultiplier = 0.35f;
+            hpMultiplier = 0.35f;
+            speedMultiplier = 1.0f;
         }
 
         /// <summary>
@@ -153,24 +192,24 @@ namespace TribeSystem
             switch (quality)
             {
                 case CatQuality.White:
-                    minRatio = 0.1f;
-                    maxRatio = 0.2f;
-                    break;
-                case CatQuality.Blue:
-                    minRatio = 0.2f;
-                    maxRatio = 0.3f;
-                    break;
-                case CatQuality.Purple:
                     minRatio = 0.3f;
                     maxRatio = 0.4f;
                     break;
-                case CatQuality.Gold:
+                case CatQuality.Blue:
                     minRatio = 0.4f;
                     maxRatio = 0.5f;
                     break;
+                case CatQuality.Purple:
+                    minRatio = 0.5f;
+                    maxRatio = 0.6f;
+                    break;
+                case CatQuality.Gold:
+                    minRatio = 0.6f;
+                    maxRatio = 0.7f;
+                    break;
                 default:
-                    minRatio = 0.1f;
-                    maxRatio = 0.2f;
+                    minRatio = 0.3f;
+                    maxRatio = 0.4f;
                     break;
             }
 
@@ -392,6 +431,38 @@ namespace TribeSystem
     }
 
     /// <summary>
+    /// 消耗品效果类型
+    /// </summary>
+    public enum ConsumableEffectType
+    {
+        Bomb,         // 炸弹：对所有敌人造成200点真实伤害
+        FreezeTrap,   // 冰冻陷阱：所有敌人停止攻击3秒
+        HealPotion,   // 回复药水：回复所有己方单位50%最大生命值
+        AttackBuff,   // 攻击强化：所有己方单位攻击力+30%，持续15秒
+        DefenseBuff   // 防御强化：所有己方单位防御力+30%，持续15秒
+    }
+
+    /// <summary>
+    /// 消耗品数据
+    /// </summary>
+    [Serializable]
+    public class ConsumableItem
+    {
+        public int id;
+        public string name;
+        public ConsumableEffectType effectType;
+        public int basePrice;
+
+        public ConsumableItem()
+        {
+            id = 0;
+            name = "";
+            effectType = ConsumableEffectType.Bomb;
+            basePrice = 0;
+        }
+    }
+
+    /// <summary>
     /// 商店物品
     /// </summary>
     [Serializable]
@@ -401,6 +472,7 @@ namespace TribeSystem
         public ShopItemType itemType;
         public TribeType? catTribeType; // 猫的族群类型
         public CatQuality? catQuality;  // 猫的品质
+        public ConsumableEffectType? consumableEffectType; // 消耗品效果类型
         public int basePrice;
         public string name;
         public string description;
@@ -442,6 +514,7 @@ namespace TribeSystem
         public TribeType tribeType;
         public string tribeName;
         public int initialCatCount;
+        public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
         public LeaderBaseStats leaderBaseStats;
         public LeaderBaseStats catBaseStats;  // 小猫的基础属性（command属性不使用）
 
@@ -450,6 +523,7 @@ namespace TribeSystem
             tribeType = TribeType.Maine;
             tribeName = "";
             initialCatCount = 3;
+            deployCostPerCat = 10;
             leaderBaseStats = new LeaderBaseStats();
             catBaseStats = new LeaderBaseStats();
         }
@@ -561,6 +635,92 @@ namespace TribeSystem
         {
             optionType = NewTribeEventOptionType.NewRandomTribe;
             description = "";
+        }
+    }
+
+    /// <summary>
+    /// 敌人情况选项卡（地形+天气+敌人类别组合）
+    /// </summary>
+    [Serializable]
+    public class BattleScenarioOption
+    {
+        public TerrainType terrain;
+        public WeatherType weather;
+        public EnemyFormationType formationType;
+
+        public BattleScenarioOption()
+        {
+            terrain = TerrainType.Plain;
+            weather = WeatherType.Sunny;
+            formationType = EnemyFormationType.Single;
+        }
+
+        public string GetDisplayName()
+        {
+            return $"{GetTerrainName(terrain)} / {GetWeatherName(weather)}";
+        }
+
+        public static string GetTerrainName(TerrainType t)
+        {
+            switch (t)
+            {
+                case TerrainType.Plain: return "平地";
+                case TerrainType.Brush: return "灌木";
+                default: return t.ToString();
+            }
+        }
+
+        public static string GetWeatherName(WeatherType w)
+        {
+            switch (w)
+            {
+                case WeatherType.Sunny: return "晴天";
+                case WeatherType.Rainy: return "雨天";
+                case WeatherType.Night: return "夜晚";
+                case WeatherType.Windy: return "大风";
+                default: return w.ToString();
+            }
+        }
+
+        public static string GetFormationName(EnemyFormationType f)
+        {
+            switch (f)
+            {
+                case EnemyFormationType.Single: return "强敌";
+                case EnemyFormationType.Swarm: return "群敌";
+                default: return f.ToString();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 种族在特定地形/天气下的属性修正
+    /// </summary>
+    public struct TerrainWeatherBuff
+    {
+        public float attackPercent;
+        public float defensePercent;
+        public float hpPercent;
+        public float speedPercent;
+
+        public bool IsNeutral =>
+            Mathf.Approximately(attackPercent, 0f) &&
+            Mathf.Approximately(defensePercent, 0f) &&
+            Mathf.Approximately(hpPercent, 0f) &&
+            Mathf.Approximately(speedPercent, 0f);
+
+        public string GetDescription()
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (!Mathf.Approximately(attackPercent, 0f))
+                parts.Add($"攻{(attackPercent > 0 ? "+" : "")}{Mathf.RoundToInt(attackPercent * 100)}%");
+            if (!Mathf.Approximately(defensePercent, 0f))
+                parts.Add($"防{(defensePercent > 0 ? "+" : "")}{Mathf.RoundToInt(defensePercent * 100)}%");
+            if (!Mathf.Approximately(hpPercent, 0f))
+                parts.Add($"血{(hpPercent > 0 ? "+" : "")}{Mathf.RoundToInt(hpPercent * 100)}%");
+            if (!Mathf.Approximately(speedPercent, 0f))
+                parts.Add($"速{(speedPercent > 0 ? "+" : "")}{Mathf.RoundToInt(speedPercent * 100)}%");
+            return parts.Count > 0 ? string.Join(" ", parts.ToArray()) : "无修正";
         }
     }
 }

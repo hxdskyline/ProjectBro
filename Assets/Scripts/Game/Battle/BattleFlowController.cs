@@ -10,6 +10,7 @@ public class BattleFlowController
     private bool _isPaused;
 
     public bool IsPaused => _isPaused;
+    public BattleManager BattleManager => _battleManager;
 
     public void StartBattle(
         int levelId,

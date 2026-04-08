@@ -5,7 +5,7 @@ using TribeSystem;
 using TribeSystem.UI;
 
 /// <summary>
-/// 战前准备界面 - 族群系统版本
+/// 战前准备界面 - 族群系统版本（含地形/天气/难度/出战消耗）
 /// </summary>
 public class BattlePreparePanel : UIPanel
 {
@@ -18,6 +18,11 @@ public class BattlePreparePanel : UIPanel
     private const string EnemyRootName = "EnemyCardsRoot";
     private const string StartButtonName = "PrepareStartButton";
     private const string BackButtonName = "PrepareBackButton";
+    private const string ScenarioTabsName = "ScenarioTabsRoot";
+    private const string DifficultyTabsName = "DifficultyTabsRoot";
+    private const string DeployCostName = "DeployCostText";
+    private const string BuffPreviewName = "BuffPreviewText";
+    private const string EnemyInfoName = "EnemyInfoText";
 
     private readonly List<TribeRecord> _ownedTribes = new List<TribeRecord>();
     private readonly List<TribeRecord> _deployedTribes = new List<TribeRecord>();
@@ -32,8 +37,26 @@ public class BattlePreparePanel : UIPanel
     [SerializeField] private RectTransform _enemyCardsRoot;
     private Font _uiFont;
 
+    // New: scenario/difficulty/cost UI
+    private RectTransform _scenarioTabsRoot;
+    private RectTransform _difficultyTabsRoot;
+    private Text _deployCostText;
+    private Text _buffPreviewText;
+    private Text _enemyInfoText;
+
+    // State
     private int _currentLevel;
     private int _maxDeployedCount = 6;
+    private List<BattleScenarioOption> _scenarioOptions = new List<BattleScenarioOption>();
+    private List<DifficultyLevel> _difficultyOptions = new List<DifficultyLevel>();
+    private int _selectedScenarioIndex;
+    private int _selectedDifficultyIndex;
+    private int _freeDeployQuota;
+    private int _currentCatFood;
+
+    // Colors
+    private static readonly Color TabActiveColor = new Color(0.2f, 0.6f, 0.3f, 0.95f);
+    private static readonly Color TabInactiveColor = new Color(0.3f, 0.35f, 0.4f, 0.85f);
 
     public override void Initialize()
     {
@@ -58,7 +81,7 @@ public class BattlePreparePanel : UIPanel
     }
 
     /// <summary>
-    /// 设置战斗准备 - 新族群系统
+    /// 设置战斗准备 - 新族群系统（含场景/难度）
     /// </summary>
     public void SetupBattle(
         int levelId,
@@ -85,6 +108,22 @@ public class BattlePreparePanel : UIPanel
                 _deployedTribes.Add(tribe);
             }
         }
+
+        // Load scenario/difficulty options from campaign config
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign != null)
+        {
+            _scenarioOptions = campaign.GetScenarioOptions(levelId);
+            _difficultyOptions = campaign.GetDifficultyOptions(levelId);
+            _freeDeployQuota = campaign.GetFreeDeployQuota(levelId);
+        }
+
+        _selectedScenarioIndex = 0;
+        _selectedDifficultyIndex = 0;
+
+        // Load current cat food
+        DataManager dataManager = GameManager.Instance?.DataManager;
+        _currentCatFood = dataManager != null ? (int)dataManager.GetCatFood() : 0;
 
         RefreshUI();
     }
@@ -122,8 +161,14 @@ public class BattlePreparePanel : UIPanel
     private void RefreshUI()
     {
         RefreshTexts();
+        RebuildScenarioTabs();
+        RebuildDifficultyTabs();
         RebuildTribeViews();
         RebuildEnemyViews();
+        RefreshDeployCost();
+        RefreshBuffPreview();
+        RefreshEnemyInfo();
+        RefreshStartButtonState();
     }
 
     private void RefreshTexts()
@@ -133,16 +178,13 @@ public class BattlePreparePanel : UIPanel
             _titleText.text = $"战前准备  Battle {_currentLevel}";
         }
 
-        // 计算上阵小猫总数
         int totalCatCount = 0;
         int restingLeaderCount = 0;
         foreach (TribeRecord tribe in _deployedTribes)
         {
             totalCatCount += tribe.GetCatCount();
             if (tribe.leader?.restTurns > 0)
-            {
                 restingLeaderCount++;
-            }
         }
 
         if (_summaryText != null)
@@ -151,8 +193,7 @@ public class BattlePreparePanel : UIPanel
                 $"持有族群: {_ownedTribes.Count + _deployedTribes.Count}    " +
                 $"上阵: {_deployedTribes.Count}/{_maxDeployedCount}    " +
                 $"上阵小猫: {totalCatCount}    " +
-                $"休息族长: {restingLeaderCount}    " +
-                $"敌人: {ResolveEnemyCount(_currentLevel)}";
+                $"猫粮: {_currentCatFood}";
         }
 
         if (_statusText != null && string.IsNullOrEmpty(_statusText.text))
@@ -160,6 +201,260 @@ public class BattlePreparePanel : UIPanel
             _statusText.text = "点击族群卡片进行上阵/下阵操作。族长休息中的族群无法上阵。";
         }
     }
+
+    // --- Scenario Tabs ---
+
+    private void RebuildScenarioTabs()
+    {
+        if (_scenarioTabsRoot == null) return;
+        ClearChildren(_scenarioTabsRoot);
+
+        if (_scenarioOptions == null || _scenarioOptions.Count == 0)
+            return;
+
+        // Configure horizontal layout
+        HorizontalLayoutGroup hLayout = _scenarioTabsRoot.GetComponent<HorizontalLayoutGroup>();
+        if (hLayout == null)
+        {
+            hLayout = GetOrAddComponent<HorizontalLayoutGroup>(_scenarioTabsRoot.gameObject);
+            hLayout.spacing = 6f;
+            hLayout.childAlignment = TextAnchor.MiddleLeft;
+            hLayout.childControlHeight = true;
+            hLayout.childControlWidth = false;
+            hLayout.childForceExpandHeight = false;
+            hLayout.childForceExpandWidth = false;
+            hLayout.padding = new RectOffset(4, 4, 4, 4);
+        }
+
+        // Label
+        GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
+        labelGo.transform.SetParent(_scenarioTabsRoot, false);
+        Text label = labelGo.GetComponent<Text>();
+        label.font = _uiFont;
+        label.fontSize = 16;
+        label.color = Color.white;
+        label.text = "敌人情况:";
+        label.alignment = TextAnchor.MiddleLeft;
+        LayoutElement labelLe = labelGo.GetComponent<LayoutElement>();
+        labelLe.preferredWidth = 80f;
+        labelLe.minHeight = 30f;
+
+        for (int i = 0; i < _scenarioOptions.Count; i++)
+        {
+            int capturedIndex = i;
+            BattleScenarioOption option = _scenarioOptions[i];
+
+            GameObject tabGo = new GameObject($"Scenario_{i}", typeof(RectTransform), typeof(Image),
+                typeof(Button), typeof(LayoutElement));
+            tabGo.transform.SetParent(_scenarioTabsRoot, false);
+
+            LayoutElement le = tabGo.GetComponent<LayoutElement>();
+            le.preferredWidth = 140f;
+            le.minHeight = 32f;
+
+            Image bg = tabGo.GetComponent<Image>();
+            bg.color = (i == _selectedScenarioIndex) ? TabActiveColor : TabInactiveColor;
+
+            Button btn = tabGo.GetComponent<Button>();
+            btn.targetGraphic = bg;
+            btn.onClick.AddListener(() => OnScenarioTabClicked(capturedIndex));
+
+            // Tab text
+            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.transform.SetParent(tabGo.transform, false);
+            RectTransform textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            Text tabText = textGo.GetComponent<Text>();
+            tabText.font = _uiFont;
+            tabText.fontSize = 15;
+            tabText.color = Color.white;
+            tabText.alignment = TextAnchor.MiddleCenter;
+            tabText.text = $"{option.GetDisplayName()}\n{BattleScenarioOption.GetFormationName(option.formationType)}";
+            tabText.raycastTarget = false;
+        }
+    }
+
+    private void OnScenarioTabClicked(int index)
+    {
+        if (index == _selectedScenarioIndex) return;
+        _selectedScenarioIndex = index;
+        RefreshUI();
+    }
+
+    // --- Difficulty Tabs ---
+
+    private void RebuildDifficultyTabs()
+    {
+        if (_difficultyTabsRoot == null) return;
+        ClearChildren(_difficultyTabsRoot);
+
+        if (_difficultyOptions == null || _difficultyOptions.Count == 0)
+            return;
+
+        HorizontalLayoutGroup hLayout = _difficultyTabsRoot.GetComponent<HorizontalLayoutGroup>();
+        if (hLayout == null)
+        {
+            hLayout = GetOrAddComponent<HorizontalLayoutGroup>(_difficultyTabsRoot.gameObject);
+            hLayout.spacing = 6f;
+            hLayout.childAlignment = TextAnchor.MiddleLeft;
+            hLayout.childControlHeight = true;
+            hLayout.childControlWidth = false;
+            hLayout.childForceExpandHeight = false;
+            hLayout.childForceExpandWidth = false;
+            hLayout.padding = new RectOffset(4, 4, 4, 4);
+        }
+
+        // Label
+        GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
+        labelGo.transform.SetParent(_difficultyTabsRoot, false);
+        Text label = labelGo.GetComponent<Text>();
+        label.font = _uiFont;
+        label.fontSize = 16;
+        label.color = Color.white;
+        label.text = "难度:";
+        label.alignment = TextAnchor.MiddleLeft;
+        LayoutElement labelLe = labelGo.GetComponent<LayoutElement>();
+        labelLe.preferredWidth = 50f;
+        labelLe.minHeight = 30f;
+
+        for (int i = 0; i < _difficultyOptions.Count; i++)
+        {
+            int capturedIndex = i;
+            DifficultyLevel diff = _difficultyOptions[i];
+
+            GameObject tabGo = new GameObject($"Difficulty_{i}", typeof(RectTransform), typeof(Image),
+                typeof(Button), typeof(LayoutElement));
+            tabGo.transform.SetParent(_difficultyTabsRoot, false);
+
+            LayoutElement le = tabGo.GetComponent<LayoutElement>();
+            le.preferredWidth = 80f;
+            le.minHeight = 32f;
+
+            Image bg = tabGo.GetComponent<Image>();
+            bg.color = (i == _selectedDifficultyIndex) ? GetDifficultyActiveColor(diff) : TabInactiveColor;
+
+            Button btn = tabGo.GetComponent<Button>();
+            btn.targetGraphic = bg;
+            btn.onClick.AddListener(() => OnDifficultyTabClicked(capturedIndex));
+
+            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.transform.SetParent(tabGo.transform, false);
+            RectTransform textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            Text tabText = textGo.GetComponent<Text>();
+            tabText.font = _uiFont;
+            tabText.fontSize = 16;
+            tabText.color = Color.white;
+            tabText.alignment = TextAnchor.MiddleCenter;
+            tabText.text = GetDifficultyName(diff);
+            tabText.raycastTarget = false;
+        }
+    }
+
+    private void OnDifficultyTabClicked(int index)
+    {
+        if (index == _selectedDifficultyIndex) return;
+        _selectedDifficultyIndex = index;
+        RefreshUI();
+    }
+
+    // --- Deploy Cost ---
+
+    private void RefreshDeployCost()
+    {
+        if (_deployCostText == null) return;
+
+        int totalCost = DeployCostCalculator.CalculateTotalCost(_deployedTribes);
+        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
+        bool canAfford = _currentCatFood >= actualCost;
+
+        string text = $"出战消耗: {totalCost}猫粮  免费额度: {_freeDeployQuota}  " +
+                       $"实际消耗: {actualCost}猫粮  (持有: {_currentCatFood})";
+
+        if (!canAfford)
+        {
+            text += "  <color=#ff4444>猫粮不足!</color>";
+        }
+
+        _deployCostText.text = text;
+    }
+
+    private void RefreshStartButtonState()
+    {
+        if (_startBattleButton == null) return;
+
+        int totalCost = DeployCostCalculator.CalculateTotalCost(_deployedTribes);
+        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
+        bool canAfford = _currentCatFood >= actualCost;
+
+        _startBattleButton.interactable = canAfford && _deployedTribes.Count > 0;
+    }
+
+    // --- Buff Preview ---
+
+    private void RefreshBuffPreview()
+    {
+        if (_buffPreviewText == null) return;
+
+        if (_scenarioOptions == null || _scenarioOptions.Count == 0 ||
+            _selectedScenarioIndex >= _scenarioOptions.Count)
+        {
+            _buffPreviewText.text = "";
+            return;
+        }
+
+        BattleScenarioOption selectedScenario = _scenarioOptions[_selectedScenarioIndex];
+
+        string text = $"战场: {BattleScenarioOption.GetTerrainName(selectedScenario.terrain)} / " +
+                       $"{BattleScenarioOption.GetWeatherName(selectedScenario.weather)}\n";
+
+        if (_deployedTribes.Count == 0)
+        {
+            text += "上阵族群后显示 buff 预览";
+        }
+        else
+        {
+            foreach (TribeRecord tribe in _deployedTribes)
+            {
+                TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(
+                    tribe.tribeType, selectedScenario.terrain, selectedScenario.weather);
+
+                text += $"{GetTribeTypeName(tribe.tribeType)}: {buff.GetDescription()}\n";
+            }
+        }
+
+        _buffPreviewText.text = text.TrimEnd('\n');
+    }
+
+    // --- Enemy Info ---
+
+    private void RefreshEnemyInfo()
+    {
+        if (_enemyInfoText == null) return;
+
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign == null) return;
+
+        DifficultyLevel selectedDifficulty = GetSelectedDifficulty();
+        UnitStaticAttributes enemyStats = campaign.GetEnemyStats(_currentLevel, selectedDifficulty);
+        int reward = campaign.GetCatFoodReward(_currentLevel, selectedDifficulty);
+
+        string text = $"难度: {GetDifficultyName(selectedDifficulty)}  " +
+                       $"敌人 ATK={enemyStats.Attack} DEF={enemyStats.Defense} HP={enemyStats.MaxHp}  " +
+                       $"奖励: {reward}猫粮";
+
+        _enemyInfoText.text = text;
+    }
+
+    // --- Tribe Views ---
 
     private void RebuildTribeViews()
     {
@@ -181,10 +476,21 @@ public class BattlePreparePanel : UIPanel
     {
         ClearChildren(_enemyCardsRoot);
 
-        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
-        int[] enemyUnitIds = battleCampaignRuntime != null
-            ? battleCampaignRuntime.GetEnemyUnitIdsForBattle(_currentLevel)
-            : null;
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign == null) return;
+
+        // Determine formation type from selected scenario
+        EnemyFormationType formation = EnemyFormationType.Single;
+        if (_scenarioOptions != null && _selectedScenarioIndex < _scenarioOptions.Count)
+        {
+            formation = _scenarioOptions[_selectedScenarioIndex].formationType;
+        }
+
+        int[] enemyUnitIds = campaign.GetEnemyUnitIds(_currentLevel, formation);
+        if (enemyUnitIds == null || enemyUnitIds.Length == 0)
+        {
+            enemyUnitIds = campaign.GetEnemyUnitIdsForBattle(_currentLevel);
+        }
 
         if (enemyUnitIds == null || enemyUnitIds.Length == 0)
         {
@@ -221,34 +527,32 @@ public class BattlePreparePanel : UIPanel
         Image cardBg = cardGo.GetComponent<Image>();
         cardBg.color = ResolveTribeCardBackgroundColor(zoneType, isLeaderResting, tribe.tribeType);
 
-        // 绑定点击事件
         Button cardButton = cardGo.GetComponent<Button>();
-        TribeRecord capturedTribe = tribe; // 捕获变量
+        TribeRecord capturedTribe = tribe;
         cardButton.onClick.AddListener(() => HandleTribeClick(capturedTribe));
 
-        // 创建卡片内容
         CreateTribeCardContent(cardRect, tribe);
     }
 
     private void CreateTribeCardContent(RectTransform cardRect, TribeRecord tribe)
     {
-        // 族群名称
         Text nameText = CreateCardText(cardRect.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 18);
         nameText.alignment = TextAnchor.UpperLeft;
         nameText.text = $"{GetTribeTypeName(tribe.tribeType)}族 (ID:{tribe.tribeId})";
 
-        // 族长状态和小猫信息
         string statusInfo = $"族长: {(tribe.leader?.restTurns > 0 ? $"休息中({tribe.leader.restTurns}回)" : "可出战")}  小猫: {tribe.GetCatCount()}只";
         Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 14);
         statText.alignment = TextAnchor.LowerLeft;
         statText.text = statusInfo;
 
-        // 族长属性简略
         if (tribe.leader != null)
         {
             Text detailText = CreateCardText(cardRect.transform, "Detail", new Vector2(0f, 0.5f), new Vector2(1f, 0.8f), new Vector2(10f, 0f), 12);
             detailText.alignment = TextAnchor.MiddleLeft;
-            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 速{tribe.leader.baseSpeed} 统{tribe.leader.command}";
+            int costPerCat = 0;
+            TribeConfig config = TribeConfigLoader.Instance?.GetTribeConfig(tribe.tribeType);
+            if (config != null) costPerCat = config.deployCostPerCat;
+            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 统{tribe.leader.command}  消耗{costPerCat}/猫";
         }
     }
 
@@ -304,6 +608,8 @@ public class BattlePreparePanel : UIPanel
         return text;
     }
 
+    // --- Battle Start ---
+
     private void OnStartBattleClicked()
     {
         if (_deployedTribes.Count == 0)
@@ -312,7 +618,6 @@ public class BattlePreparePanel : UIPanel
             return;
         }
 
-        // 检查是否有族长在休息
         foreach (TribeRecord tribe in _deployedTribes)
         {
             if (IsLeaderResting(tribe))
@@ -322,19 +627,49 @@ public class BattlePreparePanel : UIPanel
             }
         }
 
+        // Check deploy cost
+        int totalCost = DeployCostCalculator.CalculateTotalCost(_deployedTribes);
+        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
+        if (_currentCatFood < actualCost)
+        {
+            SetStatusText($"猫粮不足! 需要 {actualCost} 猫粮，当前持有 {_currentCatFood}。", true);
+            return;
+        }
+
+        // Deduct cat food
+        if (actualCost > 0)
+        {
+            DataManager dataManager = GameManager.Instance?.DataManager;
+            if (dataManager != null)
+            {
+                dataManager.TrySpendCatFood(actualCost);
+                dataManager.SavePlayerData();
+            }
+        }
+
+        // Get selected scenario and difficulty
+        TerrainType terrain = TerrainType.Plain;
+        WeatherType weather = WeatherType.Sunny;
+        if (_scenarioOptions != null && _selectedScenarioIndex < _scenarioOptions.Count)
+        {
+            terrain = _scenarioOptions[_selectedScenarioIndex].terrain;
+            weather = _scenarioOptions[_selectedScenarioIndex].weather;
+        }
+
+        DifficultyLevel difficulty = GetSelectedDifficulty();
+
         GameManager.Instance.UIManager.HidePanel("ui/BattlePreparePanel");
 
         BattlePanel battlePanel = GameManager.Instance.UIManager.ShowPanel<BattlePanel>("ui/BattlePanel", UIManager.UILayer.Normal);
         if (battlePanel != null)
         {
-            battlePanel.StartBattle(_currentLevel, new List<TribeRecord>(_deployedTribes));
+            battlePanel.StartBattle(_currentLevel, new List<TribeRecord>(_deployedTribes), terrain, weather, difficulty);
         }
     }
 
     private void OnBackClicked()
     {
         GameManager.Instance.UIManager.HidePanel("ui/BattlePreparePanel");
-        // 返回族群构筑界面
         TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/TribeBuildPanel");
         if (tribeBuildPanel != null)
         {
@@ -342,18 +677,17 @@ public class BattlePreparePanel : UIPanel
         }
         else
         {
-            // 如果找不到面板，尝试显示
             GameManager.Instance.UIManager.ShowPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel", UIManager.UILayer.Normal);
         }
     }
 
+    // --- Layout ---
+
     private void EnsureRuntimeLayout()
     {
         RectTransform panelRect = transform as RectTransform;
-        if (panelRect == null)
-        {
-            return;
-        }
+        if (panelRect == null) return;
+
         Image backgroundImage = GetOrAddComponent<Image>(gameObject);
         backgroundImage.color = new Color(0.06f, 0.09f, 0.14f, 0.96f);
 
@@ -374,7 +708,6 @@ public class BattlePreparePanel : UIPanel
         if (_titleText == null)
         {
             _titleText = GetOrCreateText(contentRoot, TitleName, _uiFont, 42, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.9f), new Vector2(0.5f, 0.98f), new Color(0.1f, 0.15f, 0.25f, 1f));
-            Debug.LogWarning("[BattlePreparePanel] Title text not found on prefab; created runtime fallback.");
         }
 
         if (_summaryText == null)
@@ -385,9 +718,31 @@ public class BattlePreparePanel : UIPanel
         if (_summaryText == null)
         {
             _summaryText = GetOrCreateText(contentRoot, SummaryName, _uiFont, 20, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.84f), new Vector2(0.97f, 0.9f), new Color(0.15f, 0.19f, 0.26f, 1f));
-            Debug.LogWarning("[BattlePreparePanel] Summary text not found on prefab; created runtime fallback.");
         }
 
+        // Scenario tabs row (between summary and status)
+        if (_scenarioTabsRoot == null)
+        {
+            var tf = contentRoot.Find(ScenarioTabsName);
+            if (tf != null) _scenarioTabsRoot = tf as RectTransform;
+        }
+        if (_scenarioTabsRoot == null)
+        {
+            _scenarioTabsRoot = GetOrCreateChildRect(contentRoot, ScenarioTabsName, new Vector2(0.03f, 0.78f), new Vector2(0.5f, 0.84f));
+        }
+
+        // Difficulty tabs row (right of scenario tabs)
+        if (_difficultyTabsRoot == null)
+        {
+            var tf = contentRoot.Find(DifficultyTabsName);
+            if (tf != null) _difficultyTabsRoot = tf as RectTransform;
+        }
+        if (_difficultyTabsRoot == null)
+        {
+            _difficultyTabsRoot = GetOrCreateChildRect(contentRoot, DifficultyTabsName, new Vector2(0.5f, 0.78f), new Vector2(0.97f, 0.84f));
+        }
+
+        // Status text
         if (_statusText == null)
         {
             var tf = contentRoot.Find(StatusName);
@@ -395,8 +750,7 @@ public class BattlePreparePanel : UIPanel
         }
         if (_statusText == null)
         {
-            _statusText = GetOrCreateText(contentRoot, StatusName, _uiFont, 18, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.78f), new Vector2(0.97f, 0.84f), new Color(0.55f, 0.29f, 0.08f, 1f));
-            Debug.LogWarning("[BattlePreparePanel] Status text not found on prefab; created runtime fallback.");
+            _statusText = GetOrCreateText(contentRoot, StatusName, _uiFont, 18, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.72f), new Vector2(0.97f, 0.78f), new Color(0.55f, 0.29f, 0.08f, 1f));
         }
 
         if (_ownedTribesRoot == null)
@@ -404,8 +758,7 @@ public class BattlePreparePanel : UIPanel
             _ownedTribesRoot = contentRoot.Find(OwnedRootName) as RectTransform;
             if (_ownedTribesRoot == null)
             {
-                _ownedTribesRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有族群", new Vector2(0.03f, 0.16f), new Vector2(0.32f, 0.75f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
-                Debug.LogWarning("[BattlePreparePanel] OwnedTribesRoot not found on prefab; created runtime fallback.");
+                _ownedTribesRoot = CreateRuntimeZone(contentRoot, OwnedRootName, "持有族群", new Vector2(0.03f, 0.3f), new Vector2(0.32f, 0.72f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
             }
         }
 
@@ -414,8 +767,7 @@ public class BattlePreparePanel : UIPanel
             _deployedTribesRoot = contentRoot.Find(DeployedRootName) as RectTransform;
             if (_deployedTribesRoot == null)
             {
-                _deployedTribesRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.16f), new Vector2(0.645f, 0.75f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
-                Debug.LogWarning("[BattlePreparePanel] DeployedTribesRoot not found on prefab; created runtime fallback.");
+                _deployedTribesRoot = CreateRuntimeZone(contentRoot, DeployedRootName, "上阵区域", new Vector2(0.355f, 0.3f), new Vector2(0.645f, 0.72f), new Color(0.15f, 0.33f, 0.2f, 0.72f));
             }
         }
 
@@ -424,9 +776,41 @@ public class BattlePreparePanel : UIPanel
             _enemyCardsRoot = contentRoot.Find(EnemyRootName) as RectTransform;
             if (_enemyCardsRoot == null)
             {
-                _enemyCardsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "敌人列表", new Vector2(0.68f, 0.16f), new Vector2(0.97f, 0.75f), new Color(0.42f, 0.18f, 0.18f, 0.72f));
-                Debug.LogWarning("[BattlePreparePanel] EnemyCardsRoot not found on prefab; created runtime fallback.");
+                _enemyCardsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "敌人列表", new Vector2(0.68f, 0.3f), new Vector2(0.97f, 0.72f), new Color(0.42f, 0.18f, 0.18f, 0.72f));
             }
+        }
+
+        // Deploy cost text
+        if (_deployCostText == null)
+        {
+            var tf = contentRoot.Find(DeployCostName);
+            if (tf != null) _deployCostText = tf.GetComponent<Text>();
+        }
+        if (_deployCostText == null)
+        {
+            _deployCostText = GetOrCreateText(contentRoot, DeployCostName, _uiFont, 16, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.24f), new Vector2(0.65f, 0.3f), new Color(0.85f, 0.75f, 0.2f, 1f));
+        }
+
+        // Buff preview text
+        if (_buffPreviewText == null)
+        {
+            var tf = contentRoot.Find(BuffPreviewName);
+            if (tf != null) _buffPreviewText = tf.GetComponent<Text>();
+        }
+        if (_buffPreviewText == null)
+        {
+            _buffPreviewText = GetOrCreateText(contentRoot, BuffPreviewName, _uiFont, 14, TextAnchor.UpperLeft, new Vector2(0.68f, 0.08f), new Vector2(0.97f, 0.3f), new Color(0.7f, 0.85f, 0.7f, 1f));
+        }
+
+        // Enemy info text
+        if (_enemyInfoText == null)
+        {
+            var tf = contentRoot.Find(EnemyInfoName);
+            if (tf != null) _enemyInfoText = tf.GetComponent<Text>();
+        }
+        if (_enemyInfoText == null)
+        {
+            _enemyInfoText = GetOrCreateText(contentRoot, EnemyInfoName, _uiFont, 15, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.24f), new Color(0.8f, 0.5f, 0.5f, 1f));
         }
 
         if (_backButton == null)
@@ -437,7 +821,6 @@ public class BattlePreparePanel : UIPanel
         if (_backButton == null)
         {
             _backButton = GetOrCreateButton(contentRoot, BackButtonName, "返回构筑", _uiFont, new Vector2(0.03f, 0.04f), new Vector2(0.2f, 0.11f), new Color(0.35f, 0.36f, 0.4f, 1f));
-            Debug.LogWarning("[BattlePreparePanel] BackButton not found on prefab; created runtime fallback.");
         }
 
         if (_startBattleButton == null)
@@ -448,13 +831,11 @@ public class BattlePreparePanel : UIPanel
         if (_startBattleButton == null)
         {
             _startBattleButton = GetOrCreateButton(contentRoot, StartButtonName, "进入战斗", _uiFont, new Vector2(0.79f, 0.04f), new Vector2(0.97f, 0.11f), new Color(0.16f, 0.43f, 0.29f, 1f));
-            Debug.LogWarning("[BattlePreparePanel] StartButton not found on prefab; created runtime fallback.");
         }
     }
 
     private void EnsureDropZones()
     {
-        // 族群系统不需要拖放区域，使用点击切换
     }
 
     private void EnsureZoneLayouts()
@@ -470,9 +851,7 @@ public class BattlePreparePanel : UIPanel
 
         HorizontalLayoutGroup oldHorizontal = zoneRoot.GetComponent<HorizontalLayoutGroup>();
         if (oldHorizontal != null)
-        {
             Object.Destroy(oldHorizontal);
-        }
 
         VerticalLayoutGroup layout = GetOrAddComponent<VerticalLayoutGroup>(zoneRoot.gameObject);
         layout.spacing = 8f;
@@ -499,13 +878,13 @@ public class BattlePreparePanel : UIPanel
         return listRect;
     }
 
+    // --- Utility ---
+
     private static T GetOrAddComponent<T>(GameObject gameObject) where T : Component
     {
         T component = gameObject.GetComponent<T>();
         if (component == null)
-        {
             component = gameObject.AddComponent<T>();
-        }
         return component;
     }
 
@@ -533,14 +912,8 @@ public class BattlePreparePanel : UIPanel
     }
 
     private static Text GetOrCreateText(
-        RectTransform parent,
-        string objectName,
-        Font font,
-        int fontSize,
-        TextAnchor alignment,
-        Vector2 anchorMin,
-        Vector2 anchorMax,
-        Color color)
+        RectTransform parent, string objectName, Font font, int fontSize,
+        TextAnchor alignment, Vector2 anchorMin, Vector2 anchorMax, Color color)
     {
         RectTransform rectTransform = GetOrCreateChildRect(parent, objectName, anchorMin, anchorMax);
         Text text = GetOrAddComponent<Text>(rectTransform.gameObject);
@@ -556,13 +929,8 @@ public class BattlePreparePanel : UIPanel
     }
 
     private static Button GetOrCreateButton(
-        RectTransform parent,
-        string objectName,
-        string label,
-        Font font,
-        Vector2 anchorMin,
-        Vector2 anchorMax,
-        Color backgroundColor)
+        RectTransform parent, string objectName, string label, Font font,
+        Vector2 anchorMin, Vector2 anchorMax, Color backgroundColor)
     {
         RectTransform rectTransform = GetOrCreateChildRect(parent, objectName, anchorMin, anchorMax);
         Image image = GetOrAddComponent<Image>(rectTransform.gameObject);
@@ -588,32 +956,20 @@ public class BattlePreparePanel : UIPanel
     {
         List<TribeRecord> fromList = GetZoneList(fromZone);
         List<TribeRecord> targetList = GetZoneList(targetZone);
-        if (fromList == null || targetList == null)
-        {
-            return false;
-        }
-
+        if (fromList == null || targetList == null) return false;
         return MoveTribeById(fromList, targetList, tribeId);
     }
 
     private List<TribeRecord> GetZoneList(PrepareTribeZoneType zoneType)
     {
-        if (zoneType == PrepareTribeZoneType.Deployed)
-        {
-            return _deployedTribes;
-        }
-        return _ownedTribes;
+        return zoneType == PrepareTribeZoneType.Deployed ? _deployedTribes : _ownedTribes;
     }
 
     private static bool MoveTribeById(List<TribeRecord> from, List<TribeRecord> to, int tribeId)
     {
         for (int i = 0; i < from.Count; i++)
         {
-            if (from[i].tribeId != tribeId)
-            {
-                continue;
-            }
-
+            if (from[i].tribeId != tribeId) continue;
             TribeRecord tribe = from[i];
             from.RemoveAt(i);
             to.Add(tribe);
@@ -626,10 +982,7 @@ public class BattlePreparePanel : UIPanel
     {
         for (int i = 0; i < tribes.Count; i++)
         {
-            if (tribes[i].tribeId != tribeId)
-            {
-                continue;
-            }
+            if (tribes[i].tribeId != tribeId) continue;
             tribes.RemoveAt(i);
             return;
         }
@@ -637,39 +990,10 @@ public class BattlePreparePanel : UIPanel
 
     private void ClearChildren(RectTransform root)
     {
-        if (root == null)
-        {
-            return;
-        }
-
+        if (root == null) return;
         for (int i = root.childCount - 1; i >= 0; i--)
         {
             Object.Destroy(root.GetChild(i).gameObject);
-        }
-    }
-
-    private int ResolveEnemyCount(int levelId)
-    {
-        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
-        if (battleCampaignRuntime == null)
-        {
-            return 1;
-        }
-        return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
-    }
-
-    private static string ResolveEnemyName(int enemyUnitId)
-    {
-        switch (enemyUnitId)
-        {
-            case 1:
-                return "敌方侦察猫";
-            case 2:
-                return "敌方突击猫";
-            case 3:
-                return "敌方精英猫";
-            default:
-                return $"敌方兵种 {enemyUnitId}";
         }
     }
 
@@ -678,17 +1002,42 @@ public class BattlePreparePanel : UIPanel
         return tribe.leader != null && tribe.leader.restTurns > 0;
     }
 
+    private DifficultyLevel GetSelectedDifficulty()
+    {
+        if (_difficultyOptions != null && _selectedDifficultyIndex < _difficultyOptions.Count)
+            return _difficultyOptions[_selectedDifficultyIndex];
+        return DifficultyLevel.Normal;
+    }
+
+    private static string GetDifficultyName(DifficultyLevel diff)
+    {
+        switch (diff)
+        {
+            case DifficultyLevel.Normal: return "普通";
+            case DifficultyLevel.Hard: return "困难";
+            case DifficultyLevel.Bloodbath: return "血战";
+            default: return diff.ToString();
+        }
+    }
+
+    private static Color GetDifficultyActiveColor(DifficultyLevel diff)
+    {
+        switch (diff)
+        {
+            case DifficultyLevel.Normal: return new Color(0.2f, 0.6f, 0.3f, 0.95f);
+            case DifficultyLevel.Hard: return new Color(0.7f, 0.5f, 0.1f, 0.95f);
+            case DifficultyLevel.Bloodbath: return new Color(0.7f, 0.15f, 0.15f, 0.95f);
+            default: return TabActiveColor;
+        }
+    }
+
     private Color ResolveTribeCardBackgroundColor(PrepareTribeZoneType zoneType, bool isLeaderResting, TribeType tribeType)
     {
         if (isLeaderResting)
-        {
-            return new Color(0.4f, 0.25f, 0.25f, 0.95f); // 红色调 - 无法上阵
-        }
+            return new Color(0.4f, 0.25f, 0.25f, 0.95f);
 
         if (zoneType == PrepareTribeZoneType.Deployed)
-        {
-            return new Color(0.22f, 0.5f, 0.3f, 0.95f); // 绿色调 - 已上阵
-        }
+            return new Color(0.22f, 0.5f, 0.3f, 0.95f);
 
         return GetTribeTypeColor(tribeType);
     }
@@ -721,26 +1070,28 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
+    private string ResolveEnemyName(int enemyUnitId)
+    {
+        switch (enemyUnitId)
+        {
+            case 1: return "敌方侦察猫";
+            case 2: return "敌方突击猫";
+            case 3: return "敌方精英猫";
+            default: return $"敌方兵种 {enemyUnitId}";
+        }
+    }
+
     private void SetStatusText(string message, bool overwrite)
     {
-        if (_statusText == null)
-        {
-            return;
-        }
-
+        if (_statusText == null) return;
         if (overwrite || string.IsNullOrEmpty(_statusText.text))
-        {
             _statusText.text = message;
-        }
     }
 
     private static Font LoadBuiltinFont()
     {
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (font != null)
-        {
-            return font;
-        }
+        if (font != null) return font;
         return Resources.GetBuiltinResource<Font>("Arial.ttf");
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using TribeSystem;
 
 /// <summary>
 /// 战斗管理器 - 管理战斗逻辑（暂时仅作为占位符）
@@ -41,6 +42,8 @@ public class BattleManager : MonoBehaviour
 
     public bool IsInBattle => _isInBattle;
     public int LevelId => _levelId;
+    public BattleFighter[] PlayerFighters => _playerFighters;
+    public BattleFighter[] EnemyFighters => _enemyFighters;
 
     public void Initialize(int levelId)
     {
@@ -141,6 +144,18 @@ public class BattleManager : MonoBehaviour
     {
         Time.timeScale = 1;
         Debug.Log("[BattleManager] Battle resumed");
+    }
+
+    public bool TryUseConsumable(ConsumableEffectType effectType)
+    {
+        if (_simulation == null || !_isInBattle)
+        {
+            Debug.LogWarning("[BattleManager] Cannot use consumable: not in battle");
+            return false;
+        }
+
+        _simulation.ApplyConsumable(effectType);
+        return true;
     }
 
     private void OnDestroy()

@@ -105,8 +105,18 @@ namespace TribeSystem
                     break;
 
                 case ShopItemType.Consumable:
-                    // TODO: 添加消耗品到玩家背包
-                    Debug.Log($"[ShopService] Bought consumable: {item.name}");
+                    if (item.consumableEffectType.HasValue)
+                    {
+                        var consumable = new ConsumableItem
+                        {
+                            id = (int)(System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue),
+                            name = item.name,
+                            effectType = item.consumableEffectType.Value,
+                            basePrice = item.basePrice
+                        };
+                        _dataManager.AddConsumable(consumable);
+                        Debug.Log($"[ShopService] Bought consumable: {item.name} ({consumable.effectType})");
+                    }
                     break;
 
                 case ShopItemType.Cat:
@@ -184,14 +194,17 @@ namespace TribeSystem
         private ShopItem GenerateConsumableItem(ShopConfig config)
         {
             int price = Random.Range(config.items.consumable.basePriceMin, config.items.consumable.basePriceMax + 1);
+            string name = GetRandomConsumableName();
+            ConsumableEffectType effectType = GetConsumableEffectType(name);
 
             return new ShopItem
             {
                 itemId = Random.Range(200, 300),
                 itemType = ShopItemType.Consumable,
+                consumableEffectType = effectType,
                 basePrice = price,
-                name = GetRandomConsumableName(),
-                description = "一次性使用道具"
+                name = name,
+                description = GetConsumableDescription(effectType)
             };
         }
 
@@ -288,6 +301,32 @@ namespace TribeSystem
         {
             string[] names = { "炸弹", "冰冻陷阱", "回复药水", "攻击强化", "防御强化" };
             return names[Random.Range(0, names.Length)];
+        }
+
+        private ConsumableEffectType GetConsumableEffectType(string name)
+        {
+            switch (name)
+            {
+                case "炸弹": return ConsumableEffectType.Bomb;
+                case "冰冻陷阱": return ConsumableEffectType.FreezeTrap;
+                case "回复药水": return ConsumableEffectType.HealPotion;
+                case "攻击强化": return ConsumableEffectType.AttackBuff;
+                case "防御强化": return ConsumableEffectType.DefenseBuff;
+                default: return ConsumableEffectType.Bomb;
+            }
+        }
+
+        private string GetConsumableDescription(ConsumableEffectType type)
+        {
+            switch (type)
+            {
+                case ConsumableEffectType.Bomb: return "对所有敌人造成200点伤害";
+                case ConsumableEffectType.FreezeTrap: return "所有敌人停止攻击3秒";
+                case ConsumableEffectType.HealPotion: return "回复所有己方单位50%生命值";
+                case ConsumableEffectType.AttackBuff: return "己方攻击力+30%，持续15秒";
+                case ConsumableEffectType.DefenseBuff: return "己方防御力+30%，持续15秒";
+                default: return "消耗品";
+            }
         }
 
         private string GetTribeTypeName(TribeType type)

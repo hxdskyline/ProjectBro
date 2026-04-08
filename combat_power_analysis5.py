@@ -22,13 +22,11 @@ def calc_stats(tt, buffs=None, cat_mult=AVG_CAT_MULT, is_cat=False):
     if is_cat:
         atk *= cat_mult; df *= cat_mult; hp *= cat_mult; spd *= cat_mult
     if buffs:
-        atk *= (1 + buffs.get('atk_pct', 0))
-        df *= (1 + buffs.get('def_pct', 0))
-        hp *= (1 + buffs.get('hp_pct', 0))
-        spd *= (1 + buffs.get('spd_pct', 0))
-        atk += buffs.get('atk_flat', 0)
-        df += buffs.get('def_flat', 0)
-        hp += buffs.get('hp_flat', 0)
+        # Apply modifiers: final = base * (1 + pctBuff - pctDebuff) + flatBuff - flatDebuff
+        atk = atk * (1 + buffs.get('atk_pct', 0)) + buffs.get('atk_flat', 0)
+        df = df * (1 + buffs.get('def_pct', 0)) + buffs.get('def_flat', 0)
+        hp = hp * (1 + buffs.get('hp_pct', 0)) + buffs.get('hp_flat', 0)
+        spd = spd * (1 + buffs.get('spd_pct', 0)) + buffs.get('spd_flat', 0)
     return (max(1, int(atk)), max(0, int(df)), max(1, int(hp)))
 
 def build_player_units(tribes_owned, leader_buffs, cat_counts, avg_quality):
@@ -124,14 +122,22 @@ for i, lv in enumerate(rounds_def):
     e_hp = ed['hp']
     e_spd = ed['spd']
 
-    # Calculate per-hit damage
+    # Calculate per-hit damage using new formula:
+    # FDMG = MAX(DMG * DR * SKILLMULT, 1) + TD
+    # DMG = MAX(CATK - CDEF, 0)
+    # DR = MAX(1 - CDEF / (CDEF + 100), 0.2)
+    def calc_dmg(atk, defe):
+        raw = max(0, atk - defe)
+        dr = max(0.2, 1.0 - float(defe) / (defe + 100))
+        return max(1, int(round(raw * dr)))
+
     leaders = [u for u in units if u['atk'] > 50]
     cats = [u for u in units if u['atk'] <= 50]
 
-    leader_dmg = max(1, leaders[0]['atk'] - e_def) if leaders else 0
-    enemy_dmg_to_leader = max(1, e_atk - leaders[0]['def']) if leaders else 0
-    cat_dmg = max(1, cats[0]['atk'] - e_def) if cats else 0
-    enemy_dmg_to_cat = max(1, e_atk - cats[0]['def']) if cats else 0
+    leader_dmg = calc_dmg(leaders[0]['atk'], e_def) if leaders else 0
+    enemy_dmg_to_leader = calc_dmg(e_atk, leaders[0]['def']) if leaders else 0
+    cat_dmg = calc_dmg(cats[0]['atk'], e_def) if cats else 0
+    enemy_dmg_to_cat = calc_dmg(e_atk, cats[0]['def']) if cats else 0
 
     # Estimate time to kill
     hits_to_kill_enemy = float(e_hp) / max(1, leader_dmg)

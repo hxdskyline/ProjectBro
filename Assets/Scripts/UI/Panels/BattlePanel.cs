@@ -19,6 +19,16 @@ public class BattlePanel : UIPanel
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
+    private TerrainType _currentTerrain;
+    private WeatherType _currentWeather;
+    private DifficultyLevel _currentDifficulty;
+    private List<TribeRecord> _deployedTribes;
+    private BattleHUDPanel _battleHUD;
+
+    // Consumable UI
+    private List<ConsumableItem> _consumableItems;
+    private readonly List<GameObject> _consumableButtonObjects = new List<GameObject>();
+    private RectTransform _consumableBarRoot;
 
     private readonly Dictionary<string, AvatarAnimationDefinition> _playerAvatarDefinitionsByAddress
         = new Dictionary<string, AvatarAnimationDefinition>();
@@ -70,11 +80,17 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 开始战斗 - 使用新族群系统
+    /// 开始战斗 - 使用新族群系统（含地形/天气/难度）
     /// </summary>
-    public void StartBattle(int levelId, List<TribeRecord> deployedTribes)
+    public void StartBattle(int levelId, List<TribeRecord> deployedTribes,
+        TerrainType terrain = TerrainType.Plain, WeatherType weather = WeatherType.Sunny,
+        DifficultyLevel difficulty = DifficultyLevel.Normal)
     {
         _currentLevel = levelId;
+        _currentTerrain = terrain;
+        _currentWeather = weather;
+        _currentDifficulty = difficulty;
+        _deployedTribes = deployedTribes;
         _isPaused = false;
 
         if (_flowController == null)
@@ -84,7 +100,7 @@ public class BattlePanel : UIPanel
 
         if (_levelText != null)
         {
-            _levelText.text = $"Level: {levelId}";
+            _levelText.text = $"Level: {levelId}  {BattleScenarioOption.GetTerrainName(terrain)}/{BattleScenarioOption.GetWeatherName(weather)}  {GetDifficultyName(difficulty)}";
         }
 
         if (_battleInfoText != null)
@@ -94,35 +110,59 @@ public class BattlePanel : UIPanel
 
         BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
         UnitStaticAttributes? enemyStats = campaign != null
-            ? campaign.GetEnemyStatsForBattle(levelId)
-            : (UnitStaticAttributes?)null;
+            ? (UnitStaticAttributes?)campaign.GetEnemyStats(levelId, difficulty)
+            : null;
+
+        int enemyCount = ResolveEnemyCount(levelId);
 
         _flowController.StartBattle(
             levelId,
             _fighterPrefab,
             _playerAvatarDefinition,
             _enemyAvatarDefinition,
-            ResolveEnemyCount(levelId),
+            enemyCount,
             BuildPlayerSpawnDefinitions(deployedTribes),
             OnBattleEnded,
             enemyStats);
 
+        // Create battle HUD (vertical HP bars in top-left)
+        CreateBattleHUD(deployedTribes);
+
+        // Create consumable button bar at bottom
+        CreateConsumableBar();
+
         if (enemyStats.HasValue)
         {
             var s = enemyStats.Value;
-            Debug.Log($"[BattlePanel] Battle Lv{levelId}: {deployedTribes?.Count ?? 0} tribes | Enemy stats ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed}");
+            Debug.Log($"[BattlePanel] Battle Lv{levelId} {GetDifficultyName(difficulty)}: " +
+                $"{deployedTribes?.Count ?? 0} tribes | " +
+                $"Terrain={BattleScenarioOption.GetTerrainName(terrain)} " +
+                $"Weather={BattleScenarioOption.GetWeatherName(weather)} | " +
+                $"Enemy stats ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed} | " +
+                $"Enemy count={enemyCount}");
         }
     }
 
     private int ResolveEnemyCount(int levelId)
     {
-        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
-        if (battleCampaignRuntime == null)
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign == null)
         {
             return 1;
         }
 
-        return battleCampaignRuntime.GetEnemyCountForBattle(levelId);
+        // Try to get formation-specific count from scenario options
+        var scenarios = campaign.GetScenarioOptions(levelId);
+        if (scenarios != null && scenarios.Count > 0)
+        {
+            // Use first scenario's formation type (will be overridden by selected scenario later)
+            EnemyFormationType formation = scenarios[0].formationType;
+            int[] ids = campaign.GetEnemyUnitIds(levelId, formation);
+            if (ids != null && ids.Length > 0)
+                return ids.Length;
+        }
+
+        return campaign.GetEnemyCountForBattle(levelId);
     }
 
     /// <summary>
@@ -176,7 +216,7 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 创建族长战斗单位定义
+    /// 创建族长战斗单位定义（含地形/天气buff）
     /// </summary>
     private bool CreateLeaderSpawnDefinition(TribeRecord tribe, out BattleFighterSpawnDefinition definition)
     {
@@ -188,17 +228,25 @@ public class BattlePanel : UIPanel
         // 计算族长最终属性（含永久buff、临时buff、心情加成）
         LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader);
 
+        // 应用地形/天气 buff
+        TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
+        float finalAtk = leaderStats.attack * (1f + buff.attackPercent);
+        float finalDef = leaderStats.defense * (1f + buff.defensePercent);
+        float finalHp = leaderStats.hp * (1f + buff.hpPercent);
+        float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed);
+        float finalSpeed = baseSpeed * (1f + buff.speedPercent);
+
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
-            MaxHp = Mathf.Max(1, leaderStats.hp),
-            Attack = Mathf.Max(1, leaderStats.attack),
-            Defense = Mathf.Max(0, leaderStats.defense),
-            MoveSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed),
-            AttackRange = Mathf.Max(0.1f, 1.5f) // 族长攻击范围略大
+            MaxHp = Mathf.Max(1, Mathf.RoundToInt(finalHp)),
+            Attack = Mathf.Max(1, Mathf.RoundToInt(finalAtk)),
+            Defense = Mathf.Max(0, Mathf.RoundToInt(finalDef)),
+            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            AttackRange = Mathf.Max(0.1f, 1.5f)
         };
 
-        // 族长名称格式："[族长] 族群名称"
-        string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}";
+        string buffTag = buff.IsNeutral ? "" : $" [{buff.GetDescription()}]";
+        string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}{buffTag}";
 
         definition = new BattleFighterSpawnDefinition(
             leaderName,
@@ -209,7 +257,7 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 创建小猫战斗单位定义
+    /// 创建小猫战斗单位定义（含地形/天气buff）
     /// </summary>
     private bool CreateCatSpawnDefinition(TribeRecord tribe, CatData cat, out BattleFighterSpawnDefinition definition)
     {
@@ -218,7 +266,6 @@ public class BattlePanel : UIPanel
         if (tribe.leader == null)
             return false;
 
-        // 获取小猫的基础属性配置
         var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
         if (tribeConfig?.catBaseStats == null)
         {
@@ -226,34 +273,37 @@ public class BattlePanel : UIPanel
             return false;
         }
 
-        // 转换catBaseStats为LeaderStats格式（供TribeStatsCalculator使用）
-        // 注：小猫的command设为0（小猫不使用统帅力）
         LeaderStats catBaseStatsAsLeader = new LeaderStats(
             tribeConfig.catBaseStats.attack,
             tribeConfig.catBaseStats.defense,
             tribeConfig.catBaseStats.hp,
             tribeConfig.catBaseStats.speed,
-            0  // 小猫的command为0
+            0
         );
 
-        // 计算小猫属性（基于小猫基础属性和品质比例）
         CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, catBaseStatsAsLeader);
 
-        // 应用统帅惩罚（小猫数量影响速度）
         int catCount = tribe.cats?.Count ?? 0;
         int command = tribe.leader.command;
-        int finalSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
+        int penalizedSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
+
+        // 应用地形/天气 buff
+        TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
+        float finalAtk = catStats.attack * (1f + buff.attackPercent);
+        float finalDef = catStats.defense * (1f + buff.defensePercent);
+        float finalHp = catStats.hp * (1f + buff.hpPercent);
+        float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(penalizedSpeed);
+        float finalSpeed = baseSpeed * (1f + buff.speedPercent);
 
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
-            MaxHp = Mathf.Max(1, catStats.hp),
-            Attack = Mathf.Max(1, catStats.attack),
-            Defense = Mathf.Max(0, catStats.defense),
-            MoveSpeed = TribeStatsCalculator.CalculateMovementSpeed(finalSpeed),
-            AttackRange = Mathf.Max(0.1f, 1.0f) // 小猫攻击范围正常
+            MaxHp = Mathf.Max(1, Mathf.RoundToInt(finalHp)),
+            Attack = Mathf.Max(1, Mathf.RoundToInt(finalAtk)),
+            Defense = Mathf.Max(0, Mathf.RoundToInt(finalDef)),
+            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            AttackRange = Mathf.Max(0.1f, 1.0f)
         };
 
-        // 小猫名称格式："[品质] 族群名称"
         string catName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
 
         definition = new BattleFighterSpawnDefinition(
@@ -314,10 +364,208 @@ public class BattlePanel : UIPanel
         }
     }
 
+    private static string GetDifficultyName(DifficultyLevel diff)
+    {
+        switch (diff)
+        {
+            case DifficultyLevel.Normal: return "普通";
+            case DifficultyLevel.Hard: return "困难";
+            case DifficultyLevel.Bloodbath: return "血战";
+            default: return diff.ToString();
+        }
+    }
+
+    private void CreateBattleHUD(List<TribeRecord> deployedTribes)
+    {
+        CleanupBattleHUD();
+
+        BattleManager bm = _flowController?.BattleManager;
+        if (bm == null) return;
+
+        BattleFighter[] playerFighters = bm.PlayerFighters;
+        BattleFighter[] enemyFighters = bm.EnemyFighters;
+        if (playerFighters == null || enemyFighters == null) return;
+
+        GameObject hudGo = new GameObject("BattleHUD", typeof(RectTransform));
+        hudGo.transform.SetParent(transform, false);
+
+        RectTransform hudRect = hudGo.GetComponent<RectTransform>();
+        hudRect.anchorMin = Vector2.zero;
+        hudRect.anchorMax = Vector2.one;
+        hudRect.offsetMin = Vector2.zero;
+        hudRect.offsetMax = Vector2.zero;
+
+        _battleHUD = hudGo.AddComponent<BattleHUDPanel>();
+        _battleHUD.Initialize(playerFighters, enemyFighters, deployedTribes);
+    }
+
+    private void CleanupBattleHUD()
+    {
+        if (_battleHUD != null)
+        {
+            _battleHUD.Cleanup();
+            _battleHUD = null;
+        }
+    }
+
+    private void CreateConsumableBar()
+    {
+        CleanupConsumableButtons();
+
+        DataManager dataManager = GameManager.Instance?.DataManager;
+        if (dataManager == null) return;
+
+        var allConsumables = dataManager.GetConsumables();
+        if (allConsumables == null || allConsumables.Count == 0) return;
+
+        // Copy items so we can modify the list during battle
+        _consumableItems = new List<ConsumableItem>(allConsumables);
+
+        // Root container at bottom-center
+        GameObject barGo = new GameObject("ConsumableBar", typeof(RectTransform));
+        barGo.transform.SetParent(transform, false);
+
+        _consumableBarRoot = barGo.GetComponent<RectTransform>();
+        _consumableBarRoot.anchorMin = new Vector2(0.5f, 0f);
+        _consumableBarRoot.anchorMax = new Vector2(0.5f, 0f);
+        _consumableBarRoot.pivot = new Vector2(0.5f, 0f);
+        _consumableBarRoot.anchoredPosition = new Vector2(0f, 12f);
+
+        HorizontalLayoutGroup layout = barGo.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 8f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        for (int i = 0; i < _consumableItems.Count; i++)
+        {
+            ConsumableItem item = _consumableItems[i];
+            CreateConsumableButton(item, font);
+        }
+    }
+
+    private void CreateConsumableButton(ConsumableItem item, Font font)
+    {
+        GameObject btnGo = new GameObject($"Btn_{item.name}", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnGo.transform.SetParent(_consumableBarRoot, false);
+
+        RectTransform btnRect = btnGo.GetComponent<RectTransform>();
+        btnRect.sizeDelta = new Vector2(80f, 36f);
+
+        Image bgImg = btnGo.GetComponent<Image>();
+        bgImg.color = GetConsumableColor(item.effectType);
+
+        // Label
+        GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
+        labelGo.transform.SetParent(btnGo.transform, false);
+
+        RectTransform labelRect = labelGo.GetComponent<RectTransform>();
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        Text labelText = labelGo.GetComponent<Text>();
+        labelText.font = font;
+        labelText.fontSize = 14;
+        labelText.color = Color.white;
+        labelText.alignment = TextAnchor.MiddleCenter;
+        labelText.text = item.name;
+        labelText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        labelText.verticalOverflow = VerticalWrapMode.Overflow;
+        labelText.raycastTarget = false;
+
+        Button btn = btnGo.GetComponent<Button>();
+        int itemId = item.id;
+        btn.onClick.AddListener(() => OnConsumableButtonClicked(itemId));
+
+        _consumableButtonObjects.Add(btnGo);
+    }
+
+    private void OnConsumableButtonClicked(int itemId)
+    {
+        if (_consumableItems == null) return;
+
+        // Find the item
+        ConsumableItem item = null;
+        int index = -1;
+        for (int i = 0; i < _consumableItems.Count; i++)
+        {
+            if (_consumableItems[i].id == itemId)
+            {
+                item = _consumableItems[i];
+                index = i;
+                break;
+            }
+        }
+
+        if (item == null || index < 0) return;
+
+        // Apply effect
+        BattleManager bm = _flowController?.BattleManager;
+        if (bm == null || !bm.IsInBattle) return;
+
+        bm.TryUseConsumable(item.effectType);
+
+        // Remove from inventory
+        GameManager.Instance?.DataManager?.RemoveConsumable(item.id);
+
+        // Remove from local list
+        _consumableItems.RemoveAt(index);
+
+        // Destroy button
+        if (index < _consumableButtonObjects.Count)
+        {
+            GameObject btnObj = _consumableButtonObjects[index];
+            _consumableButtonObjects.RemoveAt(index);
+            Object.Destroy(btnObj);
+        }
+
+        Debug.Log($"[BattlePanel] Used consumable: {item.name}");
+    }
+
+    private void CleanupConsumableButtons()
+    {
+        for (int i = _consumableButtonObjects.Count - 1; i >= 0; i--)
+        {
+            if (_consumableButtonObjects[i] != null)
+                Object.Destroy(_consumableButtonObjects[i]);
+        }
+        _consumableButtonObjects.Clear();
+        _consumableItems = null;
+
+        if (_consumableBarRoot != null)
+        {
+            Object.Destroy(_consumableBarRoot.gameObject);
+            _consumableBarRoot = null;
+        }
+    }
+
+    private static Color GetConsumableColor(ConsumableEffectType type)
+    {
+        switch (type)
+        {
+            case ConsumableEffectType.Bomb: return new Color(0.8f, 0.3f, 0.2f, 0.85f);
+            case ConsumableEffectType.FreezeTrap: return new Color(0.3f, 0.5f, 0.9f, 0.85f);
+            case ConsumableEffectType.HealPotion: return new Color(0.2f, 0.7f, 0.3f, 0.85f);
+            case ConsumableEffectType.AttackBuff: return new Color(0.9f, 0.6f, 0.1f, 0.85f);
+            case ConsumableEffectType.DefenseBuff: return new Color(0.4f, 0.4f, 0.8f, 0.85f);
+            default: return new Color(0.5f, 0.5f, 0.5f, 0.85f);
+        }
+    }
+
     private void OnBattleEnded(bool victory)
     {
         _isPaused = false;
         Time.timeScale = 1f;
+
+        CleanupBattleHUD();
+        CleanupConsumableButtons();
 
         if (victory)
         {
@@ -355,27 +603,35 @@ public class BattlePanel : UIPanel
     /// <summary>
     /// 处理战斗后的恢复逻辑
     /// 胜利：小猫下回合自动恢复，族长不休息
-    /// 失败：小猫下回合自动恢复，族长休息1回合
+    /// 失败：参战族长休息1回合（未参战的不受影响）
     /// </summary>
     private void ProcessPostBattleRecovery(bool victory)
     {
+        if (victory) return;
+
+        if (_deployedTribes == null) return;
+
         DataManager dataManager = GameManager.Instance?.DataManager;
         if (dataManager == null) return;
 
-        List<TribeRecord> tribes = dataManager.GetTribes();
-        if (tribes == null) return;
+        List<TribeRecord> allTribes = dataManager.GetTribes();
+        if (allTribes == null) return;
 
-        foreach (TribeRecord tribe in tribes)
+        // 只有参战的族长才需要休息
+        foreach (TribeRecord deployed in _deployedTribes)
         {
-            // 失败时族长需要休息
-            if (!victory && tribe.leader != null)
-            {
-                tribe.leader.restTurns = 1;
-                Debug.Log($"[BattlePanel] {tribe.tribeType}族长需要休息1回合");
-            }
+            if (deployed.leader == null) continue;
 
-            // 小猫总是下回合自动恢复（无需操作，仅作为记录）
-            // 实际恢复在下一回合开始时处理
+            // 在全局列表中找到对应族长并设置休息
+            foreach (TribeRecord tribe in allTribes)
+            {
+                if (tribe.tribeId == deployed.tribeId && tribe.leader != null)
+                {
+                    tribe.leader.restTurns = 1;
+                    Debug.Log($"[BattlePanel] {tribe.tribeType}族长需要休息1回合");
+                    break;
+                }
+            }
         }
 
         dataManager.SavePlayerData();
@@ -407,6 +663,9 @@ public class BattlePanel : UIPanel
 
     public override void Close()
     {
+        CleanupBattleHUD();
+        CleanupConsumableButtons();
+
         if (_flowController != null)
         {
             _flowController.StopAndDispose(OnBattleEnded);

@@ -8,6 +8,16 @@ namespace TribeSystem
     public static class TribeStatsCalculator
     {
         /// <summary>
+        /// 通用属性修正方法
+        /// 公式：final = base * (1 + SUM(percentBuffs) - SUM(percentDebuffs)) + SUM(flatBuffs) - SUM(flatDebuffs)
+        /// </summary>
+        public static float ApplyModifiers(float baseValue, float percentBuffSum, float flatBuffSum,
+            float percentDebuffSum = 0f, float flatDebuffSum = 0f)
+        {
+            return baseValue * (1f + percentBuffSum - percentDebuffSum) + flatBuffSum - flatDebuffSum;
+        }
+
+        /// <summary>
         /// 计算族长的最终属性（包含所有加成）
         /// </summary>
         public static LeaderStats CalculateLeaderStats(LeaderData leader)
@@ -17,50 +27,40 @@ namespace TribeSystem
                 return new LeaderStats(0, 0, 0, 0, 0);
             }
 
-            int baseAttack = leader.baseAttack;
-            int baseDefense = leader.baseDefense;
-            int baseHp = leader.baseHp;
-            int baseSpeed = leader.baseSpeed;
-            int baseCommand = leader.command;
+            float atk = leader.baseAttack;
+            float def = leader.baseDefense;
+            float hp = leader.baseHp;
+            float spd = leader.baseSpeed;
+            float cmd = leader.command;
 
             // 应用永久加成
             if (leader.permanentBuffs != null)
             {
-                var buffs = leader.permanentBuffs;
-
-                // 先乘百分比加成
-                baseAttack = Mathf.RoundToInt(baseAttack * (1f + buffs.attackPercent));
-                baseDefense = Mathf.RoundToInt(baseDefense * (1f + buffs.defensePercent));
-                baseHp = Mathf.RoundToInt(baseHp * (1f + buffs.hpPercent));
-                baseSpeed = Mathf.RoundToInt(baseSpeed * (1f + buffs.speedPercent));
-                baseCommand = Mathf.RoundToInt(baseCommand * (1f + buffs.commandPercent));
-
-                // 再加绝对值加成
-                baseAttack += buffs.attackBonus;
-                baseDefense += buffs.defenseBonus;
-                baseHp += buffs.hpBonus;
-                baseSpeed += buffs.speedBonus;
-                baseCommand += buffs.commandBonus;
+                var b = leader.permanentBuffs;
+                atk = ApplyModifiers(atk, b.attackPercent, b.attackBonus);
+                def = ApplyModifiers(def, b.defensePercent, b.defenseBonus);
+                hp = ApplyModifiers(hp, b.hpPercent, b.hpBonus);
+                spd = ApplyModifiers(spd, b.speedPercent, b.speedBonus);
+                cmd = ApplyModifiers(cmd, b.commandPercent, b.commandBonus);
             }
 
-            // 应用限时加成
+            // 应用限时加成（只有百分比，不影响统帅）
             if (leader.temporaryBuff != null && leader.temporaryBuff.IsActive())
             {
-                var temp = leader.temporaryBuff;
-                baseAttack = Mathf.RoundToInt(baseAttack * (1f + temp.attackPercent));
-                baseDefense = Mathf.RoundToInt(baseDefense * (1f + temp.defensePercent));
-                baseHp = Mathf.RoundToInt(baseHp * (1f + temp.hpPercent));
-                baseSpeed = Mathf.RoundToInt(baseSpeed * (1f + temp.speedPercent));
+                var t = leader.temporaryBuff;
+                atk = ApplyModifiers(atk, t.attackPercent, 0f);
+                def = ApplyModifiers(def, t.defensePercent, 0f);
+                hp = ApplyModifiers(hp, t.hpPercent, 0f);
+                spd = ApplyModifiers(spd, t.speedPercent, 0f);
             }
 
-            // 确保属性不低于1
-            baseAttack = Mathf.Max(1, baseAttack);
-            baseDefense = Mathf.Max(1, baseDefense);
-            baseHp = Mathf.Max(1, baseHp);
-            baseSpeed = Mathf.Max(1, baseSpeed);
-            baseCommand = Mathf.Max(1, baseCommand);
-
-            return new LeaderStats(baseAttack, baseDefense, baseHp, baseSpeed, baseCommand);
+            return new LeaderStats(
+                Mathf.Max(1, Mathf.RoundToInt(atk)),
+                Mathf.Max(1, Mathf.RoundToInt(def)),
+                Mathf.Max(1, Mathf.RoundToInt(hp)),
+                Mathf.Max(1, Mathf.RoundToInt(spd)),
+                Mathf.Max(1, Mathf.RoundToInt(cmd))
+            );
         }
 
         /// <summary>
@@ -136,15 +136,15 @@ namespace TribeSystem
             switch (quality)
             {
                 case CatQuality.White:
-                    return (0.1f, 0.2f);
-                case CatQuality.Blue:
-                    return (0.2f, 0.3f);
-                case CatQuality.Purple:
                     return (0.3f, 0.4f);
-                case CatQuality.Gold:
+                case CatQuality.Blue:
                     return (0.4f, 0.5f);
+                case CatQuality.Purple:
+                    return (0.5f, 0.6f);
+                case CatQuality.Gold:
+                    return (0.6f, 0.7f);
                 default:
-                    return (0.1f, 0.2f);
+                    return (0.3f, 0.4f);
             }
         }
 
@@ -170,22 +170,18 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 计算伤害（技能系数 × 攻击力）
+        /// 计算最终伤害（新公式）
+        /// FDMG = MAX(DMG * DR * SKILLMULT, 1) + TD
+        /// DMG = MAX(CATK - CDEF, 0)
+        /// DR = MAX(1 - CDEF / (CDEF + 100), 0.2)
         /// </summary>
-        public static int CalculateDamage(float skillCoefficient, int attack)
+        public static int CalculateDamageNew(int correctedAttack, int correctedDefense,
+            float skillMultiplier = 1f, int trueDamage = 0)
         {
-            return Mathf.RoundToInt(skillCoefficient * attack);
-        }
-
-        /// <summary>
-        /// 计算受到的伤害（考虑防御）
-        /// 公式：受到伤害 = MAX{(敌方攻击 - 我方防御), 0} / 敌方攻击 × 技能系数
-        /// </summary>
-        public static int CalculateReceivedDamage(float skillCoefficient, int enemyAttack, int myDefense)
-        {
-            int damageReduction = Mathf.Max(0, enemyAttack - myDefense);
-            float damageRatio = (float)damageReduction / Mathf.Max(1, enemyAttack);
-            return Mathf.RoundToInt(skillCoefficient * enemyAttack * damageRatio);
+            int rawDmg = Mathf.Max(0, correctedAttack - correctedDefense);
+            float dr = Mathf.Max(0.2f, 1f - (float)correctedDefense / (correctedDefense + 100f));
+            float finalF = rawDmg * dr * skillMultiplier;
+            return Mathf.Max(1, Mathf.RoundToInt(finalF)) + trueDamage;
         }
 
         /// <summary>
