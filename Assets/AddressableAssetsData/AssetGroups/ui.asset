@@ -47,23 +47,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 723ba7015db41744a8d572f7d44525bd
-    m_Address: ui/sprite/kaishijiemian_btn_guanbi
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 76cec11c98c41cb45a09469fde834ef9
-    m_Address: ui/sprite/kaishijiemian_bg_beijing
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 805a67ddf1563d74bb4c3d06fb3a7bae
     m_Address: ui/tribebuild/tribecard
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 87dac4e33fe5e884e985acdc77cd1bb4
-    m_Address: ui/sprite/kaishijiemian_btn_xuanze
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -87,18 +72,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c8248391f2842d448aafe87fcf662fae
-    m_Address: "ui/sprite/\u6807\u6CE8-k-\u5F00\u59CB\u754C\u9762"
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c9ae4ee05daf3b543bf304794b6a01e4
     m_Address: ui/texture/mainmenubg
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cbb8eb8fe57655841b3e4b692df312c2
-    m_Address: ui/sprite/commonbutton
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

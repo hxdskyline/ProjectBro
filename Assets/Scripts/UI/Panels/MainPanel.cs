@@ -120,6 +120,7 @@ public class MainPanel : UIPanel
     private void OnSettingsButtonClicked()
     {
         Debug.Log("[MainPanel] Settings button clicked");
+        GameManager.Instance.UIManager.ShowPanel<SettingsPanel>("ui/settingspanel", UIManager.UILayer.PopUp);
     }
 
     private void OnQuitButtonClicked()

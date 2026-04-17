@@ -347,6 +347,74 @@ _startBattleButton -> PrepareStartButton
 
 ---
 
+## 6. SettingsPanel 预制体
+
+**路径:** `Assets/Bundle/UI/SettingsPanel.prefab`
+**Addressable 地址:** `ui/settingspanel`
+
+### UI层次结构
+```
+SettingsPanel (RectTransform, Image, CanvasGroup, SettingsPanel)
+├── Background (Image) - 半透明遮罩
+├── ContentPanel (RectTransform, Image) - 主面板容器
+│   ├── CloseButton (Button) - 右上角关闭
+│   │   └── Label (Text) - "×"
+│   ├── LeftPanel (RectTransform) - 左栏
+│   │   ├── MasterVolumeToggle (Toggle) - 音量总开关
+│   │   │   ├── Label (Text) - "音量总开关"
+│   │   │   ├── Background (Image) - Toggle背景
+│   │   │   └── Checkmark (Image) - 勾选标记
+│   │   ├── SfxVolumeToggle (Toggle) - 音效开关
+│   │   │   ├── Label (Text) - "音效开关"
+│   │   │   ├── Background (Image)
+│   │   │   └── Checkmark (Image)
+│   │   └── BgmVolumeToggle (Toggle) - BGM开关
+│   │       ├── Label (Text) - "BGM开关"
+│   │       ├── Background (Image)
+│   │       └── Checkmark (Image)
+│   ├── RightPanel (RectTransform) - 右栏
+│   │   └── TipsText (Text) - "祝你好运"
+│   └── ButtonBar (RectTransform) - 底部按钮栏
+│       ├── ConfirmButton (Button) - "确认"
+│       │   └── Label (Text) - "确认"
+│       └── CancelButton (Button) - "取消"
+│           └── Label (Text) - "取消"
+```
+
+### 组件设置
+
+| 对象 | 组件 | 设置 |
+|------|------|------|
+| SettingsPanel | RectTransform | Anchor: Stretch, Full Screen |
+| SettingsPanel | Image | Color: (0, 0, 0, 0.5) - 半透明遮罩 |
+| SettingsPanel | SettingsPanel | 绑定下方字段 |
+| ContentPanel | RectTransform | Anchor: Center, Size: (600, 400) |
+| ContentPanel | Image | Color: (0.12, 0.12, 0.15, 0.98) |
+| LeftPanel | VerticalLayoutGroup | Spacing: 20, Padding: 20, Child Alignment: Upper Left |
+| RightPanel | LayoutGroup | 居中显示 TipsText |
+| ButtonBar | HorizontalLayoutGroup | Spacing: 40, Child Alignment: Middle Center |
+| ConfirmButton | Image | Color: (0.2, 0.5, 0.3, 1) |
+| CancelButton | Image | Color: (0.5, 0.25, 0.2, 1) |
+
+### 序列化字段绑定
+
+```
+_closeButton -> ContentPanel/CloseButton
+_masterVolumeToggle -> LeftPanel/MasterVolumeToggle
+_sfxVolumeToggle -> LeftPanel/SfxVolumeToggle
+_bgmVolumeToggle -> LeftPanel/BgmVolumeToggle
+_confirmButton -> ButtonBar/ConfirmButton
+_cancelButton -> ButtonBar/CancelButton
+```
+
+### 注意事项
+
+- 关闭按钮在右上角（Anchor: Top-Right）
+- 左栏和右栏使用水平排列（ContentPanel 用 HorizontalLayoutGroup 或手动布局）
+- 设置面板作为 PopUp 层显示，关闭后 MainPanel 仍在底层
+
+---
+
 ## 创建步骤
 
 ### 方式一：手动创建
