@@ -239,13 +239,14 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 获取小猫出售价格（买入价的50%）
+        /// 获取小猫出售价格（买入价 × sellRatio）
         /// </summary>
         public int GetCatSellPrice(TribeType tribeType, CatQuality quality)
         {
             var config = TribeConfigLoader.Instance.GetShopConfig();
             int buyPrice = CalculateCatPrice(config, tribeType, quality);
-            return Mathf.RoundToInt(buyPrice * 0.5f);
+            float sellRatio = config.items.cat?.sellRatio ?? 0.5f;
+            return Mathf.RoundToInt(buyPrice * sellRatio);
         }
 
         private int CalculateCatPrice(ShopConfig config, TribeType tribeType, CatQuality quality)

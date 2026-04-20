@@ -2,7 +2,7 @@
   "tiers": [
     {
       "tierName": "free",
-      "displayName": "免费祭祀",
+      "displayName": "免费祈愿",
       "cost": 0,
       "drawCount": 3,
       "blessings": [
@@ -14,8 +14,8 @@
     },
     {
       "tierName": "low",
-      "displayName": "普通祭祀",
-      "cost": 100,
+      "displayName": "普通祈愿",
+      "cost": 300,
       "drawCount": 3,
       "blessings": [
         { "type": "LeaderStatBoostPermanent", "weight": 35, "statTypes": ["Attack","Defense","Hp","Speed"], "minAmount": 20, "maxAmount": 50 },
@@ -26,8 +26,8 @@
     },
     {
       "tierName": "high",
-      "displayName": "盛大祭祀",
-      "cost": 500,
+      "displayName": "盛大祈愿",
+      "cost": 600,
       "drawCount": 3,
       "blessings": [
         { "type": "LeaderStatBoostPercent",   "weight": 35, "statTypes": ["Attack","Defense","Hp","Speed"], "minPercent": 0.05, "maxPercent": 0.15 },

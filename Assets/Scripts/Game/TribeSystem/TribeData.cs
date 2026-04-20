@@ -377,6 +377,27 @@ namespace TribeSystem
     }
 
     /// <summary>
+    /// 祈愿效果类型（需求优化版）
+    /// </summary>
+    public enum PrayerEffectType
+    {
+        Luck,               // 气运：影响地形/天气出现概率
+        WarDance,           // 战舞：提升小猫品质
+        SpiritCommunion     // 通灵：改变心情
+    }
+
+    /// <summary>
+    /// 祈愿品质等级（蓝/紫/金/橙）
+    /// </summary>
+    public enum PrayerGrade
+    {
+        Blue,   // 蓝色 - 最差
+        Purple, // 紫色
+        Gold,   // 金色
+        Orange  // 橙色 - 最好
+    }
+
+    /// <summary>
     /// 祭祀奖励
     /// </summary>
     [Serializable]

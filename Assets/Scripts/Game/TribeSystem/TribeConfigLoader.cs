@@ -506,6 +506,7 @@ namespace TribeSystem
         public Dictionary<string, int> basePrices;
         public Dictionary<string, float> qualityBonusMultipliers;
         public float priceVariation;
+        public float sellRatio = 0.5f;
     }
 
     #endregion

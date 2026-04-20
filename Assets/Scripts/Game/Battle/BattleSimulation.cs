@@ -326,7 +326,9 @@ public class BattleSimulation
 
         if (self.AttackCooldownTimer <= 0f)
         {
-            self.AttackCooldownTimer = _config.AttackCooldown;
+            // 攻击速度: AS = CS/2000, 攻击间隔 = 1/AS
+            float attackSpeed = self.RuntimeAttributes?.CorrectedAttackSpeed ?? 1f;
+            self.AttackCooldownTimer = 1f / Mathf.Max(0.001f, attackSpeed);
             self.PendingHitTimer = _config.AttackResolveDelay;
             self.PendingTarget = target;
             self.Avatar?.PlayAttackAndReturnIdle();
@@ -395,12 +397,15 @@ public class BattleSimulation
             return;
         }
 
-            // New damage formula: FDMG = MAX(DMG * DR * SKILLMULT, 1) + TD
-            // DMG = MAX(CATK - CDEF, 0), DR = MAX(1 - CDEF/(CDEF+100), 0.2)
+            // 需求公式: FDMG = MAX[DMG * DR * SKILLMULT * PBUFF + ABUFF, 1] + TD
+            // DMG = MAX(CATK - CDEF, 0)
+            // DR = MAX(1 - CDEF/(CDEF+100), 0.2)
             int rawDmg = Mathf.Max(0, attackerRuntime.Attack - defenderRuntime.Defense);
             float dr = Mathf.Max(0.2f, 1f - (float)defenderRuntime.Defense / (defenderRuntime.Defense + 100f));
             float skillMult = attackerRuntime.SkillMultiplier;
-            float finalF = rawDmg * dr * skillMult;
+            float dmgPercentMod = 1f + defenderRuntime.DamageReceivePercentBuff;
+            int dmgFlatMod = defenderRuntime.DamageReceiveFlatBuff;
+            float finalF = rawDmg * dr * skillMult * dmgPercentMod + dmgFlatMod;
             int damage = Mathf.Max(1, Mathf.RoundToInt(finalF)) + attackerRuntime.TrueDamage;
             int newHp = Mathf.Max(0, defenderRuntime.CurrentHp - damage);
             defenderRuntime.CurrentHp = newHp;
@@ -425,7 +430,7 @@ public class BattleSimulation
     private float GetMoveSpeed(BattleFighter fighter)
     {
         return fighter?.RuntimeAttributes != null
-            ? Mathf.Max(0.1f, fighter.RuntimeAttributes.MoveSpeed)
+            ? Mathf.Max(0.001f, fighter.RuntimeAttributes.CorrectedMoveSpeed)
             : 2.2f;
     }
 

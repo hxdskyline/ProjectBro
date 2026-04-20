@@ -4,6 +4,13 @@ using System.IO;
 using LitJson;
 using TribeSystem;
 
+public enum LevelType
+{
+    Normal,  // 普通关
+    Elite,   // 精英关
+    Boss     // Boss关
+}
+
 public class BattleCampaignRuntime
 {
     private const string BattleLevelConfigFileName = "battle_campaign_levels.json";
@@ -35,6 +42,9 @@ public class BattleCampaignRuntime
 
     // New: free deploy quota per battle
     private readonly Dictionary<int, int> _freeDeployQuotaMap = new Dictionary<int, int>();
+
+    // New: level type per battle (normal/elite/boss)
+    private readonly Dictionary<int, LevelType> _levelTypeMap = new Dictionary<int, LevelType>();
 
     private readonly bool[] _hasRecruitmentByBattle;
     private readonly bool[] _hasRitualByBattle;
@@ -279,6 +289,16 @@ public class BattleCampaignRuntime
     }
 
     /// <summary>
+    /// 获取指定关卡的类型（普通/精英/Boss）
+    /// </summary>
+    public LevelType GetLevelType(int battleNumber)
+    {
+        if (_levelTypeMap.TryGetValue(battleNumber, out var levelType))
+            return levelType;
+        return LevelType.Normal;
+    }
+
+    /// <summary>
     /// 获取指定关卡指定敌人类别的单位ID
     /// </summary>
     public int[] GetEnemyUnitIds(int battleNumber, EnemyFormationType formation)
@@ -495,6 +515,12 @@ public class BattleCampaignRuntime
                 {
                     _freeDeployQuotaMap[battleNumber] = ReadInt(levelJson, "freeDeployQuota");
                 }
+
+                // Parse levelType
+                if (levelJson.Keys.Contains("levelType"))
+                {
+                    _levelTypeMap[battleNumber] = ParseLevelType(levelJson["levelType"].ToString());
+                }
             }
 
             return enemyUnitIdsByBattle;
@@ -636,6 +662,16 @@ public class BattleCampaignRuntime
         {
             case "swarm": return EnemyFormationType.Swarm;
             default: return EnemyFormationType.Single;
+        }
+    }
+
+    private static LevelType ParseLevelType(string s)
+    {
+        switch (s.ToLowerInvariant())
+        {
+            case "elite": return LevelType.Elite;
+            case "boss": return LevelType.Boss;
+            default: return LevelType.Normal;
         }
     }
 }

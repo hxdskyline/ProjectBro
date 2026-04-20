@@ -175,7 +175,8 @@ public class BattlePreparePanel : UIPanel
     {
         if (_titleText != null)
         {
-            _titleText.text = $"战前准备  Battle {_currentLevel}";
+            string levelTag = GetLevelTypeTag();
+            _titleText.text = $"战前准备{levelTag} Battle {_currentLevel}";
         }
 
         int totalCatCount = 0;
@@ -1007,6 +1008,19 @@ public class BattlePreparePanel : UIPanel
         if (_difficultyOptions != null && _selectedDifficultyIndex < _difficultyOptions.Count)
             return _difficultyOptions[_selectedDifficultyIndex];
         return DifficultyLevel.Normal;
+    }
+
+    private string GetLevelTypeTag()
+    {
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign == null) return "";
+
+        switch (campaign.GetLevelType(_currentLevel))
+        {
+            case LevelType.Elite: return " [精英]";
+            case LevelType.Boss: return " [Boss]";
+            default: return "";
+        }
     }
 
     private static string GetDifficultyName(DifficultyLevel diff)

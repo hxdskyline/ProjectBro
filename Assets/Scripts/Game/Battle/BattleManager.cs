@@ -1,9 +1,10 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using TribeSystem;
 
 /// <summary>
-/// 战斗管理器 - 管理战斗逻辑（暂时仅作为占位符）
+/// 战斗管理器 - 管理战斗逻辑
 /// </summary>
 public class BattleManager : MonoBehaviour
 {
@@ -37,6 +38,8 @@ public class BattleManager : MonoBehaviour
     private BattleFighterSpawnDefinition[] _playerFighterDefinitions;
     private int _enemyFighterCount;
     private UnitStaticAttributes? _enemyStaticAttributes;
+    private TerrainType _currentTerrain = TerrainType.Plain;
+    private WeatherType _currentWeather = WeatherType.Sunny;
 
     public System.Action<bool> BattleEnded;
 
@@ -77,6 +80,12 @@ public class BattleManager : MonoBehaviour
         _enemyStaticAttributes = stats;
     }
 
+    public void ConfigureTerrainWeather(TerrainType terrain, WeatherType weather)
+    {
+        _currentTerrain = terrain;
+        _currentWeather = weather;
+    }
+
     public void StartBattle()
     {
         if (_isInBattle)
@@ -88,6 +97,13 @@ public class BattleManager : MonoBehaviour
         Debug.Log("[BattleManager] Battle started");
 
         BuildDemoFighters();
+
+        // 应用地形/天气 BUFF 到玩家单位（通过运行时修正体系）
+        ApplyTerrainWeatherBuffs();
+
+        // 应用饰品属性加成
+        ApplyAccessoryBuffs();
+
         _simulation = new BattleSimulation(
             _playerFighters,
             _enemyFighters,
@@ -239,6 +255,118 @@ public class BattleManager : MonoBehaviour
         _playerFighters = null;
         _enemyFighters = null;
         ClearOldAvatars();
+    }
+
+    /// <summary>
+    /// 将地形/天气 BUFF 应用到所有玩家单位的运行时修正属性上
+    /// </summary>
+    private void ApplyTerrainWeatherBuffs()
+    {
+        if (_playerFighters == null || _playerFighters.Length == 0)
+            return;
+
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            BattleFighter fighter = _playerFighters[i];
+            if (fighter == null || fighter.RuntimeAttributes == null)
+                continue;
+
+            TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(
+                fighter.TribeType, _currentTerrain, _currentWeather);
+
+            if (buff.IsNeutral)
+                continue;
+
+            UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
+            attrs.AttackPercentBuff += buff.attackPercent;
+            attrs.DefensePercentBuff += buff.defensePercent;
+            attrs.HpPercentBuff += buff.hpPercent;
+            attrs.SpeedPercentBuff += buff.speedPercent;
+            attrs.Recalculate();
+        }
+
+        Debug.Log($"[BattleManager] Applied terrain/weather BUFFs: " +
+            $"Terrain={_currentTerrain}, Weather={_currentWeather}");
+    }
+
+    /// <summary>
+    /// 将已解锁饰品的属性加成应用到所有玩家单位
+    /// </summary>
+    private void ApplyAccessoryBuffs()
+    {
+        if (_playerFighters == null || _playerFighters.Length == 0)
+            return;
+
+        DataManager dataManager = GameManager.Instance?.DataManager;
+        if (dataManager == null) return;
+
+        var unlockedAccessories = dataManager.GetUnlockedAccessories();
+        if (unlockedAccessories == null || unlockedAccessories.Count == 0)
+            return;
+
+        // 加载饰品配置
+        string configPath = System.IO.Path.Combine(Application.streamingAssetsPath, "accessory_config.json");
+        if (!System.IO.File.Exists(configPath))
+            return;
+
+        try
+        {
+            string json = System.IO.File.ReadAllText(configPath);
+            LitJson.JsonData root = LitJson.JsonMapper.ToObject(json);
+            LitJson.JsonData accessoriesJson = root["accessories"];
+
+            // 汇总所有已解锁饰品的效果
+            float atkBonus = 0f, defBonus = 0f, hpBonus = 0f, spdBonus = 0f;
+
+            for (int i = 0; i < accessoriesJson.Count; i++)
+            {
+                LitJson.JsonData acc = accessoriesJson[i];
+                string accId = acc["id"].ToString();
+                if (!unlockedAccessories.Contains(accId))
+                    continue;
+
+                string effectType = acc["effectType"].ToString();
+                float effectValue = float.TryParse(acc["effectValue"].ToString(), out float v) ? v : 0f;
+
+                switch (effectType)
+                {
+                    case "AttackPercent":  atkBonus += effectValue; break;
+                    case "DefensePercent": defBonus += effectValue; break;
+                    case "HpPercent":      hpBonus  += effectValue; break;
+                    case "SpeedPercent":   spdBonus += effectValue; break;
+                    case "AllPercent":
+                        atkBonus += effectValue;
+                        defBonus += effectValue;
+                        hpBonus  += effectValue;
+                        spdBonus += effectValue;
+                        break;
+                }
+            }
+
+            // 应用到所有玩家单位
+            for (int i = 0; i < _playerFighters.Length; i++)
+            {
+                BattleFighter fighter = _playerFighters[i];
+                if (fighter == null || fighter.RuntimeAttributes == null)
+                    continue;
+
+                UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
+                attrs.AttackPercentBuff  += atkBonus;
+                attrs.DefensePercentBuff += defBonus;
+                attrs.HpPercentBuff      += hpBonus;
+                attrs.SpeedPercentBuff   += spdBonus;
+                attrs.Recalculate();
+            }
+
+            if (atkBonus != 0 || defBonus != 0 || hpBonus != 0 || spdBonus != 0)
+            {
+                Debug.Log($"[BattleManager] Applied accessory BUFFs: ATK+{atkBonus:P0} DEF+{defBonus:P0} HP+{hpBonus:P0} SPD+{spdBonus:P0}");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[BattleManager] Failed to apply accessory buffs: {e.Message}");
+        }
     }
 
     private void LogBattleSummary(bool victory)

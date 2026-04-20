@@ -123,7 +123,9 @@ public class BattlePanel : UIPanel
             enemyCount,
             BuildPlayerSpawnDefinitions(deployedTribes),
             OnBattleEnded,
-            enemyStats);
+            enemyStats,
+            terrain,
+            weather);
 
         // Create battle HUD (vertical HP bars in top-left)
         CreateBattleHUD(deployedTribes);
@@ -216,7 +218,7 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 创建族长战斗单位定义（含地形/天气buff）
+    /// 创建族长战斗单位定义（基础属性，BUFF 通过运行时修正体系生效）
     /// </summary>
     private bool CreateLeaderSpawnDefinition(TribeRecord tribe, out BattleFighterSpawnDefinition definition)
     {
@@ -226,38 +228,35 @@ public class BattlePanel : UIPanel
             return false;
 
         // 计算族长最终属性（含永久buff、临时buff、心情加成）
-        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader);
-
-        // 应用地形/天气 buff
-        TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
-        float finalAtk = leaderStats.attack * (1f + buff.attackPercent);
-        float finalDef = leaderStats.defense * (1f + buff.defensePercent);
-        float finalHp = leaderStats.hp * (1f + buff.hpPercent);
+        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId);
         float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed);
-        float finalSpeed = baseSpeed * (1f + buff.speedPercent);
 
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
-            MaxHp = Mathf.Max(1, Mathf.RoundToInt(finalHp)),
-            Attack = Mathf.Max(1, Mathf.RoundToInt(finalAtk)),
-            Defense = Mathf.Max(0, Mathf.RoundToInt(finalDef)),
-            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            MaxHp = Mathf.Max(1, Mathf.RoundToInt(leaderStats.hp)),
+            Attack = Mathf.Max(1, Mathf.RoundToInt(leaderStats.attack)),
+            Defense = Mathf.Max(0, Mathf.RoundToInt(leaderStats.defense)),
+            MoveSpeed = Mathf.Max(0.1f, baseSpeed),
             AttackRange = Mathf.Max(0.1f, 1.5f)
         };
 
+        // BUFF 预览文本（实际 BUFF 在 BattleManager 中通过运行时修正生效）
+        TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
         string buffTag = buff.IsNeutral ? "" : $" [{buff.GetDescription()}]";
         string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}{buffTag}";
 
         definition = new BattleFighterSpawnDefinition(
             leaderName,
             staticAttributes,
-            GetTribeAvatarDefinition(tribe.tribeType));
+            GetTribeAvatarDefinition(tribe.tribeType),
+            1.0f,
+            tribe.tribeType);
 
         return true;
     }
 
     /// <summary>
-    /// 创建小猫战斗单位定义（含地形/天气buff）
+    /// 创建小猫战斗单位定义（基础属性，BUFF 通过运行时修正体系生效）
     /// </summary>
     private bool CreateCatSpawnDefinition(TribeRecord tribe, CatData cat, out BattleFighterSpawnDefinition definition)
     {
@@ -286,21 +285,14 @@ public class BattlePanel : UIPanel
         int catCount = tribe.cats?.Count ?? 0;
         int command = tribe.leader.command;
         int penalizedSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
-
-        // 应用地形/天气 buff
-        TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
-        float finalAtk = catStats.attack * (1f + buff.attackPercent);
-        float finalDef = catStats.defense * (1f + buff.defensePercent);
-        float finalHp = catStats.hp * (1f + buff.hpPercent);
         float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(penalizedSpeed);
-        float finalSpeed = baseSpeed * (1f + buff.speedPercent);
 
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
-            MaxHp = Mathf.Max(1, Mathf.RoundToInt(finalHp)),
-            Attack = Mathf.Max(1, Mathf.RoundToInt(finalAtk)),
-            Defense = Mathf.Max(0, Mathf.RoundToInt(finalDef)),
-            MoveSpeed = Mathf.Max(0.1f, finalSpeed),
+            MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
+            Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
+            Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
+            MoveSpeed = Mathf.Max(0.1f, baseSpeed),
             AttackRange = Mathf.Max(0.1f, 1.0f)
         };
 
@@ -310,7 +302,8 @@ public class BattlePanel : UIPanel
             catName,
             staticAttributes,
             GetTribeAvatarDefinition(tribe.tribeType),
-            0.65f);
+            0.65f,
+            tribe.tribeType);
 
         return true;
     }

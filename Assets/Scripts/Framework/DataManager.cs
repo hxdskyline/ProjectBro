@@ -378,6 +378,13 @@ public class DataManager : MonoBehaviour
         return _playerData.unlockedAccessories.Contains(accessoryId);
     }
 
+    public System.Collections.Generic.List<string> GetUnlockedAccessories()
+    {
+        if (_playerData == null) return new System.Collections.Generic.List<string>();
+        EnsurePlayerDataDefaults();
+        return new System.Collections.Generic.List<string>(_playerData.unlockedAccessories);
+    }
+
     public int GetShopRefreshCount()
     {
         if (_playerData == null) return 0;
@@ -499,6 +506,19 @@ public class DataManager : MonoBehaviour
         if (_playerData == null) return;
         EnsurePlayerDataDefaults();
         _playerData.lastStandCount = count;
+        if (saveImmediately) SavePlayerData();
+    }
+
+    public int GetLastExpandedTribeId()
+    {
+        if (_playerData == null) return -1;
+        return _playerData.lastExpandedTribeId;
+    }
+
+    public void SetLastExpandedTribeId(int tribeId, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        _playerData.lastExpandedTribeId = tribeId;
         if (saveImmediately) SavePlayerData();
     }
 
@@ -666,6 +686,9 @@ public class PlayerData
     [System.Obsolete("Use TribeSystem instead")]
     public ShopSessionRecord shopSession;
     public int lastStandCount;
+
+    // 上次展开的族群ID（-1表示无）
+    public int lastExpandedTribeId = -1;
 }
 
 [System.Serializable]

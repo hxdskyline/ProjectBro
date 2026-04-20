@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using TribeSystem;
 
 /// <summary>
 /// 战斗流程控制器 - 负责战斗管理器的创建、配置、启动和销毁。
@@ -20,7 +21,9 @@ public class BattleFlowController
         int enemyFighterCount,
         BattleFighterSpawnDefinition[] playerFighterDefinitions,
         Action<bool> onBattleEnded,
-        UnitStaticAttributes? enemyStats = null)
+        UnitStaticAttributes? enemyStats = null,
+        TerrainType terrain = TerrainType.Plain,
+        WeatherType weather = WeatherType.Sunny)
     {
         EnsureBattleManager();
 
@@ -30,6 +33,7 @@ public class BattleFlowController
         _battleManager.ConfigureDemoAvatars(playerDefinition, enemyDefinition);
         _battleManager.ConfigureEnemyFighterCount(enemyFighterCount);
         _battleManager.ConfigurePlayerFighters(playerFighterDefinitions);
+        _battleManager.ConfigureTerrainWeather(terrain, weather);
         if (enemyStats.HasValue)
         {
             _battleManager.ConfigureEnemyStats(enemyStats.Value);

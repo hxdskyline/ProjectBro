@@ -26,6 +26,9 @@ namespace TribeSystem.UI
         [Header("预制体引用")]
         [SerializeField] private TribeCard _tribeCardPrefab;
         [SerializeField] private TribeDetailTips _tribeDetailTipsPrefab;
+        [SerializeField] private RectTransform _catListContainer;
+        [SerializeField] private RectTransform _catEntryPrefab;
+        [SerializeField] private Button _sellCatButton;
 
         [Header("子面板引用")]
         [SerializeField] private RecruitmentPanel _recruitmentPanel;
@@ -60,9 +63,10 @@ namespace TribeSystem.UI
         private List<string> _popupEventQueue;
         private int _popupQueueIndex;
 
-        private TribeDetailTips _currentDetailTips;
         private Dictionary<int, TribeCard> _tribeCardMap = new Dictionary<int, TribeCard>();
-        private TribeCard _currentDetailCard;
+        private TribeCard _expandedCard;
+        private int _selectedCatIndex = -1; // 当前选中的小猫索引
+        private System.Collections.Generic.List<RectTransform> _catEntries = new System.Collections.Generic.List<RectTransform>();
 
         private Font _cachedFont;
 
@@ -132,6 +136,13 @@ namespace TribeSystem.UI
             {
                 _backButton.onClick.RemoveAllListeners();
                 _backButton.onClick.AddListener(OnBackButtonClicked);
+            }
+
+            // 绑定出售小猫按钮
+            if (_sellCatButton != null)
+            {
+                _sellCatButton.onClick.RemoveAllListeners();
+                _sellCatButton.onClick.AddListener(OnSellCatButtonClicked);
             }
         }
 
@@ -921,6 +932,10 @@ namespace TribeSystem.UI
                 Destroy(_tribeListContainer.GetChild(i).gameObject);
             }
 
+            // 重建卡片时清空小猫列表
+            _expandedCard = null;
+            ClearCatList();
+
             // 使用预制体生成族群卡片
             if (_tribeCardPrefab != null)
             {
@@ -928,9 +943,18 @@ namespace TribeSystem.UI
                 foreach (var tribe in _tribes)
                 {
                     TribeCard card = Instantiate(_tribeCardPrefab, _tribeListContainer, false);
-                    // 注：族群部署在BattlePreparePanel中进行，此处仅展示族群信息
-                    card.Setup(tribe, false, null, OnShowTribeDetail);
+                    card.Setup(tribe, false, null, null);
+                    card.SetExpandCallback(OnCardExpandRequested);
                     _tribeCardMap[tribe.tribeId] = card;
+                }
+
+                // 展开上次保存的族群（若族群还在）
+                int savedId = _dataManager?.GetLastExpandedTribeId() ?? -1;
+                if (savedId >= 0 && _tribeCardMap.TryGetValue(savedId, out TribeCard savedCard))
+                {
+                    savedCard.SetExpanded(true);
+                    _expandedCard = savedCard;
+                    RebuildCatList(savedCard.Tribe);
                 }
             }
             else
@@ -1072,54 +1096,173 @@ namespace TribeSystem.UI
             SetTribeDeployState(tribeId, value);
         }
 
-        private void OnShowTribeDetail(TribeRecord tribe, bool isDeployed)
+        private void OnCardExpandRequested(TribeCard card)
         {
-            if (_tribeDetailTipsPrefab == null)
+            if (_expandedCard == card)
             {
-                Debug.LogWarning("[TribeBuildPanel] TribeDetailTips prefab not assigned");
+                // 点击已展开的卡片 = 收起
+                card.SetExpanded(false);
+                _expandedCard = null;
+                ClearCatList();
+                _dataManager?.SetLastExpandedTribeId(-1);
                 return;
             }
 
-            // 如果已打开同一张卡的详情，关闭它
-            if (_currentDetailTips != null && _currentDetailCard != null && _tribeCardMap.TryGetValue(tribe.tribeId, out var existing) && existing == _currentDetailCard)
+            // 收起上一张展开的卡
+            if (_expandedCard != null)
             {
-                OnDetailTipsClosed();
-                Destroy(_currentDetailTips.gameObject);
-                _currentDetailTips = null;
-                return;
+                _expandedCard.SetExpanded(false);
             }
 
-            // 如果已有详情面板（其他卡），先清回调再销毁，避免销毁时触发旧的 OnDetailTipsClosed
-            if (_currentDetailTips != null)
-            {
-                _currentDetailTips.ClearOnClosed();
-                Destroy(_currentDetailTips.gameObject);
-            }
+            // 展开新卡
+            _expandedCard = card;
+            card.SetExpanded(true);
 
-            // 恢复上一张卡的头像
-            if (_currentDetailCard != null)
-            {
-                _currentDetailCard.SetPortraitVariant(1);
-            }
+            // 刷新小猫列表
+            RebuildCatList(card.Tribe);
 
-            // 切换当前卡的头像为 variant 2
-            if (_tribeCardMap.TryGetValue(tribe.tribeId, out var card))
-            {
-                _currentDetailCard = card;
-                card.SetPortraitVariant(2);
-            }
-
-            // 实例化详情面板
-            _currentDetailTips = Instantiate(_tribeDetailTipsPrefab, transform, false);
-            _currentDetailTips.Show(tribe, isDeployed, OnTribeRestClicked, OnTribeDeployChanged, OnDetailTipsClosed);
+            // 保存展开的族群ID
+            _dataManager?.SetLastExpandedTribeId(card.Tribe?.tribeId ?? -1);
         }
 
-        private void OnDetailTipsClosed()
+        /// <summary>
+        /// 重建小猫列表（展开卡片时调用）
+        /// </summary>
+        private void RebuildCatList(TribeRecord tribe)
         {
-            if (_currentDetailCard != null)
+            if (_catListContainer == null) return;
+
+            // 清空现有条目
+            for (int i = _catListContainer.childCount - 1; i >= 0; i--)
+                Destroy(_catListContainer.GetChild(i).gameObject);
+            _catEntries.Clear();
+            _selectedCatIndex = -1;
+
+            if (tribe == null || tribe.cats == null || tribe.cats.Count == 0) return;
+
+            // 每只小猫一个条目（从预制体实例化）
+            for (int i = 0; i < tribe.cats.Count; i++)
             {
-                _currentDetailCard.SetPortraitVariant(1);
-                _currentDetailCard = null;
+                if (_catEntryPrefab == null) break;
+
+                RectTransform entry = Instantiate(_catEntryPrefab, _catListContainer, false);
+                entry.name = $"Cat_{i + 1}";
+                _catEntries.Add(entry);
+
+                // 找到品质色块并设置颜色
+                Image iconImg = entry.GetChild(0)?.GetComponent<Image>();
+                if (iconImg != null)
+                    iconImg.color = GetQualityColor(tribe.cats[i].quality);
+
+                // 找到 Info 文本并设置内容
+                Text infoText = entry.Find("Info")?.GetComponent<Text>();
+                if (infoText != null)
+                {
+                    string qualityName = GetQualityName(tribe.cats[i].quality);
+                    infoText.text = $"[{qualityName}] 攻{Mathf.RoundToInt(tribe.cats[i].attackMultiplier * 100)}% 防{Mathf.RoundToInt(tribe.cats[i].defenseMultiplier * 100)}% 血{Mathf.RoundToInt(tribe.cats[i].hpMultiplier * 100)}% 速{Mathf.RoundToInt(tribe.cats[i].speedMultiplier * 100)}%";
+                }
+
+                // 添加点击事件
+                Button btn = entry.GetComponent<Button>();
+                if (btn == null)
+                    btn = entry.gameObject.AddComponent<Button>();
+                int catIndex = i;
+                btn.onClick.AddListener(() => OnCatEntryClicked(catIndex));
+            }
+
+            // 默认选中第一个
+            if (_catEntries.Count > 0)
+                SelectCatEntry(0);
+        }
+
+        private void OnCatEntryClicked(int index)
+        {
+            SelectCatEntry(index);
+        }
+
+        private void SelectCatEntry(int index)
+        {
+            _selectedCatIndex = index;
+            // 更新所有条目的高亮状态
+            for (int i = 0; i < _catEntries.Count; i++)
+            {
+                Transform highlight = _catEntries[i].Find("SelectedHighlight");
+                if (highlight != null)
+                    highlight.gameObject.SetActive(i == index);
+            }
+        }
+
+        /// <summary>
+        /// 收起卡片时清空小猫列表
+        /// </summary>
+        private void ClearCatList()
+        {
+            if (_catListContainer == null) return;
+            for (int i = _catListContainer.childCount - 1; i >= 0; i--)
+                Destroy(_catListContainer.GetChild(i).gameObject);
+            _catEntries.Clear();
+            _selectedCatIndex = -1;
+        }
+
+        /// <summary>
+        /// 出售选中的小猫
+        /// </summary>
+        private void OnSellCatButtonClicked()
+        {
+            if (_expandedCard == null) return;
+            var tribe = _expandedCard.Tribe;
+            if (tribe == null || tribe.cats == null) return;
+            if (_selectedCatIndex < 0 || _selectedCatIndex >= tribe.cats.Count) return;
+
+            CatData cat = tribe.cats[_selectedCatIndex];
+
+            // 通过 ShopService 出售（会自动加猫粮）
+            int sellPrice = _shopService.SellCat(tribe, cat);
+
+            Debug.Log($"[TribeBuildPanel] 出售小猫获得 {sellPrice} 猫粮");
+
+            // 更新猫粮显示
+            if (_catFoodText != null)
+                _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
+
+            // 记算新的选中索引：自动选中上一个
+            int newIndex = _selectedCatIndex - 1;
+
+            // 刷新列表
+            RebuildCatList(tribe);
+
+            // 自动选中上一个小猫（如果存在）
+            if (_catEntries.Count > 0)
+            {
+                int targetIndex = Mathf.Clamp(newIndex, 0, _catEntries.Count - 1);
+                SelectCatEntry(targetIndex);
+            }
+
+            // 保存数据
+            _dataManager?.SavePlayerData();
+        }
+
+        private Color GetQualityColor(CatQuality quality)
+        {
+            switch (quality)
+            {
+                case CatQuality.White: return new Color(0.85f, 0.85f, 0.85f, 1f);
+                case CatQuality.Blue: return new Color(0.3f, 0.5f, 0.9f, 1f);
+                case CatQuality.Purple: return new Color(0.7f, 0.3f, 0.9f, 1f);
+                case CatQuality.Gold: return new Color(0.9f, 0.75f, 0.1f, 1f);
+                default: return Color.gray;
+            }
+        }
+
+        private string GetQualityName(CatQuality quality)
+        {
+            switch (quality)
+            {
+                case CatQuality.White: return "菜鸟";
+                case CatQuality.Blue: return "老手";
+                case CatQuality.Purple: return "精英";
+                case CatQuality.Gold: return "大师";
+                default: return quality.ToString();
             }
         }
 

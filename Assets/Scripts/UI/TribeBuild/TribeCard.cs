@@ -5,6 +5,15 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace TribeSystem.UI
 {
+    public enum TribeCardAttrIndex
+    {
+        Attack = 0,
+        Defense = 1,
+        Speed = 2,
+        Hp = 3,
+        Command = 4
+    }
+
     /// <summary>
     /// 族群卡片组件 - 显示单个族群信息
     /// </summary>
@@ -13,50 +22,53 @@ namespace TribeSystem.UI
         [Header("UI 组件")]
         [SerializeField] private Text _nameText;
         [SerializeField] private Text _countText;
-        [SerializeField] private Text _statusText;
-        [SerializeField] private Text _statsText;
-        [SerializeField] private Image _backgroundImage;
         [SerializeField] private Image _portraitImage; // 族群头像
-        [SerializeField] private Toggle _toggle;
-        [SerializeField] private Button _detailButton; // 点击显示详情的按钮
+
+        [Header("Small/Big 节点（点击卡片切换）")]
+        [SerializeField] private GameObject _smallNode;
+        [SerializeField] private GameObject _bigNode;
+
+        [Header("Big卡属性节点 Attr/Item1~5/Num")]
+        [SerializeField] private Text[] _attrItemNums; // 攻击、防御、速度、生命、统御
+
+        [Header("Big卡Buff栏")]
+        [SerializeField] private RectTransform _buffBarRoot; // BuffScroll/Viewport/BuffContent 的 Content
+        [SerializeField] private RectTransform _buffEntryPrefab; // BuffEntry 预制体
 
         private TribeRecord _tribe;
         private bool _isDeployed;
-        private System.Action<int, bool> _onToggleChanged;
-        private System.Action<TribeRecord, bool> _onShowDetail;
+        private bool _isExpanded;
+        private System.Action<TribeCard> _onExpandRequested;
         private int _currentVariant = 1;
         private TribeType _tribeType;
         private AsyncOperationHandle<Sprite> _portraitHandle;
+        private TerrainType _currentTerrain;
+        private WeatherType _currentWeather;
 
         /// <summary>
         /// 设置卡片数据
         /// </summary>
         public void Setup(TribeRecord tribe, bool isDeployed, System.Action<int, bool> onToggleChanged, System.Action<TribeRecord, bool> onShowDetail = null)
         {
+            Setup(tribe, isDeployed, onToggleChanged, onShowDetail, TerrainType.Plain, WeatherType.Sunny);
+        }
+
+        /// <summary>
+        /// 设置卡片数据（带地形天气，用于显示buff）
+        /// </summary>
+        public void Setup(TribeRecord tribe, bool isDeployed, System.Action<int, bool> onToggleChanged, System.Action<TribeRecord, bool> onShowDetail, TerrainType terrain, WeatherType weather)
+        {
             _tribe = tribe;
             _isDeployed = isDeployed;
-            _onToggleChanged = onToggleChanged;
-            _onShowDetail = onShowDetail;
+            _currentTerrain = terrain;
+            _currentWeather = weather;
 
-            // 绑定 Toggle 事件
-            if (_toggle != null)
+            // 卡片本身点击 → 切换展开/收起
+            Button cardButton = GetComponentInChildren<Button>(true);
+            if (cardButton != null)
             {
-                _toggle.onValueChanged.RemoveAllListeners();
-                _toggle.onValueChanged.AddListener(OnToggleValueChanged);
-                _toggle.SetIsOnWithoutNotify(isDeployed);
-            }
-
-            // 绑定详情按钮事件
-            if (_detailButton != null)
-            {
-                _detailButton.onClick.RemoveAllListeners();
-                _detailButton.onClick.AddListener(OnDetailButtonClicked);
-            }
-
-            // 更新背景颜色
-            if (_backgroundImage != null)
-            {
-                _backgroundImage.color = GetTribeCardColor(tribe.tribeType);
+                cardButton.onClick.RemoveAllListeners();
+                cardButton.onClick.AddListener(OnCardClicked);
             }
 
             // 加载头像
@@ -64,8 +76,47 @@ namespace TribeSystem.UI
             _currentVariant = 1;
             LoadPortrait(_tribeType, _currentVariant);
 
+            // 初始为 Small 状态
+            SetExpanded(false);
+
             // 更新文本内容
             UpdateTexts();
+        }
+
+        /// <summary>
+        /// 设置展开回调（由父级管理同一时间只展开一张卡）
+        /// </summary>
+        public void SetExpandCallback(System.Action<TribeCard> onExpandRequested)
+        {
+            _onExpandRequested = onExpandRequested;
+        }
+
+        /// <summary>
+        /// 切换展开/收起状态
+        /// </summary>
+        public void SetExpanded(bool expanded)
+        {
+            _isExpanded = expanded;
+            if (_smallNode != null) _smallNode.SetActive(!expanded);
+            if (_bigNode != null) _bigNode.SetActive(expanded);
+
+            // 通过 LayoutElement 控制高度，VerticalLayoutGroup 会据此自动布局
+            LayoutElement le = GetComponent<LayoutElement>();
+            if (le != null)
+                le.preferredHeight = expanded ? 350f : 175f;
+
+            if (expanded)
+                RebuildBuffBar();
+        }
+
+        public bool IsExpanded => _isExpanded;
+        public TribeRecord Tribe => _tribe;
+
+        private void OnCardClicked()
+        {
+            if (_isExpanded) return;
+            // 未展开 → 请求展开（父级会收起其他卡）
+            _onExpandRequested?.Invoke(this);
         }
 
         /// <summary>
@@ -130,56 +181,144 @@ namespace TribeSystem.UI
                 _countText.text = $"小猫: {_tribe.GetCatCount()} 只";
             }
 
-            // 状态
-            if (_statusText != null)
+            // Big卡属性节点
+            // Big卡属性节点
+            if (_attrItemNums != null && _attrItemNums.Length >= 5 && _tribe.leader != null)
             {
-                if (_tribe.IsLeaderResting())
-                {
-                    _statusText.text = $"族长休息中 ({_tribe.leader.restTurns}回)";
-                    _statusText.color = new Color(1f, 0.3f, 0.3f, 1f);
-                }
-                else
-                {
-                    _statusText.text = "状态: 可出战";
-                    _statusText.color = new Color(0.8f, 0.8f, 0.8f, 1f);
-                }
+                var leader = _tribe.leader;
+                SetAttr(TribeCardAttrIndex.Attack, leader.baseAttack.ToString());
+                SetAttr(TribeCardAttrIndex.Defense, leader.baseDefense.ToString());
+                SetAttr(TribeCardAttrIndex.Speed, leader.baseSpeed.ToString());
+                SetAttr(TribeCardAttrIndex.Hp, leader.baseHp.ToString());
+                SetAttr(TribeCardAttrIndex.Command, leader.command.ToString());
             }
 
-            // 族长属性
-            if (_statsText != null)
-            {
-                _statsText.text = $"攻{_tribe.leader.baseAttack} 防{_tribe.leader.baseDefense}\n血{_tribe.leader.baseHp} 速{_tribe.leader.baseSpeed} 统{_tribe.leader.command}";
-            }
+            // Buff栏
+            RebuildBuffBar();
         }
 
-        private void OnToggleValueChanged(bool value)
+        private void SetAttr(TribeCardAttrIndex index, string value)
         {
-            if (_tribe != null && _onToggleChanged != null)
-            {
-                _onToggleChanged(_tribe.tribeId, value);
-            }
+            int i = (int)index;
+            if (_attrItemNums != null && i >= 0 && i < _attrItemNums.Length && _attrItemNums[i] != null)
+                _attrItemNums[i].text = value;
         }
 
-        private void OnDetailButtonClicked()
+        private void RebuildBuffBar()
         {
-            if (_tribe != null && _onShowDetail != null)
+            if (_tribe == null) return;
+
+            if (_buffBarRoot == null)
             {
-                _onShowDetail(_tribe, _isDeployed);
+                EnsureBuffBarRoot();
             }
+
+            if (_buffBarRoot == null) return;
+
+            // 清空现有buff条目
+            for (int i = _buffBarRoot.childCount - 1; i >= 0; i--)
+                Destroy(_buffBarRoot.GetChild(i).gameObject);
+
+            var leader = _tribe.leader;
+            if (leader == null) return;
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            // 1. 永久buff
+            AddPermanentBuffEntries(leader.permanentBuffs, font);
+
+            // 2. 临时buff
+            if (leader.temporaryBuff != null && leader.temporaryBuff.IsActive())
+                AddTemporaryBuffEntry(leader.temporaryBuff, font);
+
+            // 3. 地形天气buff
+            TerrainWeatherBuff twBuff = TribeBattleBuffProvider.GetBuff(_tribe.tribeType, _currentTerrain, _currentWeather);
+            if (!twBuff.IsNeutral)
+                AddTerrainWeatherBuffEntry(twBuff, font);
         }
 
-        private Color GetTribeCardColor(TribeType tribeType)
+        private void AddPermanentBuffEntries(PermanentBuffs pb, Font font)
         {
-            switch (tribeType)
-            {
-                case TribeType.Maine: return new Color(0.3f, 0.5f, 0.7f, 1f);
-                case TribeType.Tabby: return new Color(0.6f, 0.4f, 0.3f, 1f);
-                case TribeType.Orange: return new Color(0.7f, 0.5f, 0.2f, 1f);
-                case TribeType.Cow: return new Color(0.4f, 0.4f, 0.5f, 1f);
-                case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 1f);
-                case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 1f);
-                default: return new Color(0.5f, 0.5f, 0.5f, 1f);
-            }
+            if (pb == null) return;
+
+            if (pb.attackBonus != 0 || pb.attackPercent != 0f)
+                CreateBuffEntry("atk_icon", "攻击强化", FormatStatBuff("攻击", pb.attackBonus, pb.attackPercent), font, new Color(0.9f, 0.3f, 0.2f, 0.8f));
+            if (pb.defenseBonus != 0 || pb.defensePercent != 0f)
+                CreateBuffEntry("def_icon", "防御强化", FormatStatBuff("防御", pb.defenseBonus, pb.defensePercent), font, new Color(0.3f, 0.5f, 0.9f, 0.8f));
+            if (pb.hpBonus != 0 || pb.hpPercent != 0f)
+                CreateBuffEntry("hp_icon", "生命强化", FormatStatBuff("生命", pb.hpBonus, pb.hpPercent), font, new Color(0.2f, 0.8f, 0.3f, 0.8f));
+            if (pb.speedBonus != 0 || pb.speedPercent != 0f)
+                CreateBuffEntry("spd_icon", "速度强化", FormatStatBuff("速度", pb.speedBonus, pb.speedPercent), font, new Color(0.8f, 0.6f, 0.1f, 0.8f));
+            if (pb.commandBonus != 0 || pb.commandPercent != 0f)
+                CreateBuffEntry("cmd_icon", "统御强化", FormatStatBuff("统御", pb.commandBonus, pb.commandPercent), font, new Color(0.6f, 0.3f, 0.8f, 0.8f));
+        }
+
+        private void AddTemporaryBuffEntry(TemporaryBuff tb, Font font)
+        {
+            if (tb == null) return;
+
+            var lines = new System.Collections.Generic.List<string>();
+            if (tb.attackPercent != 0f) lines.Add($"攻击 {(tb.attackPercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.attackPercent * 100)}%");
+            if (tb.defensePercent != 0f) lines.Add($"防御 {(tb.defensePercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.defensePercent * 100)}%");
+            if (tb.hpPercent != 0f) lines.Add($"生命 {(tb.hpPercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.hpPercent * 100)}%");
+            if (tb.speedPercent != 0f) lines.Add($"速度 {(tb.speedPercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.speedPercent * 100)}%");
+            lines.Add($"剩余 {tb.duration} 回合");
+            CreateBuffEntry("temp_icon", "限时加成", string.Join("\n", lines.ToArray()), font, new Color(0.9f, 0.7f, 0.1f, 0.8f));
+        }
+
+        private void AddTerrainWeatherBuffEntry(TerrainWeatherBuff twBuff, Font font)
+        {
+            CreateBuffEntry("env_icon", "环境修正", twBuff.GetDescription(), font, new Color(0.4f, 0.7f, 0.5f, 0.8f));
+        }
+
+        private string FormatStatBuff(string statName, int flatBonus, float percentBonus)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (flatBonus != 0) parts.Add($"{(flatBonus > 0 ? "+" : "")}{flatBonus}");
+            if (percentBonus != 0f) parts.Add($"{(percentBonus > 0 ? "+" : "")}{Mathf.RoundToInt(percentBonus * 100)}%");
+            return $"{statName} {string.Join(" ", parts.ToArray())}";
+        }
+
+        /// <summary>
+        /// 确保 _buffBarRoot 引用有效（从预制体子树中查找 BuffContent）
+        /// </summary>
+        private void EnsureBuffBarRoot()
+        {
+            if (_buffBarRoot != null) return;
+            // 从 Buff 节点下的 BuffScroll/Viewport/BuffContent 找到 Content
+            Transform buffScroll = transform.Find("Buff");
+            if (buffScroll == null) buffScroll = _bigNode?.transform.Find("Buff");
+            if (buffScroll == null) return;
+            var content = buffScroll.Find("BuffScroll/Viewport/BuffContent");
+            if (content != null)
+                _buffBarRoot = content.GetComponent<RectTransform>();
+        }
+
+        /// <summary>
+        /// 实例化buff条目预制体，填充图标、名称、描述
+        /// </summary>
+        private void CreateBuffEntry(string iconName, string buffName, string description, Font font, Color iconColor)
+        {
+            if (_buffEntryPrefab == null || _buffBarRoot == null) return;
+
+            RectTransform entry = Instantiate(_buffEntryPrefab, _buffBarRoot, false);
+            entry.name = $"Buff_{buffName}";
+
+            // 图标颜色
+            Image iconImg = entry.Find("Icon")?.GetComponent<Image>();
+            if (iconImg != null)
+                iconImg.color = iconColor;
+
+            // 名称文本
+            Text nameText = entry.Find("Name")?.GetComponent<Text>();
+            if (nameText != null)
+                nameText.text = buffName;
+
+            // 描述文本
+            Text descText = entry.Find("Desc")?.GetComponent<Text>();
+            if (descText != null)
+                descText.text = description;
         }
 
         private void OnDestroy()

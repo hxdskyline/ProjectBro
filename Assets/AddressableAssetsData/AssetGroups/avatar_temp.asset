@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: avatar_temp
   m_Data:
     m_SerializedData: []
-  m_GUID: 2cbe3ae24808d6444b2bc2b7d34884ab
+  m_GUID: 690bc6748f1c3234d8357c3949ebe0c9
   m_SerializeEntries:
   - m_GUID: 19110bee0eafc944980ebfa255305510
     m_Address: avatartemp/nainiu1
@@ -180,6 +180,4 @@ MonoBehaviour:
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas:
-    - {fileID: 11400000, guid: 39ecb5a0deb645b4e82c3b6b7df9bd06, type: 2}
-    - {fileID: 11400000, guid: af1bd3aa338539140865e266bffe5e2e, type: 2}
+    m_Schemas: []

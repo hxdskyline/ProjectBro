@@ -1,4 +1,5 @@
 using UnityEngine;
+using TribeSystem;
 
 public class BattleFighter
 {
@@ -17,6 +18,7 @@ public class BattleFighter
     public bool IsRemoved;
     public float DeathTimer;
     public float FreezeTimer; // >0 时不攻击
+    public TribeType TribeType; // 用于地形/天气 BUFF
 
     public int CurrentHp => RuntimeAttributes?.CurrentHp ?? 0;
     public bool IsDead => CurrentHp <= 0;

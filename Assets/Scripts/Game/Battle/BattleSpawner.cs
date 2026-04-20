@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using TribeSystem;
 
 public static class BattleSpawner
 {
@@ -96,7 +97,8 @@ public static class BattleSpawner
                 faceRight,
                 tint,
                 config,
-                fighterDefinition.ScaleMultiplier > 0f ? fighterDefinition.ScaleMultiplier : 1.0f);
+                fighterDefinition.ScaleMultiplier > 0f ? fighterDefinition.ScaleMultiplier : 1.0f,
+                fighterDefinition.TribeType);
 
             occupiedPositions.Add(spawnPosition);
         }
@@ -187,7 +189,8 @@ public static class BattleSpawner
         bool faceRight,
         Color tint,
         BattleSpawnConfig config,
-        float scaleMultiplier = 1.0f)
+        float scaleMultiplier = 1.0f,
+        TribeType tribeType = TribeType.Tabby)
     {
         GameObject go;
         if (config.FighterPrefab != null)
@@ -257,7 +260,8 @@ public static class BattleSpawner
             RuntimeAttributes = runtimeAttributes,
             Avatar = battleAvatar,
             Transform = go.transform,
-            BaseScale = scale
+            BaseScale = scale,
+            TribeType = tribeType
         };
     }
 

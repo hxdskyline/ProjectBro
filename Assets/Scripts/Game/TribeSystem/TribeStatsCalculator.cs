@@ -20,7 +20,7 @@ namespace TribeSystem
         /// <summary>
         /// 计算族长的最终属性（包含所有加成）
         /// </summary>
-        public static LeaderStats CalculateLeaderStats(LeaderData leader)
+        public static LeaderStats CalculateLeaderStats(LeaderData leader, string moodId = null)
         {
             if (leader == null)
             {
@@ -52,6 +52,16 @@ namespace TribeSystem
                 def = ApplyModifiers(def, t.defensePercent, 0f);
                 hp = ApplyModifiers(hp, t.hpPercent, 0f);
                 spd = ApplyModifiers(spd, t.speedPercent, 0f);
+            }
+
+            // 应用心情修正
+            if (!string.IsNullOrEmpty(moodId))
+            {
+                var moodMod = GetMoodModifier(moodId);
+                atk = ApplyModifiers(atk, moodMod.atkPercent, 0f);
+                def = ApplyModifiers(def, moodMod.defPercent, 0f);
+                hp = ApplyModifiers(hp, moodMod.hpPercent, 0f);
+                spd = ApplyModifiers(spd, moodMod.spdPercent, 0f);
             }
 
             return new LeaderStats(
@@ -200,6 +210,28 @@ namespace TribeSystem
         public static float CalculateAttackFrequency(int speedAttribute)
         {
             return speedAttribute / 2000f;
+        }
+
+        // ─── 心情修正 ─────────────────────────────────────────────
+
+        private struct MoodModifier
+        {
+            public float atkPercent;
+            public float defPercent;
+            public float hpPercent;
+            public float spdPercent;
+        }
+
+        private static MoodModifier GetMoodModifier(string moodId)
+        {
+            switch (moodId)
+            {
+                case "sad":      return new MoodModifier { atkPercent = -0.1f, defPercent = -0.1f, hpPercent = -0.1f, spdPercent = -0.1f };
+                case "normal":   return new MoodModifier { atkPercent = 0f,    defPercent = 0f,    hpPercent = 0f,    spdPercent = 0f };
+                case "happy":    return new MoodModifier { atkPercent = 0.1f,  defPercent = 0.1f,  hpPercent = 0.1f,  spdPercent = 0.1f };
+                case "ecstatic": return new MoodModifier { atkPercent = 0.2f,  defPercent = 0.2f,  hpPercent = 0.2f,  spdPercent = 0.2f };
+                default:         return new MoodModifier { atkPercent = 0f,    defPercent = 0f,    hpPercent = 0f,    spdPercent = 0f };
+            }
         }
     }
 }

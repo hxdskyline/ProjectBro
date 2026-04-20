@@ -2,6 +2,7 @@
   "levels": [
     {
       "battleNumber": 1,
+      "levelType": "normal",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "sunny", "formationType": "single" }
       ],
@@ -22,6 +23,7 @@
     },
     {
       "battleNumber": 2,
+      "levelType": "normal",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "sunny", "formationType": "single" }
       ],
@@ -42,6 +44,7 @@
     },
     {
       "battleNumber": 3,
+      "levelType": "elite",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "sunny", "formationType": "single" },
         { "terrain": "brush", "weather": "rainy", "formationType": "swarm" }
@@ -49,7 +52,7 @@
       "difficultyOptions": ["normal", "hard"],
       "freeDeployQuota": 60,
       "enemyUnitIds": {
-        "single": [1, 1, 1, 2, 2, 2, 2],
+        "single": [1, 1, 2, 2, 2, 2, 2],
         "swarm":  [1, 1, 2, 2, 2, 2, 2, 2, 2]
       },
       "enemyStats": {
@@ -64,6 +67,7 @@
     },
     {
       "battleNumber": 4,
+      "levelType": "normal",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "night", "formationType": "single" },
         { "terrain": "brush", "weather": "sunny", "formationType": "swarm" }
@@ -87,6 +91,7 @@
     },
     {
       "battleNumber": 5,
+      "levelType": "elite",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "sunny", "formationType": "single" },
         { "terrain": "brush", "weather": "rainy", "formationType": "swarm" },
@@ -111,6 +116,7 @@
     },
     {
       "battleNumber": 6,
+      "levelType": "normal",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "windy", "formationType": "single" },
         { "terrain": "brush", "weather": "sunny", "formationType": "swarm" }
@@ -134,6 +140,7 @@
     },
     {
       "battleNumber": 7,
+      "levelType": "elite",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "night", "formationType": "single" },
         { "terrain": "brush", "weather": "rainy", "formationType": "swarm" },
@@ -158,6 +165,7 @@
     },
     {
       "battleNumber": 8,
+      "levelType": "normal",
       "scenarioOptions": [
         { "terrain": "brush", "weather": "night", "formationType": "single" },
         { "terrain": "plain", "weather": "rainy", "formationType": "swarm" }
@@ -181,6 +189,7 @@
     },
     {
       "battleNumber": 9,
+      "levelType": "elite",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "sunny", "formationType": "single" },
         { "terrain": "brush", "weather": "windy", "formationType": "swarm" },
@@ -205,6 +214,7 @@
     },
     {
       "battleNumber": 10,
+      "levelType": "boss",
       "scenarioOptions": [
         { "terrain": "plain", "weather": "night", "formationType": "single" },
         { "terrain": "brush", "weather": "rainy", "formationType": "swarm" },

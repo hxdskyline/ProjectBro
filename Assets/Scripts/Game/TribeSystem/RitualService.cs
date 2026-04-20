@@ -4,20 +4,35 @@ using UnityEngine;
 namespace TribeSystem
 {
     /// <summary>
-    /// 祭祀服务
-    /// 流程：选择档次 → 从该档次的祝福池中抽取若干条 → 玩家选一条 → 执行
+    /// 祈愿（祭祀）服务 - 需求优化版
+    /// 三种效果：气运/战舞/通灵
+    /// 三档消耗：0/300/600
+    /// 必定额外获得饰品或猫粮
     /// </summary>
     public class RitualService
     {
         private DataManager _dataManager;
+
+        // 消耗档次配置（可配置）
+        private static readonly int[] CostTiers = { 0, 300, 600 };
+
+        // 每档消耗对应的可出品质
+        // 0消耗: 蓝/紫; 300消耗: 紫/金; 600消耗: 金/橙
+        private static readonly PrayerGrade[][] GradesByCostTier = {
+            new[] { PrayerGrade.Blue, PrayerGrade.Purple },
+            new[] { PrayerGrade.Purple, PrayerGrade.Gold },
+            new[] { PrayerGrade.Gold, PrayerGrade.Orange }
+        };
 
         public RitualService()
         {
             _dataManager = GameManager.Instance?.DataManager;
         }
 
+        // ─── 兼容旧 UI 的方法（RitualPanel 调用）────────────────────
+
         /// <summary>
-        /// 获取所有可用档次（用于 Step1 展示）
+        /// 获取所有可用档次（兼容旧UI）
         /// </summary>
         public List<RitualTier> GetTiers()
         {
@@ -25,7 +40,7 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 从指定档次的祝福池中按权重抽取 drawCount 条（具体数值已经 roll 好）
+        /// 从指定档次的祝福池中按权重抽取 drawCount 条（兼容旧UI）
         /// </summary>
         public List<RitualRewardItem> DrawBlessings(RitualTier tier)
         {
@@ -42,8 +57,7 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 执行祭祀：扣猫粮，应用选中的祝福
-        /// 需要族长时自动选取随机活跃族群
+        /// 执行祭祀（兼容旧UI）：扣猫粮，应用选中的祝福
         /// </summary>
         public bool ExecuteRitual(RitualTier tier, RitualRewardItem blessing)
         {
@@ -55,7 +69,6 @@ namespace TribeSystem
                 return false;
             }
 
-            // 族长类祝福需要指定族群
             TribeRecord targetTribe = null;
             if (blessing.rewardType == RitualRewardType.LeaderStatBoostTemporary
              || blessing.rewardType == RitualRewardType.LeaderStatBoostPermanent
@@ -68,12 +81,287 @@ namespace TribeSystem
             }
 
             ApplyRewardItem(blessing, targetTribe);
+
+            // 必定额外获得饰品或猫粮
+            ApplyGuaranteedBonusLegacy(blessing);
+
             _dataManager.SavePlayerData();
             Debug.Log($"[RitualService] Ritual executed: {blessing.displayName} (tier={tier.tierName}, cost={tier.cost})");
             return true;
         }
 
-        // ─── 内部：抽取并实例化一条祝福 ───────────────────────────────────────
+        /// <summary>
+        /// 获取消耗档次列表
+        /// </summary>
+        public int[] GetCostTiers()
+        {
+            return CostTiers;
+        }
+
+        /// <summary>
+        /// 获取祈愿效果类型列表
+        /// </summary>
+        public PrayerEffectType[] GetEffectTypes()
+        {
+            return new[] { PrayerEffectType.Luck, PrayerEffectType.WarDance, PrayerEffectType.SpiritCommunion };
+        }
+
+        /// <summary>
+        /// 执行祈愿
+        /// </summary>
+        /// <param name="effectType">效果类型（气运/战舞/通灵）</param>
+        /// <param name="costTierIndex">消耗档次索引（0=免费, 1=300, 2=600）</param>
+        /// <param name="targetTribe">祈愿种族</param>
+        /// <returns>祈愿结果</returns>
+        public PrayerResult ExecutePrayer(PrayerEffectType effectType, int costTierIndex, TribeRecord targetTribe)
+        {
+            if (targetTribe == null)
+            {
+                Debug.LogWarning("[RitualService] No target tribe for prayer");
+                return null;
+            }
+
+            costTierIndex = Mathf.Clamp(costTierIndex, 0, CostTiers.Length - 1);
+            int cost = CostTiers[costTierIndex];
+
+            // 扣猫粮
+            if (cost > 0 && !_dataManager.TrySpendCatFood(cost))
+            {
+                Debug.LogWarning("[RitualService] Not enough cat food for prayer");
+                return null;
+            }
+
+            // 根据消耗档次确定可出品质范围
+            PrayerGrade[] availableGrades = GradesByCostTier[costTierIndex];
+            PrayerGrade grade = availableGrades[Random.Range(0, availableGrades.Length)];
+
+            // 创建祈愿结果
+            var result = new PrayerResult
+            {
+                effectType = effectType,
+                grade = grade,
+                costSpent = cost,
+                targetTribeType = targetTribe.tribeType
+            };
+
+            // 应用主要效果
+            ApplyMainEffect(effectType, grade, targetTribe, result);
+
+            // 必定额外获得饰品或猫粮
+            ApplyGuaranteedBonus(effectType, grade, costTierIndex, targetTribe, result);
+
+            _dataManager.SavePlayerData();
+            Debug.Log($"[RitualService] Prayer executed: {effectType} {grade} grade, cost={cost}, tribe={targetTribe.tribeType}");
+
+            return result;
+        }
+
+        /// <summary>
+        /// 应用主要祈愿效果
+        /// </summary>
+        private void ApplyMainEffect(PrayerEffectType effectType, PrayerGrade grade, TribeRecord tribe, PrayerResult result)
+        {
+            switch (effectType)
+            {
+                case PrayerEffectType.Luck:
+                    ApplyLuckEffect(grade, tribe, result);
+                    break;
+                case PrayerEffectType.WarDance:
+                    ApplyWarDanceEffect(grade, tribe, result);
+                    break;
+                case PrayerEffectType.SpiritCommunion:
+                    ApplySpiritCommunionEffect(grade, tribe, result);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 气运效果：影响地形/天气出现概率
+        /// 品质越高，优势地形/天气出现概率越高
+        /// </summary>
+        private void ApplyLuckEffect(PrayerGrade grade, TribeRecord tribe, PrayerResult result)
+        {
+            float bonusPercent = GetGradeBonusPercent(grade);
+            // 存储气运加成，供 BattleCampaignRuntime 在生成场景选项时使用
+            // 暂时记录到结果中，后续需要一个持久化机制
+            result.mainEffectDescription = $"气运加成: {tribe.tribeType}族优势地形/天气出现概率+{Mathf.RoundToInt(bonusPercent * 100)}%";
+
+            // 暂时用 Debug 记录，实际需要存储到 DataManager 或 BattleCampaignRuntime
+            Debug.Log($"[RitualService] Luck effect: {tribe.tribeType} terrain/weather probability +{bonusPercent:P0}");
+        }
+
+        /// <summary>
+        /// 战舞效果：提升小猫品质
+        /// 品质越高，提升的小猫数量越多/品质越高
+        /// </summary>
+        private void ApplyWarDanceEffect(PrayerGrade grade, TribeRecord tribe, PrayerResult result)
+        {
+            int evolveCount = GetWarDanceEvolveCount(grade);
+            int actualEvolved = 0;
+
+            // 随机选择小猫进行品质提升
+            if (tribe.cats != null && tribe.cats.Count > 0)
+            {
+                var indices = new List<int>();
+                for (int i = 0; i < tribe.cats.Count; i++)
+                    indices.Add(i);
+
+                // 打乱顺序
+                for (int i = indices.Count - 1; i > 0; i--)
+                {
+                    int j = Random.Range(0, i + 1);
+                    int temp = indices[i];
+                    indices[i] = indices[j];
+                    indices[j] = temp;
+                }
+
+                int toEvolve = Mathf.Min(evolveCount, indices.Count);
+                for (int i = 0; i < toEvolve; i++)
+                {
+                    if (tribe.cats[indices[i]].TryEvolve())
+                        actualEvolved++;
+                }
+            }
+
+            result.mainEffectDescription = $"战舞: {tribe.tribeType}族 {actualEvolved}只小猫品质提升";
+        }
+
+        /// <summary>
+        /// 通灵效果：改变心情
+        /// 品质越高，心情改变效果越好
+        /// </summary>
+        private void ApplySpiritCommunionEffect(PrayerGrade grade, TribeRecord tribe, PrayerResult result)
+        {
+            // 心情系统尚未完全实现，暂时用 moodId 字段存储
+            string mood = GetMoodByGrade(grade);
+            tribe.moodId = mood;
+
+            result.mainEffectDescription = $"通灵: {tribe.tribeType}族心情变为{GetMoodDisplayName(mood)}";
+            Debug.Log($"[RitualService] Spirit communion: {tribe.tribeType} mood changed to {mood}");
+        }
+
+        /// <summary>
+        /// 必定额外获得饰品或猫粮
+        /// </summary>
+        private void ApplyGuaranteedBonus(PrayerEffectType effectType, PrayerGrade grade, int costTierIndex, TribeRecord tribe, PrayerResult result)
+        {
+            // 50%概率给饰品，50%概率给猫粮
+            bool giveAccessory = Random.value > 0.5f;
+
+            if (giveAccessory)
+            {
+                // 尝试给饰品（优先未获取）
+                string accessoryId = TryGetUnaccessedAccessory(effectType, grade, costTierIndex);
+                if (accessoryId != null)
+                {
+                    _dataManager.UnlockAccessory(accessoryId);
+                    result.bonusDescription = $"额外获得: 饰品 [{accessoryId}]";
+                    Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
+                }
+                else
+                {
+                    // 所有饰品已获得，改为猫粮
+                    int catFoodBonus = GetBonusCatFoodAmount(grade, costTierIndex);
+                    _dataManager.AddCatFood(catFoodBonus);
+                    result.bonusDescription = $"额外获得: {catFoodBonus}猫粮（饰品已全收集）";
+                }
+            }
+            else
+            {
+                int catFoodBonus = GetBonusCatFoodAmount(grade, costTierIndex);
+                _dataManager.AddCatFood(catFoodBonus);
+                result.bonusDescription = $"额外获得: {catFoodBonus}猫粮";
+            }
+        }
+
+        // ─── 品质/效果数值配置 ─────────────────────────────────────────
+
+        private float GetGradeBonusPercent(PrayerGrade grade)
+        {
+            switch (grade)
+            {
+                case PrayerGrade.Blue: return 0.1f;
+                case PrayerGrade.Purple: return 0.2f;
+                case PrayerGrade.Gold: return 0.3f;
+                case PrayerGrade.Orange: return 0.5f;
+                default: return 0.1f;
+            }
+        }
+
+        private int GetWarDanceEvolveCount(PrayerGrade grade)
+        {
+            switch (grade)
+            {
+                case PrayerGrade.Blue: return 1;
+                case PrayerGrade.Purple: return 2;
+                case PrayerGrade.Gold: return 3;
+                case PrayerGrade.Orange: return 5;
+                default: return 1;
+            }
+        }
+
+        private string GetMoodByGrade(PrayerGrade grade)
+        {
+            switch (grade)
+            {
+                case PrayerGrade.Blue: return "sad";
+                case PrayerGrade.Purple: return "normal";
+                case PrayerGrade.Gold: return "happy";
+                case PrayerGrade.Orange: return "ecstatic";
+                default: return "normal";
+            }
+        }
+
+        private string GetMoodDisplayName(string mood)
+        {
+            switch (mood)
+            {
+                case "sad": return "低落";
+                case "normal": return "平静";
+                case "happy": return "开心";
+                case "ecstatic": return "狂喜";
+                default: return mood;
+            }
+        }
+
+        private int GetBonusCatFoodAmount(PrayerGrade grade, int costTierIndex)
+        {
+            int baseAmount = (costTierIndex + 1) * 50;
+            switch (grade)
+            {
+                case PrayerGrade.Blue: return baseAmount;
+                case PrayerGrade.Purple: return baseAmount * 2;
+                case PrayerGrade.Gold: return baseAmount * 3;
+                case PrayerGrade.Orange: return baseAmount * 5;
+                default: return baseAmount;
+            }
+        }
+
+        /// <summary>
+        /// 尝试获取一个未解锁的饰品ID（简化版，实际需要饰品配置表）
+        /// </summary>
+        private string TryGetUnaccessedAccessory(PrayerEffectType effectType, PrayerGrade grade, int costTierIndex)
+        {
+            // 简化实现：生成一个饰品ID，检查是否已解锁
+            // 后续需要饰品配置表来定义掉落库
+            int accessoryPoolSize = 12;
+            var unlocked = _dataManager.GetUnlockedAccessories();
+
+            var candidates = new List<string>();
+            for (int i = 1; i <= accessoryPoolSize; i++)
+            {
+                string id = $"accessory_{i}";
+                if (!unlocked.Contains(id))
+                    candidates.Add(id);
+            }
+
+            if (candidates.Count == 0)
+                return null;
+
+            return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        // ─── 兼容旧 UI 的内部方法 ────────────────────────────────────
 
         private RitualRewardItem SelectAndCreateBlessing(RitualTier tier)
         {
@@ -103,7 +391,7 @@ namespace TribeSystem
                 case RitualRewardType.LeaderStatBoostTemporary:
                 case RitualRewardType.LeaderStatBoostPermanent:
                     item.statType = ParseStat(cfg);
-                    item.amount   = Random.Range(cfg.minAmount, cfg.maxAmount + 1);
+                    item.amount = Random.Range(cfg.minAmount, cfg.maxAmount + 1);
                     item.displayName = $"{GetStatName(item.statType)} +{item.amount}"
                         + (rType == RitualRewardType.LeaderStatBoostTemporary ? "（临时）" : "（永久）");
                     break;
@@ -111,24 +399,24 @@ namespace TribeSystem
                 case RitualRewardType.LeaderStatBoostPercent:
                     item.statType = ParseStat(cfg);
                     float pct = Random.Range(cfg.minPercent, cfg.maxPercent);
-                    item.amount  = Mathf.RoundToInt(pct * 100);
+                    item.amount = Mathf.RoundToInt(pct * 100);
                     item.displayName = $"{GetStatName(item.statType)} +{item.amount}%（永久）";
                     break;
 
                 case RitualRewardType.Cats:
-                    item.catCount   = Random.Range(cfg.minCount, cfg.maxCount + 1);
+                    item.catCount = Random.Range(cfg.minCount, cfg.maxCount + 1);
                     item.catQuality = ParseQuality(cfg);
                     item.displayName = $"获得 {item.catCount} 只{GetQualityName(item.catQuality)} 小猫";
                     break;
 
                 case RitualRewardType.Consumable:
-                    item.amount      = Random.Range(cfg.minCount, cfg.maxCount + 1);
+                    item.amount = Random.Range(cfg.minCount, cfg.maxCount + 1);
                     item.consumableId = Random.Range(1, 10);
                     item.displayName = $"获得 {item.amount} 个道具";
                     break;
 
                 case RitualRewardType.CatFood:
-                    item.amount      = Random.Range(cfg.minAmount, cfg.maxAmount + 1);
+                    item.amount = Random.Range(cfg.minAmount, cfg.maxAmount + 1);
                     item.displayName = $"获得 {item.amount} 猫粮";
                     break;
 
@@ -139,8 +427,6 @@ namespace TribeSystem
             }
             return item;
         }
-
-        // ─── 内部：应用祝福效果 ────────────────────────────────────────────────
 
         private void ApplyRewardItem(RitualRewardItem item, TribeRecord tribe)
         {
@@ -171,6 +457,35 @@ namespace TribeSystem
             }
         }
 
+        /// <summary>
+        /// 旧祈愿的必定额外奖励
+        /// </summary>
+        private void ApplyGuaranteedBonusLegacy(RitualRewardItem blessing)
+        {
+            bool giveAccessory = Random.value > 0.5f;
+            if (giveAccessory)
+            {
+                string accessoryId = TryGetUnaccessedAccessory(PrayerEffectType.Luck, PrayerGrade.Purple, 1);
+                if (accessoryId != null)
+                {
+                    _dataManager.UnlockAccessory(accessoryId);
+                    Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
+                }
+                else
+                {
+                    int bonus = 100;
+                    _dataManager.AddCatFood(bonus);
+                    Debug.Log($"[RitualService] Bonus cat food: {bonus} (accessories all collected)");
+                }
+            }
+            else
+            {
+                int bonus = 100;
+                _dataManager.AddCatFood(bonus);
+                Debug.Log($"[RitualService] Bonus cat food: {bonus}");
+            }
+        }
+
         private void ApplyTemporaryStatBoost(TribeRecord tribe, StatType stat, int amount)
         {
             if (tribe.leader.temporaryBuff == null)
@@ -179,10 +494,10 @@ namespace TribeSystem
             float pct = amount / 100f;
             switch (stat)
             {
-                case StatType.Attack:  buff.attackPercent  += pct; break;
+                case StatType.Attack: buff.attackPercent += pct; break;
                 case StatType.Defense: buff.defensePercent += pct; break;
-                case StatType.Hp:      buff.hpPercent      += pct; break;
-                case StatType.Speed:   buff.speedPercent   += pct; break;
+                case StatType.Hp: buff.hpPercent += pct; break;
+                case StatType.Speed: buff.speedPercent += pct; break;
             }
             buff.duration = 1;
         }
@@ -192,10 +507,10 @@ namespace TribeSystem
             var b = tribe.leader.permanentBuffs;
             switch (stat)
             {
-                case StatType.Attack:  b.attackBonus  += amount; break;
+                case StatType.Attack: b.attackBonus += amount; break;
                 case StatType.Defense: b.defenseBonus += amount; break;
-                case StatType.Hp:      b.hpBonus      += amount; break;
-                case StatType.Speed:   b.speedBonus   += amount; break;
+                case StatType.Hp: b.hpBonus += amount; break;
+                case StatType.Speed: b.speedBonus += amount; break;
                 case StatType.Command: b.commandBonus += amount; break;
             }
         }
@@ -205,10 +520,10 @@ namespace TribeSystem
             var b = tribe.leader.permanentBuffs;
             switch (stat)
             {
-                case StatType.Attack:  b.attackPercent  += pct; break;
+                case StatType.Attack: b.attackPercent += pct; break;
                 case StatType.Defense: b.defensePercent += pct; break;
-                case StatType.Hp:      b.hpPercent      += pct; break;
-                case StatType.Speed:   b.speedPercent   += pct; break;
+                case StatType.Hp: b.hpPercent += pct; break;
+                case StatType.Speed: b.speedPercent += pct; break;
                 case StatType.Command: b.commandPercent += pct; break;
             }
         }
@@ -218,8 +533,6 @@ namespace TribeSystem
             for (int i = 0; i < count; i++)
                 tribe.cats.Add(CatData.CreateWithQuality(quality));
         }
-
-        // ─── 工具方法 ─────────────────────────────────────────────────────────
 
         private TribeRecord GetRandomActiveTribe()
         {
@@ -246,10 +559,10 @@ namespace TribeSystem
         {
             switch (stat)
             {
-                case StatType.Attack:  return "攻击";
+                case StatType.Attack: return "攻击";
                 case StatType.Defense: return "防御";
-                case StatType.Hp:      return "血量";
-                case StatType.Speed:   return "速度";
+                case StatType.Hp: return "血量";
+                case StatType.Speed: return "速度";
                 case StatType.Command: return "统御";
                 default: return "属性";
             }
@@ -259,12 +572,26 @@ namespace TribeSystem
         {
             switch (q)
             {
-                case CatQuality.White:  return "白色";
-                case CatQuality.Blue:   return "蓝色";
+                case CatQuality.White: return "白色";
+                case CatQuality.Blue: return "蓝色";
                 case CatQuality.Purple: return "紫色";
-                case CatQuality.Gold:   return "金色";
+                case CatQuality.Gold: return "金色";
                 default: return "";
             }
         }
+    }
+
+    /// <summary>
+    /// 祈愿结果数据
+    /// </summary>
+    [System.Serializable]
+    public class PrayerResult
+    {
+        public PrayerEffectType effectType;
+        public PrayerGrade grade;
+        public int costSpent;
+        public TribeType targetTribeType;
+        public string mainEffectDescription;
+        public string bonusDescription;
     }
 }

@@ -1,0 +1,8 @@
+{
+  "moods": [
+    { "id": "sad",      "displayName": "低落", "attackPercent": -0.1, "defensePercent": -0.1, "hpPercent": -0.1, "speedPercent": -0.1 },
+    { "id": "normal",   "displayName": "平静", "attackPercent": 0,    "defensePercent": 0,    "hpPercent": 0,    "speedPercent": 0 },
+    { "id": "happy",    "displayName": "开心", "attackPercent": 0.1,  "defensePercent": 0.1,  "hpPercent": 0.1,  "speedPercent": 0.1 },
+    { "id": "ecstatic", "displayName": "狂喜", "attackPercent": 0.2,  "defensePercent": 0.2,  "hpPercent": 0.2,  "speedPercent": 0.2 }
+  ]
+}
