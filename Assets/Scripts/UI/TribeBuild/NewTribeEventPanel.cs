@@ -8,6 +8,7 @@ namespace TribeSystem.UI
     /// <summary>
     /// 新部族事件面板 - 强制二选一弹窗
     /// 每4回合判定，部族数≤4时触发，在招募+祭祀之后弹出
+    /// 点击卡片的"就它了"按钮直接选择，无需确认
     /// </summary>
     public class NewTribeEventPanel : MonoBehaviour
     {
@@ -18,14 +19,9 @@ namespace TribeSystem.UI
         [SerializeField] private Text _titleText;
         [SerializeField] private Text _hintText;
         [SerializeField] private RectTransform _optionsContainer;
-        [SerializeField] private Button _confirmButton;
         [SerializeField] private GameObject _optionCardPrefab;
 
         private RectTransform _externalRoot;
-
-        private List<NewTribeEventOption> _currentOptions;
-        private NewTribeEventOption _selectedOption;
-        private Action<NewTribeEventOption> _onOptionSelected;
 
         /// <summary>
         /// 设置外部根节点（用于强制弹窗场景）
@@ -56,35 +52,22 @@ namespace TribeSystem.UI
         /// </summary>
         public void ShowOptions(List<NewTribeEventOption> options, Action<NewTribeEventOption> onSelected)
         {
-            _currentOptions = options;
-            _selectedOption = null;
-            _onOptionSelected = onSelected;
-
             ClearOptionCards();
-            GenerateOptionCards(options);
-
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = false;
-                _confirmButton.onClick.RemoveAllListeners();
-                _confirmButton.onClick.AddListener(OnConfirmClicked);
-            }
-
+            GenerateOptionCards(options, onSelected);
             Show();
         }
 
         private void EnsureUIComponents()
         {
-            if (_titleText != null && _hintText != null && _optionsContainer != null && _confirmButton != null)
+            if (_titleText != null && _hintText != null && _optionsContainer != null)
                 return;
 
             _titleText = transform.Find("Title")?.GetComponent<Text>();
             _hintText = transform.Find("Hint")?.GetComponent<Text>();
             _optionsContainer = transform.Find("OptionsContainer") as RectTransform;
-            _confirmButton = transform.Find("ConfirmButton")?.GetComponent<Button>();
         }
 
-        private void GenerateOptionCards(List<NewTribeEventOption> options)
+        private void GenerateOptionCards(List<NewTribeEventOption> options, Action<NewTribeEventOption> onSelected)
         {
             if (_optionsContainer == null || options == null || _optionCardPrefab == null) return;
 
@@ -97,7 +80,11 @@ namespace TribeSystem.UI
                 NewTribeEventCard cardComponent = cardGo.GetComponent<NewTribeEventCard>();
                 if (cardComponent != null)
                 {
-                    cardComponent.Setup(option, optionIndex);
+                    cardComponent.Setup(option, optionIndex, selectedOption =>
+                    {
+                        Hide();
+                        onSelected?.Invoke(selectedOption);
+                    });
                 }
 
                 Image cardImg = cardGo.GetComponent<Image>();
@@ -105,15 +92,8 @@ namespace TribeSystem.UI
                 {
                     cardImg.color = GetOptionCardColor(option.optionType);
                 }
-
-                Button cardBtn = cardGo.GetComponent<Button>();
-                if (cardBtn != null)
-                {
-                    cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
-                }
             }
         }
-
 
         private Color GetOptionCardColor(NewTribeEventOptionType optionType)
         {
@@ -126,52 +106,6 @@ namespace TribeSystem.UI
                 default:
                     return new Color(0.5f, 0.5f, 0.5f, 1f);
             }
-        }
-
-        private void OnOptionCardClicked(int index)
-        {
-            if (_currentOptions == null || index < 0 || index >= _currentOptions.Count)
-                return;
-
-            _selectedOption = _currentOptions[index];
-
-            // 更新选中状态
-            UpdateCardSelection(index);
-
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = true;
-            }
-        }
-
-        private void UpdateCardSelection(int selectedIndex)
-        {
-            if (_optionsContainer == null) return;
-
-            for (int i = 0; i < _optionsContainer.childCount; i++)
-            {
-                Transform child = _optionsContainer.GetChild(i);
-                NewTribeEventCard card = child.GetComponent<NewTribeEventCard>();
-                if (card != null && card.BackgroundImage != null)
-                {
-                    if (i == selectedIndex)
-                    {
-                        card.BackgroundImage.color = new Color(1f, 0.9f, 0.3f, 1f); // 金色选中
-                    }
-                    else
-                    {
-                        card.BackgroundImage.color = GetOptionCardColor(card.Option.optionType);
-                    }
-                }
-            }
-        }
-
-        private void OnConfirmClicked()
-        {
-            if (_selectedOption == null) return;
-
-            Hide();
-            _onOptionSelected?.Invoke(_selectedOption);
         }
 
         private void ClearOptionCards()

@@ -36,6 +36,7 @@ namespace TribeSystem.UI
         [SerializeField] private ShopPanel _shopPanel;
         [SerializeField] private NewTribeEventPanel _newTribeEventPanel;
         private AccessoryCodexPanel _codexPanel;
+        private RecruitmentResultPanel _recruitmentResultPanel;
 
         [Header("强制弹窗根节点")]
         [SerializeField] private RectTransform _forcedPopupRoot;
@@ -213,6 +214,24 @@ namespace TribeSystem.UI
 
             // 图鉴面板（运行时创建）
             CreateCodexPanel();
+
+            // 招募结果面板（运行时创建）
+            CreateRecruitmentResultPanel();
+        }
+
+        private void CreateRecruitmentResultPanel()
+        {
+            var root = _forcedPopupRoot != null ? _forcedPopupRoot : transform as RectTransform;
+            if (root == null) return;
+            var go = new GameObject("RecruitmentResultPanel", typeof(RectTransform), typeof(RecruitmentResultPanel));
+            go.transform.SetParent(root, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            _recruitmentResultPanel = go.GetComponent<RecruitmentResultPanel>();
+            _recruitmentResultPanel.Hide();
         }
 
         /// <summary>
@@ -330,7 +349,7 @@ namespace TribeSystem.UI
 
             if (_recruitmentPanel != null)
             {
-                _recruitmentPanel.ShowOptions(options, OnRecruitmentOptionSelected);
+                _recruitmentPanel.ShowOptions(options, OnRecruitmentOptionSelected, ResolveOptionTribeType);
             }
             else
             {
@@ -340,58 +359,130 @@ namespace TribeSystem.UI
 
         private void OnRecruitmentOptionSelected(RecruitmentOption option)
         {
-            if(option != null)
+            if (option == null)
             {
-                ExecuteRecruitmentOption(option);
-                _dataManager.SetRecruitmentCompletedForRound(_roundManager.CurrentRound);
+                _isProcessingRecruitment = false;
+                ProcessNextPopupEvent();
+                return;
             }
 
+            ExecuteRecruitmentOptionWithResult(option);
+            _dataManager.SetRecruitmentCompletedForRound(_roundManager.CurrentRound);
             _isProcessingRecruitment = false;
             _saveManager?.SaveAfterRecruitment(_roundManager.CurrentRound);
-
-            // 继续处理下一个弹窗事件
-            ProcessNextPopupEvent();
         }
 
-        private void ExecuteRecruitmentOption(RecruitmentOption option)
+        private void ExecuteRecruitmentOptionWithResult(RecruitmentOption option)
         {
             switch (option.optionType)
             {
-                case RecruitmentOptionType.NewTribe:
-                    if (option.targetTribeType.HasValue)
-                    {
-                        _recruitmentService.ExecuteNewTribeRecruitment(option.targetTribeType.Value, option.cost);
-                    }
-                    break;
-
                 case RecruitmentOptionType.AddCats:
+                {
                     var tribe = FindTribeById(option.targetTribeId);
-                    if (tribe != null)
-                    {
-                        _recruitmentService.ExecuteAddCats(tribe, option.cost);
-                    }
-                    break;
-
+                    if (tribe == null) break;
+                    string tribeName = GetTribeTypeName(tribe.tribeType);
+                    var beforeCats = SnapshotCats(tribe.cats);
+                    _recruitmentService.ExecuteAddCats(tribe, option.cost);
+                    _tribes = _dataManager.GetTribes();
+                    RefreshUI();
+                    ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                    return;
+                }
                 case RecruitmentOptionType.QualityEvolution:
-                    tribe = FindTribeById(option.targetTribeId);
-                    if (tribe != null)
-                    {
-                        _recruitmentService.ExecuteQualityEvolution(tribe, option.cost);
-                    }
-                    break;
-
+                {
+                    var tribe = FindTribeById(option.targetTribeId);
+                    if (tribe == null) break;
+                    string tribeName = GetTribeTypeName(tribe.tribeType);
+                    var beforeCats = SnapshotCats(tribe.cats);
+                    _recruitmentService.ExecuteQualityEvolution(tribe, option.cost);
+                    _tribes = _dataManager.GetTribes();
+                    RefreshUI();
+                    ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                    return;
+                }
                 case RecruitmentOptionType.LeaderBoost:
-                    tribe = FindTribeById(option.targetTribeId);
-                    if (tribe != null)
+                {
+                    var tribe = FindTribeById(option.targetTribeId);
+                    if (tribe == null) break;
+                    string tribeName = GetTribeTypeName(tribe.tribeType);
+                    _recruitmentService.ExecuteLeaderBoost(tribe, option.targetStatType, option.cost);
+                    _tribes = _dataManager.GetTribes();
+                    RefreshUI();
+                    ShowLeaderBoostResult(tribeName, tribe.leader, option.targetStatType, tribe.tribeType);
+                    return;
+                }
+                case RecruitmentOptionType.NewTribe:
+                {
+                    if (!option.targetTribeType.HasValue) break;
+                    string tribeName = GetTribeTypeName(option.targetTribeType.Value);
+                    var newTribe = _recruitmentService.ExecuteNewTribeRecruitment(option.targetTribeType.Value, option.cost);
+                    _tribes = _dataManager.GetTribes();
+                    RefreshUI();
+                    if (newTribe != null)
                     {
-                        _recruitmentService.ExecuteLeaderBoost(tribe, option.targetStatType, option.cost);
+                        ShowCatListResult(tribeName, new List<CatData>(), newTribe.cats, newTribe);
+                        return;
                     }
                     break;
+                }
             }
 
-            // 只刷新本地数据，不重新触发回合流程
-            _tribes = _dataManager.GetTribes();
+            // fallback: 无结果面板，直接继续
             RefreshUI();
+            ProcessNextPopupEvent();
+        }
+
+        private void ShowCatListResult(string tribeName, List<CatData> beforeCats, List<CatData> afterCats, TribeRecord tribe)
+        {
+            if (_recruitmentResultPanel == null)
+            {
+                ProcessNextPopupEvent();
+                return;
+            }
+            _recruitmentResultPanel.ShowCatListResult(tribeName, beforeCats, afterCats, tribe, ProcessNextPopupEvent);
+        }
+
+        private void ShowLeaderBoostResult(string tribeName, LeaderData leader, StatType boostedStat, TribeType tribeType)
+        {
+            if (_recruitmentResultPanel == null)
+            {
+                ProcessNextPopupEvent();
+                return;
+            }
+            _recruitmentResultPanel.ShowLeaderBoostResult(tribeName, leader, boostedStat, tribeType, ProcessNextPopupEvent);
+        }
+
+        private List<CatData> SnapshotCats(List<CatData> cats)
+        {
+            var snapshot = new List<CatData>();
+            if (cats == null) return snapshot;
+            foreach (var cat in cats)
+            {
+                snapshot.Add(new CatData
+                {
+                    catId = cat.catId,
+                    quality = cat.quality,
+                    attackMultiplier = cat.attackMultiplier,
+                    defenseMultiplier = cat.defenseMultiplier,
+                    hpMultiplier = cat.hpMultiplier,
+                    speedMultiplier = cat.speedMultiplier
+                });
+            }
+            return snapshot;
+        }
+
+        private string GetTribeTypeName(TribeType type)
+        {
+            switch (type)
+            {
+                case TribeType.Maine: return "缅因";
+                case TribeType.Tabby: return "狸花";
+                case TribeType.Orange: return "大橘";
+                case TribeType.Cow: return "奶牛";
+                case TribeType.Siamese: return "暹罗";
+                case TribeType.Ragdoll: return "布偶";
+                default: return type.ToString();
+            }
         }
 
         /// <summary>
@@ -432,6 +523,9 @@ namespace TribeSystem.UI
             _saveManager?.SaveAfterRitual(_roundManager.CurrentRound);
 
             _tribes = _dataManager.GetTribes();
+
+            // 立刻刷新猫粮显示
+            UpdateCatFoodDisplay();
             RefreshUI();
 
             // 继续处理下一个弹窗事件
@@ -653,13 +747,6 @@ namespace TribeSystem.UI
             var tribe = FindTribeById(tribeId);
             if (tribe == null) return;
 
-            // 检查族长是否在休息
-            if (isDeployed && tribe.IsLeaderResting())
-            {
-                Debug.Log($"[TribeBuildPanel] {tribe.tribeType}族长正在休息，无法上阵");
-                return;
-            }
-
             _tribeDeployStates[tribeId] = isDeployed;
 
             if (isDeployed)
@@ -711,12 +798,10 @@ namespace TribeSystem.UI
                 // 获取所有族群供BattlePreparePanel进行部署选择
                 List<TribeRecord> allTribes = _dataManager.GetTribes();
 
-                // 设置战斗准备（族群部署选择在BattlePreparePanel中进行）
+                // 设置战斗准备（所有族群默认上阵）
                 battlePreparePanel.SetupBattle(
                     _dataManager.GetCurrentRound(),
-                    allTribes,
-                    new List<TribeRecord>(), // 初始无已选择族群
-                    6 // 最多上阵6个族群
+                    allTribes
                 );
             }
             else
@@ -833,12 +918,6 @@ namespace TribeSystem.UI
                 {
                     tribe.leader.temporaryBuff.DecreaseDuration();
                 }
-
-                // 减少族长休息时间
-                if (tribe.leader?.restTurns > 0)
-                {
-                    tribe.leader.restTurns--;
-                }
             }
 
             _dataManager.SavePlayerData();
@@ -896,6 +975,19 @@ namespace TribeSystem.UI
             return tribe;
         }
 
+        private void UpdateCatFoodDisplay()
+        {
+            if (_catFoodText == null)
+            {
+                var t = transform.Find("CatFoodText");
+                if (t != null) _catFoodText = t.GetComponent<Text>();
+            }
+            if (_catFoodText != null)
+            {
+                _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
+            }
+        }
+
         private void RefreshUI()
         {
             // 更新回合显示（使用RoundManager获取描述）
@@ -905,10 +997,9 @@ namespace TribeSystem.UI
             }
 
             // 更新猫粮显示
-            if (_catFoodText != null)
-            {
-                _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
-            }
+            UpdateCatFoodDisplay();
+
+            // 注：上阵选择和消耗计算在BattlePreparePanel中进行，此处不需要处理
 
             // 注：上阵选择和消耗计算在BattlePreparePanel中进行，此处不需要处理
 
@@ -1037,15 +1128,7 @@ namespace TribeSystem.UI
             statusText.alignment = TextAnchor.MiddleCenter;
             statusText.color = new Color(0.8f, 0.8f, 0.8f, 1f);
 
-            if (tribe.IsLeaderResting())
-            {
-                statusText.text = $"族长休息中 ({tribe.leader.restTurns}回)";
-                statusText.color = new Color(1f, 0.3f, 0.3f, 1f);
-            }
-            else
-            {
-                statusText.text = "状态: 可出战";
-            }
+            statusText.text = "状态: 可出战";
 
             // 族长属性简略
             GameObject statsGo = new GameObject("Stats", typeof(RectTransform), typeof(Text));
@@ -1074,20 +1157,6 @@ namespace TribeSystem.UI
                 case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 1f);
                 case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 1f);
                 default: return new Color(0.5f, 0.5f, 0.5f, 1f);
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Maine: return "缅因";
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
-                default: return type.ToString();
             }
         }
 
@@ -1150,7 +1219,7 @@ namespace TribeSystem.UI
                 _catEntries.Add(entry);
 
                 // 找到品质色块并设置颜色
-                Image iconImg = entry.GetChild(0)?.GetComponent<Image>();
+                Image iconImg = entry.Find("QualityIcon")?.GetComponent<Image>();
                 if (iconImg != null)
                     iconImg.color = GetQualityColor(tribe.cats[i].quality);
 
@@ -1188,7 +1257,16 @@ namespace TribeSystem.UI
             {
                 Transform highlight = _catEntries[i].Find("SelectedHighlight");
                 if (highlight != null)
+                {
                     highlight.gameObject.SetActive(i == index);
+                    var img = highlight.GetComponent<UnityEngine.UI.Image>();
+                    if (img != null)
+                    {
+                        var c = img.color;
+                        c.a = 111f / 255f;
+                        img.color = c;
+                    }
+                }
             }
         }
 
@@ -1284,6 +1362,14 @@ namespace TribeSystem.UI
         private TribeRecord FindTribeById(int tribeId)
         {
             return _tribes?.Find(t => t.tribeId == tribeId);
+        }
+
+        private TribeType ResolveOptionTribeType(RecruitmentOption option)
+        {
+            if (option.targetTribeType.HasValue)
+                return option.targetTribeType.Value;
+            var tribe = FindTribeById(option.targetTribeId);
+            return tribe?.tribeType ?? TribeType.Maine;
         }
     }
 }

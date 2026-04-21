@@ -16,6 +16,14 @@ public class BattlePanel : UIPanel
     [SerializeField] private AvatarAnimationDefinition _playerAvatarDefinition;
     [SerializeField] private AvatarAnimationDefinition _enemyAvatarDefinition;
 
+    [Header("各品种Avatar定义")]
+    [SerializeField] private AvatarAnimationDefinition _mianyinAvatarDef;
+    [SerializeField] private AvatarAnimationDefinition _lihuaAvatarDef;
+    [SerializeField] private AvatarAnimationDefinition _dajuAvatarDef;
+    [SerializeField] private AvatarAnimationDefinition _nainiuAvatarDef;
+    [SerializeField] private AvatarAnimationDefinition _xianluoAvatarDef;
+    [SerializeField] private AvatarAnimationDefinition _buouAvatarDef;
+
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
@@ -48,11 +56,52 @@ public class BattlePanel : UIPanel
     private readonly Dictionary<TribeType, AvatarAnimationDefinition> _tribeAvatarCache
         = new Dictionary<TribeType, AvatarAnimationDefinition>();
 
+    // card_build_cards.json 中品种名 → 族群类型映射
+    private static readonly Dictionary<string, TribeType> s_nameToTribeType = new Dictionary<string, TribeType>
+    {
+        { "狸花", TribeType.Tabby   },
+        { "大橘", TribeType.Orange  },
+        { "奶牛", TribeType.Cow     },
+        { "暹罗", TribeType.Siamese },
+        { "布偶", TribeType.Ragdoll },
+        { "缅因", TribeType.Maine   },
+    };
+
+    // 品种 → card_build_cards.json 中的 avatarDefinitionAddress
+    private static Dictionary<TribeType, string> _cardBuildAvatarAddresses;
+
     private AvatarAnimationDefinition GetTribeAvatarDefinition(TribeType tribeType)
     {
         if (_tribeAvatarCache.TryGetValue(tribeType, out var cached))
             return cached;
 
+        // 优先使用序列化引用的 AvatarAnimDef asset
+        AvatarAnimationDefinition def = GetSerializedAvatarDef(tribeType);
+        if (def != null)
+        {
+            _tribeAvatarCache[tribeType] = def;
+            Debug.Log($"[BattlePanel] Avatar {tribeType}: 序列化引用 {def.AvatarId}");
+            return def;
+        }
+
+        // 从 card_build_cards.json 配置的地址加载
+        EnsureCardBuildAvatarAddresses();
+        if (_cardBuildAvatarAddresses != null && _cardBuildAvatarAddresses.TryGetValue(tribeType, out string address))
+        {
+            var loaded = GameManager.Instance.ResourceManager.LoadResource<AvatarAnimationDefinition>(address);
+            if (loaded != null)
+            {
+                _tribeAvatarCache[tribeType] = loaded;
+                Debug.Log($"[BattlePanel] Avatar {tribeType}: JSON配置 {address} → {loaded.AvatarId}");
+                return loaded;
+            }
+            else
+            {
+                Debug.LogWarning($"[BattlePanel] Avatar {tribeType}: JSON配置地址加载失败 {address}");
+            }
+        }
+
+        // Fallback: 运行时创建
         if (!s_tribeBreedNames.TryGetValue(tribeType, out string breed))
         {
             Debug.LogWarning($"[BattlePanel] 未找到族群 {tribeType} 的品种名，使用默认avatar");
@@ -63,7 +112,61 @@ public class BattlePanel : UIPanel
         string attackAddr = $"avatartemp/{breed}2";
         var definition = AvatarAnimationDefinition.CreateRuntime(breed, idleAddr, attackAddr);
         _tribeAvatarCache[tribeType] = definition;
+        Debug.Log($"[BattlePanel] Avatar {tribeType}: CreateRuntime fallback {idleAddr}/{attackAddr}");
         return definition;
+    }
+
+    private AvatarAnimationDefinition GetSerializedAvatarDef(TribeType tribeType)
+    {
+        switch (tribeType)
+        {
+            case TribeType.Maine:   return _mianyinAvatarDef;
+            case TribeType.Tabby:   return _lihuaAvatarDef;
+            case TribeType.Orange:  return _dajuAvatarDef;
+            case TribeType.Cow:     return _nainiuAvatarDef;
+            case TribeType.Siamese: return _xianluoAvatarDef;
+            case TribeType.Ragdoll: return _buouAvatarDef;
+            default: return null;
+        }
+    }
+
+    private static void EnsureCardBuildAvatarAddresses()
+    {
+        if (_cardBuildAvatarAddresses != null) return;
+        _cardBuildAvatarAddresses = new Dictionary<TribeType, string>();
+
+        string path = System.IO.Path.Combine(Application.streamingAssetsPath, "card_build_cards.json");
+        if (!System.IO.File.Exists(path))
+        {
+            Debug.LogWarning($"[BattlePanel] card_build_cards.json 不存在: {path}");
+            return;
+        }
+
+        try
+        {
+            string json = System.IO.File.ReadAllText(path);
+            var jsonData = LitJson.JsonMapper.ToObject(json);
+            if (jsonData == null || !jsonData.IsArray) return;
+
+            foreach (LitJson.JsonData card in jsonData)
+            {
+                string name = card.ContainsKey("name") ? card["name"].ToString() : null;
+                string address = card.ContainsKey("avatarDefinitionAddress") ? card["avatarDefinitionAddress"].ToString() : null;
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(address)) continue;
+
+                // 取品种名（"-" 前的部分）
+                string breedName = name.Contains("-") ? name.Split('-')[0] : name;
+                if (s_nameToTribeType.TryGetValue(breedName, out TribeType tribeType))
+                {
+                    _cardBuildAvatarAddresses[tribeType] = address;
+                    Debug.Log($"[BattlePanel] card_build: {breedName} → {tribeType} → {address}");
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[BattlePanel] 读取 card_build_cards.json 失败: {e.Message}");
+        }
     }
 
     public override void Initialize()
@@ -182,13 +285,6 @@ public class BattlePanel : UIPanel
 
         foreach (TribeRecord tribe in deployedTribes)
         {
-            // 检查族长是否在休息
-            if (tribe.leader != null && tribe.leader.restTurns > 0)
-            {
-                Debug.LogWarning($"[BattlePanel] {tribe.tribeType}族长正在休息，无法上阵");
-                continue;
-            }
-
             // 添加族长（1个）
             if (CreateLeaderSpawnDefinition(tribe, out BattleFighterSpawnDefinition leaderDef))
             {
@@ -560,74 +656,53 @@ public class BattlePanel : UIPanel
         CleanupBattleHUD();
         CleanupConsumableButtons();
 
-        if (victory)
-        {
-            Debug.Log("[BattlePanel] Battle Victory!");
-        }
-        else
-        {
-            Debug.Log("[BattlePanel] Battle Defeat!");
-        }
-
         if (_battleInfoText != null)
         {
             _battleInfoText.text = victory ? "Victory!" : "Defeat!";
         }
 
-        // 处理战斗结束后的恢复逻辑
-        ProcessPostBattleRecovery(victory);
+        // 胜利或失败都推进到下一关
+        BattleCampaignRuntime campaign = GameManager.Instance?.BattleCampaignRuntime;
+        DataManager dataManager = GameManager.Instance?.DataManager;
+        int catFoodReward = campaign?.GetCatFoodRewardForBattle(_currentLevel) ?? 200;
+        int defeatedReward = catFoodReward / 2;
 
-        GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
-
-        // 回调TribeBuildPanel处理战斗结束（地址须与 ShowPanel 时完全一致）
-        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
-        if (tribeBuildPanel != null)
+        if (victory)
         {
-            tribeBuildPanel.OnBattleEnded(victory);
+            if (dataManager != null)
+            {
+                dataManager.AddCatFood(catFoodReward);
+                dataManager.SavePlayerData();
+            }
+            Debug.Log($"[BattlePanel] Victory! 获得 {catFoodReward} 猫粮");
+        }
+        else
+        {
+            if (dataManager != null)
+            {
+                dataManager.AddCatFood(defeatedReward);
+                dataManager.SavePlayerData();
+            }
+            Debug.Log($"[BattlePanel] Defeat! 猫粮减半，获得 {defeatedReward} 猫粮");
         }
 
+        // 无论胜负都推进关卡
+        if (campaign != null)
+            campaign.AdvanceAfterVictory(_currentLevel);
+
+        // 显示结算面板（在战斗场景中，点击后再返回）
         VictoryPanel victoryPanel = GameManager.Instance.UIManager.ShowPanel<VictoryPanel>("ui/VictoryPanel", UIManager.UILayer.PopUp);
         if (victoryPanel != null)
         {
-            victoryPanel.ShowVictoryRewards(_currentLevel);
-        }
-    }
-
-    /// <summary>
-    /// 处理战斗后的恢复逻辑
-    /// 胜利：小猫下回合自动恢复，族长不休息
-    /// 失败：参战族长休息1回合（未参战的不受影响）
-    /// </summary>
-    private void ProcessPostBattleRecovery(bool victory)
-    {
-        if (victory) return;
-
-        if (_deployedTribes == null) return;
-
-        DataManager dataManager = GameManager.Instance?.DataManager;
-        if (dataManager == null) return;
-
-        List<TribeRecord> allTribes = dataManager.GetTribes();
-        if (allTribes == null) return;
-
-        // 只有参战的族长才需要休息
-        foreach (TribeRecord deployed in _deployedTribes)
-        {
-            if (deployed.leader == null) continue;
-
-            // 在全局列表中找到对应族长并设置休息
-            foreach (TribeRecord tribe in allTribes)
+            if (victory)
             {
-                if (tribe.tribeId == deployed.tribeId && tribe.leader != null)
-                {
-                    tribe.leader.restTurns = 1;
-                    Debug.Log($"[BattlePanel] {tribe.tribeType}族长需要休息1回合");
-                    break;
-                }
+                victoryPanel.ShowVictoryRewards(_currentLevel);
+            }
+            else
+            {
+                victoryPanel.ShowDefeatResult(_currentLevel, defeatedReward);
             }
         }
-
-        dataManager.SavePlayerData();
     }
 
     private void OnPauseButtonClicked()

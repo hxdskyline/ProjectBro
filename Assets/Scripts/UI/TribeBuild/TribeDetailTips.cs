@@ -91,12 +91,6 @@ namespace TribeSystem.UI
                                         $"血量: {leader.baseHp}\n" +
                                         $"速度: {leader.baseSpeed}\n" +
                                         $"统御: {leader.command}";
-
-                // 显示休息状态
-                if (leader.restTurns > 0)
-                {
-                    _leaderStatsText.text += $"\n\n<color=#ff5555>休息中: {leader.restTurns}回合</color>";
-                }
             }
 
             // 更新小猫列表

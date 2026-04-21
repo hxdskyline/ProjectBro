@@ -18,7 +18,6 @@ namespace TribeSystem.UI
         [SerializeField] private Text _titleText;
         [SerializeField] private Text _hintText;
         [SerializeField] private RectTransform _optionsContainer;
-        [SerializeField] private Button _confirmButton;
         [SerializeField] private GameObject _optionCardPrefab;
 
         private RectTransform _externalRoot;
@@ -26,13 +25,6 @@ namespace TribeSystem.UI
         private RectTransform _cachedParent;
         private bool _isRuntimeCreated;
         private GameObject _panelContent;
-
-        // 当前显示的选项
-        private List<RecruitmentOption> _currentOptions;
-        private RecruitmentOption _selectedOption;
-
-        // 回调
-        private Action<RecruitmentOption> _onOptionSelected;
 
         /// <summary>
         /// 设置外部根节点（用于强制弹窗场景）
@@ -70,30 +62,16 @@ namespace TribeSystem.UI
         /// <summary>
         /// 显示招募选项
         /// </summary>
-        public void ShowOptions(List<RecruitmentOption> options, Action<RecruitmentOption> onSelected)
+        public void ShowOptions(List<RecruitmentOption> options, Action<RecruitmentOption> onSelected, Func<RecruitmentOption, TribeType> resolveTribeType = null)
         {
-            _currentOptions = options;
-            _selectedOption = null;
-            _onOptionSelected = onSelected;
-
-            // 清空并重新生成选项卡片
             ClearOptionCards();
-            GenerateOptionCards(options);
-
-            // 设置确认按钮
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = false;
-                _confirmButton.onClick.RemoveAllListeners();
-                _confirmButton.onClick.AddListener(OnConfirmClicked);
-            }
-
+            GenerateOptionCards(options, onSelected, resolveTribeType);
             Show();
         }
 
         private void EnsureUIComponents()
         {
-            if (_titleText != null && _hintText != null && _optionsContainer != null && _confirmButton != null)
+            if (_titleText != null && _hintText != null && _optionsContainer != null)
             {
                 return;
             }
@@ -101,7 +79,6 @@ namespace TribeSystem.UI
             _titleText = transform.Find("Title")?.GetComponent<Text>();
             _hintText = transform.Find("Hint")?.GetComponent<Text>();
             _optionsContainer = transform.Find("OptionsContainer") as RectTransform;
-            _confirmButton = transform.Find("ConfirmButton")?.GetComponent<Button>();
 
             // 如果组件仍然缺失，尝试用运行时创建
             if (_optionsContainer == null)
@@ -194,40 +171,9 @@ namespace TribeSystem.UI
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = false;
             layout.padding = new RectOffset(15, 15, 15, 15);
-
-            // 确认按钮
-            GameObject confirmGo = new GameObject("ConfirmButton", typeof(RectTransform), typeof(Image), typeof(Button));
-            confirmGo.transform.SetParent(panelRect, false);
-            RectTransform confirmRect = confirmGo.GetComponent<RectTransform>();
-            confirmRect.anchorMin = new Vector2(0.35f, 0.03f);
-            confirmRect.anchorMax = new Vector2(0.65f, 0.12f);
-            confirmRect.offsetMin = Vector2.zero;
-            confirmRect.offsetMax = Vector2.zero;
-            _confirmButton = confirmGo.GetComponent<Button>();
-            Image confirmImg = confirmGo.GetComponent<Image>();
-            confirmImg.color = new Color(0.2f, 0.5f, 0.3f, 1f);
-            _confirmButton.targetGraphic = confirmImg;
-            CreateButtonLabel(confirmRect, font, "确认选择");
         }
 
-        private void CreateButtonLabel(RectTransform parent, Font font, string text)
-        {
-            GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            labelGo.transform.SetParent(parent, false);
-            RectTransform labelRect = labelGo.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-            Text label = labelGo.GetComponent<Text>();
-            label.font = font;
-            label.fontSize = 20;
-            label.alignment = TextAnchor.MiddleCenter;
-            label.color = Color.white;
-            label.text = text;
-        }
-
-        private void GenerateOptionCards(List<RecruitmentOption> options)
+        private void GenerateOptionCards(List<RecruitmentOption> options, Action<RecruitmentOption> onSelected, Func<RecruitmentOption, TribeType> resolveTribeType)
         {
             if (_optionsContainer == null || options == null) return;
 
@@ -241,12 +187,17 @@ namespace TribeSystem.UI
 
                 if (_optionCardPrefab != null)
                 {
-                    // 使用预制体实例化
                     cardGo = Instantiate(_optionCardPrefab, _optionsContainer);
                     cardComponent = cardGo.GetComponent<RecruitmentOptionCard>();
                     if (cardComponent != null)
                     {
-                        cardComponent.Setup(option, optionIndex);
+                        cardComponent.Setup(option, optionIndex, selectedOption =>
+                        {
+                            Hide();
+                            onSelected?.Invoke(selectedOption);
+                        });
+                        if (resolveTribeType != null)
+                            cardComponent.SetPortrait(resolveTribeType(option));
                     }
 
                     Image cardImg = cardGo.GetComponent<Image>();
@@ -254,17 +205,10 @@ namespace TribeSystem.UI
                     {
                         cardImg.color = GetOptionCardColor(option.optionType);
                     }
-
-                    Button cardBtn = cardGo.GetComponent<Button>();
-                    if (cardBtn != null)
-                    {
-                        cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
-                    }
                 }
                 else
                 {
-                    // Fallback: 运行时创建
-                    cardGo = new GameObject("OptionCard", typeof(RectTransform), typeof(Image), typeof(Button));
+                    cardGo = new GameObject("OptionCard", typeof(RectTransform), typeof(Image));
                     cardGo.transform.SetParent(_optionsContainer, false);
 
                     RectTransform cardRect = cardGo.GetComponent<RectTransform>();
@@ -272,9 +216,6 @@ namespace TribeSystem.UI
 
                     Image cardImg = cardGo.GetComponent<Image>();
                     cardImg.color = GetOptionCardColor(option.optionType);
-
-                    Button cardBtn = cardGo.GetComponent<Button>();
-                    cardBtn.onClick.AddListener(() => OnOptionCardClicked(optionIndex));
 
                     CreateOptionCardContent(cardRect, option);
 
@@ -369,54 +310,6 @@ namespace TribeSystem.UI
                 default:
                     return "招募选项";
             }
-        }
-
-        private void OnOptionCardClicked(int index)
-        {
-            if (_currentOptions == null || index < 0 || index >= _currentOptions.Count)
-                return;
-
-            _selectedOption = _currentOptions[index];
-
-            // 更新选中状态
-            UpdateCardSelection(index);
-
-            // 启用确认按钮
-            if (_confirmButton != null)
-            {
-                _confirmButton.interactable = true;
-            }
-        }
-
-        private void UpdateCardSelection(int selectedIndex)
-        {
-            if (_optionsContainer == null) return;
-
-            for (int i = 0; i < _optionsContainer.childCount; i++)
-            {
-                Transform child = _optionsContainer.GetChild(i);
-                RecruitmentOptionCard card = child.GetComponent<RecruitmentOptionCard>();
-                if (card != null && card.BackgroundImage != null)
-                {
-                    if (i == selectedIndex)
-                    {
-                        card.BackgroundImage.color = new Color(1f, 0.9f, 0.3f, 1f); // 金色选中
-                    }
-                    else
-                    {
-                        card.BackgroundImage.color = GetOptionCardColor(card.Option.optionType);
-                    }
-                }
-            }
-        }
-
-        private void OnConfirmClicked()
-        {
-            if (_selectedOption == null) return;
-
-            Hide();
-
-            _onOptionSelected?.Invoke(_selectedOption);
         }
 
         private void ClearOptionCards()

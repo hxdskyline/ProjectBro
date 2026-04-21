@@ -533,4 +533,4 @@ MonoBehaviour:
   _pauseButton: {fileID: 3831338109260102112}
   _fighterPrefab: {fileID: 7218620982566375310, guid: 933c4e30248586d44ba9751267b095e9, type: 3}
   _playerAvatarDefinition: {fileID: 11400000, guid: 47ac81f44b87fd74b87a7df731ce985f, type: 2}
-  _enemyAvatarDefinition: {fileID: 11400000, guid: b376febd7a8e9884395b17ee63085149, type: 2}
+  _enemyAvatarDefinition: {fileID: 11400000, guid: c5b7082f42154cf7bfb90efcc37f7cd1, type: 2}

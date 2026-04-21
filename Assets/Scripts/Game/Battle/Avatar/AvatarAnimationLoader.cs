@@ -116,6 +116,6 @@ public static class AvatarAnimationLoader
 
         ResourceManager resourceManager = GameManager.Instance.ResourceManager;
         animationSet.Unload(resourceManager);
-        Debug.Log($"[AvatarAnimationLoader] Unloaded avatar animation set: {animationSet.AvatarId}");
+        //Debug.Log($"[AvatarAnimationLoader] Unloaded avatar animation set: {animationSet.AvatarId}");
     }
 }

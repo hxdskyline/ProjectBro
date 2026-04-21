@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,7 @@ namespace TribeSystem.UI
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Text _titleText;
         [SerializeField] private Text _descText;
+        [SerializeField] private Button _okButton;
 
         public NewTribeEventOption Option { get; set; }
         public int Index { get; set; }
@@ -20,7 +22,7 @@ namespace TribeSystem.UI
             set => _backgroundImage = value;
         }
 
-        public void Setup(NewTribeEventOption option, int index)
+        public void Setup(NewTribeEventOption option, int index, Action<NewTribeEventOption> onSelected)
         {
             Option = option;
             Index = index;
@@ -32,6 +34,11 @@ namespace TribeSystem.UI
             if (_descText != null)
             {
                 _descText.text = option.description;
+            }
+            if (_okButton != null)
+            {
+                _okButton.onClick.RemoveAllListeners();
+                _okButton.onClick.AddListener(() => onSelected?.Invoke(option));
             }
         }
 

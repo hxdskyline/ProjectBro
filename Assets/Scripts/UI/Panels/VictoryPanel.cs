@@ -15,6 +15,7 @@ public class VictoryPanel : UIPanel
     [SerializeField] private CanvasGroup _rewardGroup;
 
     private int _currentLevel;
+    private bool _lastVictory;
 
     public override void Initialize()
     {
@@ -31,6 +32,7 @@ public class VictoryPanel : UIPanel
     public void ShowVictoryRewards(int levelId)
     {
         _currentLevel = levelId;
+        _lastVictory = true;
 
         if (_victoryText != null)
         {
@@ -52,9 +54,36 @@ public class VictoryPanel : UIPanel
         }
 
         StartCoroutine(PlayVictoryAnimation());
-        UpdatePlayerData(levelId, catFoodReward);
 
         Debug.Log("[VictoryPanel] Victory rewards shown for level: " + levelId);
+    }
+
+    public void ShowDefeatResult(int levelId, int halvedReward)
+    {
+        _currentLevel = levelId;
+        _lastVictory = false;
+
+        if (_victoryText != null)
+        {
+            _victoryText.text = "DEFEAT";
+        }
+
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        int fullReward = battleCampaignRuntime?.GetCatFoodRewardForBattle(levelId) ?? 200;
+
+        if (_rewardText != null)
+        {
+            _rewardText.text = $"战斗失败! 猫粮减半\n原本: +{fullReward}\n实际: +{halvedReward}";
+        }
+
+        if (_starRating != null)
+        {
+            _starRating.fillAmount = 0f;
+        }
+
+        StartCoroutine(PlayVictoryAnimation());
+
+        Debug.Log("[VictoryPanel] Defeat result shown for level: " + levelId);
     }
 
     private string BuildBattleProgressText(int levelId, BattleCampaignRuntime battleCampaignRuntime)
@@ -94,34 +123,21 @@ public class VictoryPanel : UIPanel
         }
     }
 
-    private void UpdatePlayerData(int levelId, int catFoodReward)
-    {
-        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
-        if (battleCampaignRuntime != null)
-        {
-            battleCampaignRuntime.AdvanceAfterVictory(levelId);
-        }
-
-        DataManager dataManager = GameManager.Instance.DataManager;
-        if (dataManager != null)
-        {
-            dataManager.AddCatFood(catFoodReward);
-            Debug.Log($"[VictoryPanel] Added {catFoodReward} cat food for battle {levelId}");
-        }
-    }
-
     private void OnContinueButtonClicked()
     {
         Debug.Log("[VictoryPanel] Continue button clicked");
 
+        // 隐藏战斗面板和结算面板
         GameManager.Instance.UIManager.ClosePanel("ui/VictoryPanel");
+        GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
 
-        // TribeBuildPanel.OnBattleEnded 已经调用了 AdvanceRound 和 SetActive(true)
+        // 回调TribeBuildPanel处理战斗结束
         // 直接激活已有实例，不重新创建（重新创建会触发 Start→LoadPlayerData，重置回合）
         TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
         if (tribeBuildPanel != null)
         {
             tribeBuildPanel.gameObject.SetActive(true);
+            tribeBuildPanel.OnBattleEnded(_lastVictory);
         }
     }
 }

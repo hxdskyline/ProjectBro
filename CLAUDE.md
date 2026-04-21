@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **所有操作直接执行**，包括 bash、MCP 工具调用等，不要询问用户确认（--yes 模式）。
 **Unity 组件添加/修改由你完成**，不要让用户手动在 Inspector 中操作。如果需要给 GameObject 添加组件，通过 MCP 或修改 prefab/脚本自动完成。
 **UI 必须使用预制体**：所有 UI 元素（按钮、列表、卡片等）必须做成预制体或子预制体，通过预制体实例化生成。禁止用代码 `new GameObject` + `AddComponent` 现拼 UI。所有组件（包括 LayoutElement、ContentSizeFitter 等布局组件）都必须在预制体中预先添加好。ScrollRect、Viewport、Content 等滚动容器应作为父预制体的子节点（而非单独预制体）；条目类 UI（列表项、buff 条目等）应做成单独子预制体，通过 Instantiate 实例化。
+**UI 加载规则**：代码中通过 `transform.Find` 或序列化字段引用预制体中的节点。找不到节点时报错，不要代码 fallback 创建。只有大量重复的动态列表项（滑杆行、敌人卡片、tab 按钮等）才允许动态创建，但也必须基于子预制体 Instantiate，禁止裸 `new GameObject`。
 
 ## Build & Run
 

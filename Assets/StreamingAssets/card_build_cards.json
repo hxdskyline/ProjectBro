@@ -13,7 +13,7 @@
   {
     "id": 2,
     "name": "大橘-坦克",
-    "avatarDefinitionAddress": "data/avatar/definitions/Dajv_AvatarAnimDef",
+    "avatarDefinitionAddress": "data/avatar/definitions/Daju_AvatarAnimDef",
     "gender": "公",
     "attack": 10,
     "defense": 10,
