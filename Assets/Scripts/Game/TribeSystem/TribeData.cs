@@ -350,6 +350,7 @@ namespace TribeSystem
         public TribeType? targetTribeType; // 目标族群类型（新增族群时）
         public int targetTribeId;          // 目标族群ID（已有族群操作时）
         public StatType targetStatType;    // 目标属性类型（族长强化时）
+        public float boostValue;           // 属性提升的百分比值（例如0.2代表20%）
         public string description;
 
         public RecruitmentOption()
@@ -358,6 +359,7 @@ namespace TribeSystem
             cost = 0;
             targetTribeType = null;
             targetTribeId = -1;
+            boostValue = 0.2f;
             description = "";
         }
     }

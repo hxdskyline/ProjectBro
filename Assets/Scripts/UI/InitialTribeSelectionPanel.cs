@@ -7,8 +7,8 @@ using TribeSystem;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 初始族群选择面板 - 六选二
-    /// 玩家选择2个族群作为初始战力
+    /// 初始族群选择面板 - 六选一
+    /// 玩家选择1个族群作为初始战力
     /// </summary>
     public class InitialTribeSelectionPanel : UIPanel
     {
@@ -246,15 +246,16 @@ namespace TribeSystem.UI
             }
             else
             {
-                // 选择（最多2个）
-                if (_selectedTribes.Count < 2)
+                // 选择（最多1个）
+                if (_selectedTribes.Count < 1)
                 {
                     _selectedTribes.Add(tribeType);
                 }
                 else
                 {
-                    Debug.Log("[InitialTribeSelectionPanel] 最多选择2个族群");
-                    return;
+                    // 如果已经选了1个，直接替换
+                    _selectedTribes.Clear();
+                    _selectedTribes.Add(tribeType);
                 }
             }
 
@@ -294,7 +295,7 @@ namespace TribeSystem.UI
         {
             if (_hintText != null)
             {
-                _hintText.text = $"选择2个族群作为初始战力（已选：{_selectedTribes.Count}/2）";
+                _hintText.text = $"选择1个族群作为初始战力（已选：{_selectedTribes.Count}/1）";
             }
         }
 
@@ -302,19 +303,19 @@ namespace TribeSystem.UI
         {
             if (_confirmButton != null)
             {
-                _confirmButton.interactable = _selectedTribes.Count == 2;
+                _confirmButton.interactable = _selectedTribes.Count == 1;
             }
         }
 
         private void OnConfirmClicked()
         {
-            if (_selectedTribes.Count != 2)
+            if (_selectedTribes.Count != 1)
             {
-                Debug.LogWarning("[InitialTribeSelectionPanel] 请选择2个族群");
+                Debug.LogWarning("[InitialTribeSelectionPanel] 请选择1个族群");
                 return;
             }
 
-            Debug.Log($"[InitialTribeSelectionPanel] 选择族群: {_selectedTribes[0]}, {_selectedTribes[1]}");
+            Debug.Log($"[InitialTribeSelectionPanel] 选择族群: {_selectedTribes[0]}");
 
             // 创建初始族群并保存
             CreateAndSaveInitialTribes();
@@ -350,8 +351,7 @@ namespace TribeSystem.UI
                         baseSpeed = config.leaderBaseStats.speed,
                         command = config.leaderBaseStats.command,
                         skillIds = new List<int>(),
-                        permanentBuffs = new PermanentBuffs(),
-                        restTurns = 0
+                        permanentBuffs = new PermanentBuffs()
                     },
                     cats = new List<CatData>(),
                     isActive = true

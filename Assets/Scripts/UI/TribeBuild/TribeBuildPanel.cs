@@ -5,6 +5,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 namespace TribeSystem.UI
 {
@@ -22,6 +23,7 @@ namespace TribeSystem.UI
         [SerializeField] private Button _startBattleButton;
         [SerializeField] private Button _shopButton;
         [SerializeField] private Button _backButton;
+        [SerializeField] private GameObject _shopEntranceObj; // 用于在商店未开放回合隐藏的入口节点
 
         [Header("预制体引用")]
         [SerializeField] private TribeCard _tribeCardPrefab;
@@ -40,6 +42,7 @@ namespace TribeSystem.UI
 
         [Header("强制弹窗根节点")]
         [SerializeField] private RectTransform _forcedPopupRoot;
+        [SerializeField] private GameObject _tribeAvatarRoot;
 
         private DataManager _dataManager;
         private RecruitmentService _recruitmentService;
@@ -70,6 +73,9 @@ namespace TribeSystem.UI
         private System.Collections.Generic.List<RectTransform> _catEntries = new System.Collections.Generic.List<RectTransform>();
 
         private Font _cachedFont;
+        private GameObject _catListRoot;
+        
+        private AsyncOperationHandle<Sprite> _avatarLoadHandle;
 
         private void Awake()
         {
@@ -84,6 +90,54 @@ namespace TribeSystem.UI
 
             _deployedTribes = new List<TribeRecord>();
             _tribeDeployStates = new Dictionary<int, bool>();
+
+            Transform catListTransform = transform.Find("CatList");
+            if (catListTransform != null)
+            {
+                _catListRoot = catListTransform.gameObject;
+            }
+
+            // Create root for avatars
+            RectTransform avatarRt = _tribeAvatarRoot.GetComponent<RectTransform>();
+            avatarRt.anchorMin = new Vector2(0.5f, 0.5f);
+            avatarRt.anchorMax = new Vector2(0.5f, 0.5f);
+            avatarRt.pivot = new Vector2(0.5f, 0.5f);
+            avatarRt.anchoredPosition = Vector2.zero; // Center of the screen
+            avatarRt.SetSiblingIndex(1); // Place it below the background but above the UI layout
+        }
+
+        private void Update()
+        {
+            bool isPopupActive = false;
+
+            if (_forcedPopupRoot != null && _forcedPopupRoot.gameObject.activeSelf)
+            {
+                // 如果 _forcedPopupRoot 本身处于激活状态并且包含激活子物体
+                for (int i = 0; i < _forcedPopupRoot.childCount; i++)
+                {
+                    if (_forcedPopupRoot.GetChild(i).gameObject.activeSelf)
+                    {
+                        isPopupActive = true;
+                        break;
+                    }
+                }
+            }
+
+            // 直接检查具体面板的激活状态，避免它们没有挂在 _forcedPopupRoot 下时漏判
+            if (_recruitmentPanel != null && _recruitmentPanel.gameObject.activeInHierarchy) isPopupActive = true;
+            if (_ritualPanel != null && _ritualPanel.gameObject.activeInHierarchy) isPopupActive = true;
+            if (_newTribeEventPanel != null && _newTribeEventPanel.gameObject.activeInHierarchy) isPopupActive = true;
+            if (_recruitmentResultPanel != null && _recruitmentResultPanel.gameObject.activeInHierarchy) isPopupActive = true;
+
+            if (_catListRoot != null && _catListRoot.activeSelf == isPopupActive)
+            {
+                _catListRoot.SetActive(!isPopupActive);
+            }
+
+            if (_tribeAvatarRoot != null && _tribeAvatarRoot.activeSelf == isPopupActive)
+            {
+                _tribeAvatarRoot.SetActive(!isPopupActive);
+            }
         }
 
         private void Start()
@@ -405,7 +459,7 @@ namespace TribeSystem.UI
                     var tribe = FindTribeById(option.targetTribeId);
                     if (tribe == null) break;
                     string tribeName = GetTribeTypeName(tribe.tribeType);
-                    _recruitmentService.ExecuteLeaderBoost(tribe, option.targetStatType, option.cost);
+                    _recruitmentService.ExecuteLeaderBoost(tribe, option.targetStatType, option.boostValue);
                     _tribes = _dataManager.GetTribes();
                     RefreshUI();
                     ShowLeaderBoostResult(tribeName, tribe.leader, option.targetStatType, tribe.tribeType);
@@ -439,7 +493,16 @@ namespace TribeSystem.UI
                 ProcessNextPopupEvent();
                 return;
             }
-            _recruitmentResultPanel.ShowCatListResult(tribeName, beforeCats, afterCats, tribe, ProcessNextPopupEvent);
+
+            if (_forcedPopupRoot != null)
+                _forcedPopupRoot.gameObject.SetActive(true);
+
+            _recruitmentResultPanel.ShowCatListResult(tribeName, beforeCats, afterCats, tribe, () =>
+            {
+                if (_forcedPopupRoot != null)
+                    _forcedPopupRoot.gameObject.SetActive(false);
+                ProcessNextPopupEvent();
+            });
         }
 
         private void ShowLeaderBoostResult(string tribeName, LeaderData leader, StatType boostedStat, TribeType tribeType)
@@ -449,7 +512,16 @@ namespace TribeSystem.UI
                 ProcessNextPopupEvent();
                 return;
             }
-            _recruitmentResultPanel.ShowLeaderBoostResult(tribeName, leader, boostedStat, tribeType, ProcessNextPopupEvent);
+
+            if (_forcedPopupRoot != null)
+                _forcedPopupRoot.gameObject.SetActive(true);
+
+            _recruitmentResultPanel.ShowLeaderBoostResult(tribeName, leader, boostedStat, tribeType, () =>
+            {
+                if (_forcedPopupRoot != null)
+                    _forcedPopupRoot.gameObject.SetActive(false);
+                ProcessNextPopupEvent();
+            });
         }
 
         private List<CatData> SnapshotCats(List<CatData> cats)
@@ -568,7 +640,7 @@ namespace TribeSystem.UI
                 options.Add(new NewTribeEventOption
                 {
                     optionType = NewTribeEventOptionType.NewRandomTribe,
-                    description = $"获得一个随机新部族（可选：{availableTypes.Count}种）"
+                    description = "获得一个随机新部族"
                 });
             }
             options.Add(new NewTribeEventOption
@@ -676,12 +748,54 @@ namespace TribeSystem.UI
             }
         }
 
+        private void ShowShopNotOpenHint()
+        {
+            Debug.Log("[TribeBuildPanel] 商店未开放");
+            // 创建一个临时的提示UI
+            GameObject hintGo = new GameObject("ShopNotOpenHint", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+            hintGo.transform.SetParent(transform, false);
+
+            RectTransform hintRect = hintGo.GetComponent<RectTransform>();
+            hintRect.anchorMin = new Vector2(0.5f, 0.5f);
+            hintRect.anchorMax = new Vector2(0.5f, 0.5f);
+            hintRect.sizeDelta = new Vector2(300f, 60f);
+            hintRect.anchoredPosition = new Vector2(0, 100f);
+
+            Image bg = hintGo.GetComponent<Image>();
+            bg.color = new Color(0, 0, 0, 0.8f);
+
+            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.transform.SetParent(hintGo.transform, false);
+
+            RectTransform textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            Text text = textGo.GetComponent<Text>();
+            text.text = "商店本回合未开放";
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 24;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+
+            // 1.5秒后自动销毁
+            Destroy(hintGo, 1.5f);
+        }
+
         /// <summary>
         /// 打开商店
         /// </summary>
         public void OpenShop()
         {
             if (_shopPanel == null) return;
+
+            if (_roundManager != null && !_roundManager.CanOpenShop())
+            {
+                ShowShopNotOpenHint();
+                return;
+            }
 
             // 本回合首次打开时才生成商品，关闭再打开不会刷新
             if (_currentShopItems == null || _currentShopItems.Count == 0)
@@ -852,20 +966,6 @@ namespace TribeSystem.UI
             RefreshUI();
         }
 
-        private int CalculateDeployCost()
-        {
-            // 基础消耗：每个族群50猫粮
-            int baseCostPerTribe = 50;
-
-            // 加上小猫数量影响
-            int totalCatCount = 0;
-            foreach (var tribe in _deployedTribes)
-            {
-                totalCatCount += tribe.GetCatCount();
-            }
-
-            return baseCostPerTribe * _deployedTribes.Count + totalCatCount * 5;
-        }
 
         private void AdvanceRound()
         {
@@ -925,15 +1025,13 @@ namespace TribeSystem.UI
 
         private void ShowInitialTribeSelection()
         {
-            // TODO: 显示初始六选二界面
+            // TODO: 显示初始六选一界面
             Debug.Log("[TribeBuildPanel] 显示初始族群选择界面");
 
-            // 暂时自动选择两个族群
+            // 暂时自动选择一个族群
             var maineTribe = CreateInitialTribe(TribeType.Maine);
-            var tabbyTribe = CreateInitialTribe(TribeType.Tabby);
 
             _dataManager.AddTribe(maineTribe);
-            _dataManager.AddTribe(tabbyTribe);
 
             LoadPlayerData();
             RefreshUI();
@@ -999,9 +1097,20 @@ namespace TribeSystem.UI
             // 更新猫粮显示
             UpdateCatFoodDisplay();
 
-            // 注：上阵选择和消耗计算在BattlePreparePanel中进行，此处不需要处理
-
-            // 注：上阵选择和消耗计算在BattlePreparePanel中进行，此处不需要处理
+            // 商店入口的显示/隐藏（根据当前回合商店是否营业）
+            if (_roundManager != null)
+            {
+                bool canOpenShop = _roundManager.CanOpenShop();
+                if (_shopEntranceObj != null)
+                {
+                    _shopEntranceObj.SetActive(canOpenShop);
+                }
+                else if (_shopButton != null)
+                {
+                    // Fallback：如果没有拖拽指定的入口节点，默认隐藏商店按钮
+                    _shopButton.gameObject.SetActive(canOpenShop);
+                }
+            }
 
             // 开始战斗按钮始终可用
             if (_startBattleButton != null)
@@ -1046,6 +1155,7 @@ namespace TribeSystem.UI
                     savedCard.SetExpanded(true);
                     _expandedCard = savedCard;
                     RebuildCatList(savedCard.Tribe);
+                    RebuildTribeAvatars(savedCard.Tribe);
                 }
             }
             else
@@ -1173,6 +1283,7 @@ namespace TribeSystem.UI
                 card.SetExpanded(false);
                 _expandedCard = null;
                 ClearCatList();
+                RebuildTribeAvatars(null); // Clear avatars
                 _dataManager?.SetLastExpandedTribeId(-1);
                 return;
             }
@@ -1187,11 +1298,98 @@ namespace TribeSystem.UI
             _expandedCard = card;
             card.SetExpanded(true);
 
-            // 刷新小猫列表
+            // 刷新小猫列表和头像
             RebuildCatList(card.Tribe);
+            RebuildTribeAvatars(card.Tribe);
 
             // 保存展开的族群ID
             _dataManager?.SetLastExpandedTribeId(card.Tribe?.tribeId ?? -1);
+        }
+
+        private void RebuildTribeAvatars(TribeRecord tribe)
+        {
+            if (_tribeAvatarRoot == null) return;
+
+            // Clear old avatars
+            for (int i = _tribeAvatarRoot.transform.childCount - 1; i >= 0; i--)
+            {
+                Destroy(_tribeAvatarRoot.transform.GetChild(i).gameObject);
+            }
+
+            if (_avatarLoadHandle.IsValid())
+            {
+                Addressables.Release(_avatarLoadHandle);
+            }
+
+            if (tribe == null) return;
+
+            string address = GetTribePortraitAddress(tribe.tribeType);
+            if (string.IsNullOrEmpty(address)) return;
+
+            _avatarLoadHandle = Addressables.LoadAssetAsync<Sprite>(address);
+            _avatarLoadHandle.Completed += (op) =>
+            {
+                if (op.Status == AsyncOperationStatus.Succeeded && _tribeAvatarRoot != null)
+                {
+                    Sprite avatarSprite = op.Result;
+
+                    // 1. Leader (large, slightly offset from center)
+                    GameObject leaderGo = new GameObject("LeaderAvatar", typeof(RectTransform), typeof(Image));
+                    leaderGo.transform.SetParent(_tribeAvatarRoot.transform, false);
+                    RectTransform leaderRt = leaderGo.GetComponent<RectTransform>();
+                    leaderRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    leaderRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    float leaderX = Random.Range(-30f, 30f);
+                    float leaderY = Random.Range(-30f, 30f);
+                    leaderRt.anchoredPosition = new Vector2(leaderX, leaderY);
+                    float leaderScale = Random.Range(220f, 280f);
+                    leaderRt.sizeDelta = new Vector2(leaderScale, leaderScale); // Leader size
+                    Image leaderImg = leaderGo.GetComponent<Image>();
+                    leaderImg.sprite = avatarSprite;
+                    leaderImg.color = new Color(1f, 1f, 1f, Random.Range(0.85f, 1f));
+
+                    // 2. Cats (smaller, scattered around/below leader)
+                    int catCount = tribe.GetCatCount();
+                    if (catCount > 0)
+                    {
+                        for (int i = 0; i < catCount; i++)
+                        {
+                            GameObject catGo = new GameObject($"CatAvatar_{i}", typeof(RectTransform), typeof(Image));
+                            catGo.transform.SetParent(_tribeAvatarRoot.transform, false);
+                            RectTransform catRt = catGo.GetComponent<RectTransform>();
+                            catRt.anchorMin = new Vector2(0.5f, 0.5f);
+                            catRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                            // Random position below and around the leader
+                            float baseX = (i - (catCount - 1) / 2f) * 100f;
+                            float catX = baseX + Random.Range(-40f, 40f);
+                            float catY = Random.Range(-220f, -140f);
+                            catRt.anchoredPosition = new Vector2(catX, catY);
+
+                            float catSize = Random.Range(60f, 100f);
+                            catRt.sizeDelta = new Vector2(catSize, catSize);
+
+                            Image catImg = catGo.GetComponent<Image>();
+                            catImg.sprite = avatarSprite;
+                            catImg.color = new Color(1f, 1f, 1f, Random.Range(0.6f, 0.95f));
+                        }
+                    }
+                }
+            };
+        }
+
+        private string GetTribePortraitAddress(TribeType tribeType)
+        {
+            switch (tribeType)
+            {
+                case TribeType.Maine: return "avatartemp/mianyin1";
+                case TribeType.Tabby: return "avatartemp/lihua1";
+                case TribeType.Orange: return "avatartemp/daju1";
+                case TribeType.Cow: return "avatartemp/nainiu1";
+                case TribeType.Siamese: return "avatartemp/xianluo1";
+                case TribeType.Ragdoll: return "avatartemp/buou1";
+                default: return null;
+            }
         }
 
         /// <summary>
@@ -1303,15 +1501,17 @@ namespace TribeSystem.UI
             if (_catFoodText != null)
                 _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
 
-            // 记算新的选中索引：自动选中上一个
-            int newIndex = _selectedCatIndex - 1;
+            // 记算新的选中索引：原位置即为下一个小猫的位置
+            int newIndex = _selectedCatIndex;
 
-            // 刷新列表
+            // 刷新列表和中间的模型展示
             RebuildCatList(tribe);
+            RebuildTribeAvatars(tribe);
 
-            // 自动选中上一个小猫（如果存在）
+            // 自动选中下一个小猫（如果存在，否则 clamp 到列表中最后一个）
             if (_catEntries.Count > 0)
             {
+                // 如果刚好删除了最后一个，newIndex 可能会等于 Count，所以需要 Clamp
                 int targetIndex = Mathf.Clamp(newIndex, 0, _catEntries.Count - 1);
                 SelectCatEntry(targetIndex);
             }
@@ -1342,21 +1542,6 @@ namespace TribeSystem.UI
                 case CatQuality.Gold: return "大师";
                 default: return quality.ToString();
             }
-        }
-
-        private void OnTribeRestClicked(TribeRecord tribe)
-        {
-            if (tribe?.leader != null)
-            {
-                tribe.leader.restTurns = 2; // 休息2回合
-                Debug.Log($"[TribeBuildPanel] {tribe.tribeType}族长开始休息");
-                RefreshUI();
-            }
-        }
-
-        private void OnTribeDeployChanged(TribeRecord tribe, bool isDeployed)
-        {
-            SetTribeDeployState(tribe.tribeId, isDeployed);
         }
 
         private TribeRecord FindTribeById(int tribeId)

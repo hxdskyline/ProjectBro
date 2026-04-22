@@ -35,7 +35,7 @@ namespace TribeSystem.UI
             hlg.childControlWidth = false;
             hlg.childControlHeight = true;
             hlg.childForceExpandWidth = false;
-            hlg.childForceExpandHeight = false;
+            hlg.childForceExpandHeight = true;
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
             BuildCatListColumn(_contentArea, "提升前", beforeCats, tribe, 400f);
@@ -58,7 +58,7 @@ namespace TribeSystem.UI
             hlg.childControlWidth = false;
             hlg.childControlHeight = true;
             hlg.childForceExpandWidth = false;
-            hlg.childForceExpandHeight = false;
+            hlg.childForceExpandHeight = true;
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
             // 旧值面板：用旧 buff 值计算，不标记
@@ -94,24 +94,22 @@ namespace TribeSystem.UI
             colVlg.padding = new RectOffset(8, 8, 8, 8);
             colVlg.childAlignment = TextAnchor.UpperCenter;
             colVlg.childControlWidth = true;
-            colVlg.childControlHeight = false;
+            colVlg.childControlHeight = true;
             colVlg.childForceExpandWidth = true;
-            colVlg.childForceExpandHeight = false;
+            colVlg.childForceExpandHeight = true;
 
             // 标题
             var headerGo = CreateText("Header", colRect, header, 22, new Color(1f, 0.85f, 0.4f));
             var headerLe = headerGo.AddComponent<LayoutElement>();
             headerLe.preferredHeight = 28f;
+            headerLe.minHeight = 28f;
 
             // ScrollView
             var scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
             scrollGo.transform.SetParent(colRect, false);
             var scrollRect = scrollGo.GetComponent<ScrollRect>();
             var scrollRt = scrollGo.GetComponent<RectTransform>();
-            scrollRt.anchorMin = Vector2.zero;
-            scrollRt.anchorMax = Vector2.one;
-            scrollRt.offsetMin = new Vector2(4f, 4f);
-            scrollRt.offsetMax = new Vector2(-4f, -36f);
+            // 当由 LayoutGroup 控制时，不需手动设置 anchor/offset
             scrollGo.GetComponent<Image>().color = new Color(0, 0, 0, 0.3f);
 
             var scrollLe = scrollGo.AddComponent<LayoutElement>();
@@ -241,7 +239,7 @@ namespace TribeSystem.UI
             cardVlg.padding = new RectOffset(10, 10, 10, 10);
             cardVlg.childAlignment = TextAnchor.UpperCenter;
             cardVlg.childControlWidth = true;
-            cardVlg.childControlHeight = false;
+            cardVlg.childControlHeight = true;
             cardVlg.childForceExpandWidth = true;
             cardVlg.childForceExpandHeight = false;
 
@@ -363,9 +361,9 @@ namespace TribeSystem.UI
             panelVlg.padding = new RectOffset(10, 10, 10, 10);
             panelVlg.childAlignment = TextAnchor.UpperCenter;
             panelVlg.childControlWidth = true;
-            panelVlg.childControlHeight = false;
+            panelVlg.childControlHeight = true;
             panelVlg.childForceExpandWidth = true;
-            panelVlg.childForceExpandHeight = false;
+            panelVlg.childForceExpandHeight = true;
 
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -373,6 +371,8 @@ namespace TribeSystem.UI
             _titleText = CreateTextComponent("Title", panelRect, font, 26, Color.white, TextAnchor.MiddleCenter);
             var titleLe = _titleText.gameObject.AddComponent<LayoutElement>();
             titleLe.preferredHeight = 36f;
+            titleLe.minHeight = 36f;
+            titleLe.flexibleHeight = 0f;
 
             // 内容区
             var contentGo = new GameObject("ContentArea", typeof(RectTransform));

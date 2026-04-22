@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 06a75723b28416641be8debce0ddfea6
+  m_GUID: 08b56cb525fde0742a76ce1237fb16d5
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
@@ -430,4 +430,6 @@ MonoBehaviour:
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas: []
+    m_Schemas:
+    - {fileID: 11400000, guid: e1cb797cee0872f41b727bbddf88bf02, type: 2}
+    - {fileID: 11400000, guid: dc87d57bbfaba99448838da809d7a581, type: 2}

@@ -185,7 +185,7 @@
       "hasRecruitment": true,
       "hasRitual": false,
       "hasShop": true,
-      "hasNewTribeEvent": true
+      "hasNewTribeEvent": false
     },
     {
       "battleNumber": 9,

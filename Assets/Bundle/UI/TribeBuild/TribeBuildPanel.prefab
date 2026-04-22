@@ -386,6 +386,41 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u732B\u7CAE: 1000"
+--- !u!1 &2830926626587801769
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1264530231978895405}
+  m_Layer: 0
+  m_Name: TribeAvatarRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1264530231978895405
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2830926626587801769}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5884218482546044700}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 279, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &2889586775723569278
 GameObject:
   m_ObjectHideFlags: 0
@@ -656,6 +691,7 @@ RectTransform:
   - {fileID: 1191611910865048527}
   - {fileID: 4771714908622758213}
   - {fileID: 3240000000000000001}
+  - {fileID: 1264530231978895405}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -682,6 +718,7 @@ MonoBehaviour:
   _startBattleButton: {fileID: 5964046744294056465}
   _shopButton: {fileID: 3956067093410408347}
   _backButton: {fileID: 3442466656356785286}
+  _shopEntranceObj: {fileID: 2889586775723569278}
   _tribeCardPrefab: {fileID: 9173514629417532719, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
   _tribeDetailTipsPrefab: {fileID: 8323053977849122858, guid: 93dd7b94f8b9ebc4b935dec0d3dc18f2, type: 3}
   _catListContainer: {fileID: 8885142702595135622}
@@ -692,6 +729,7 @@ MonoBehaviour:
   _shopPanel: {fileID: 8157977110538632174, guid: 36d55bbd7dd148b47a136c28a9a9e69a, type: 3}
   _newTribeEventPanel: {fileID: 1140000000000000001, guid: b7c2e4f1a9d34567890abcdef1234567, type: 3}
   _forcedPopupRoot: {fileID: 1191611910865048527}
+  _tribeAvatarRoot: {fileID: 2830926626587801769}
 --- !u!222 &3462646258224413836
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2303,10 +2341,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 5884218482546044700}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &9170140695138942558
 GameObject:

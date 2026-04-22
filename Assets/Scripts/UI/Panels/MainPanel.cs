@@ -12,6 +12,7 @@ public class MainPanel : UIPanel
     [SerializeField] private Button _startButton;
     [SerializeField] private Button _settingsButton;
     [SerializeField] private Button _quitButton;
+    [SerializeField] private Button _deleteSaveButton;
 
     public override void Initialize()
     {
@@ -32,6 +33,11 @@ public class MainPanel : UIPanel
             _quitButton.onClick.AddListener(OnQuitButtonClicked);
         }
 
+        if (_deleteSaveButton != null)
+        {
+            _deleteSaveButton.onClick.AddListener(OnDeleteSaveButtonClicked);
+        }
+
         // 默认选中状态：Start 为选中，其他为未选中
         SetSelectedButton(_startButton);
 
@@ -39,8 +45,26 @@ public class MainPanel : UIPanel
         if (_startButton != null) RegisterHover(_startButton);
         if (_settingsButton != null) RegisterHover(_settingsButton);
         if (_quitButton != null) RegisterHover(_quitButton);
+        if (_deleteSaveButton != null) RegisterHover(_deleteSaveButton);
 
         Debug.Log("[MainPanel] Initialized");
+    }
+
+    private void OnDeleteSaveButtonClicked()
+    {
+        Debug.Log("[MainPanel] Delete save button clicked");
+        if (GameManager.Instance != null && GameManager.Instance.DataManager != null)
+        {
+            GameManager.Instance.DataManager.DeleteSaveData();
+            Debug.Log("[MainPanel] 存档已删除");
+
+            // 可选：弹个提示或刷新UI状态
+            var uiManager = GameManager.Instance.UIManager;
+            if (uiManager != null)
+            {
+                // 如果有公用提示面板可以弹一下
+            }
+        }
     }
 
     private readonly Color32 _selectedTextColor = new Color32(0xFE, 0xF0, 0xD3, 0xFF); // fef0d3
@@ -63,7 +87,7 @@ public class MainPanel : UIPanel
 
     private void SetSelectedButton(Button selected)
     {
-        var buttons = new[] { _startButton, _settingsButton, _quitButton };
+        var buttons = new[] { _startButton, _settingsButton, _quitButton, _deleteSaveButton };
         foreach (var btn in buttons)
         {
             if (btn == null) continue;

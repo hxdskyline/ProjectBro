@@ -151,4 +151,40 @@ public static class TribeBattleBuffProvider
         }
         return buff;
     }
+
+    /// <summary>
+    /// 判断特定地形对该种族是增益(1)、减益(-1)还是无影响(0)
+    /// </summary>
+    public static int GetTerrainBuffStatus(TribeType tribe, TerrainType terrain)
+    {
+        TerrainWeatherBuff buff = new TerrainWeatherBuff();
+        switch (terrain)
+        {
+            case TerrainType.Plain: buff = ApplyPlainBuff(tribe, buff); break;
+            case TerrainType.Brush: buff = ApplyBrushBuff(tribe, buff); break;
+        }
+
+        if (buff.attackPercent > 0 || buff.defensePercent > 0 || buff.hpPercent > 0 || buff.speedPercent > 0) return 1;
+        if (buff.attackPercent < 0 || buff.defensePercent < 0 || buff.hpPercent < 0 || buff.speedPercent < 0) return -1;
+        return 0;
+    }
+
+    /// <summary>
+    /// 判断特定天气对该种族是增益(1)、减益(-1)还是无影响(0)
+    /// </summary>
+    public static int GetWeatherBuffStatus(TribeType tribe, WeatherType weather)
+    {
+        TerrainWeatherBuff buff = new TerrainWeatherBuff();
+        switch (weather)
+        {
+            case WeatherType.Sunny: buff = ApplySunnyBuff(tribe, buff); break;
+            case WeatherType.Rainy: buff = ApplyRainyBuff(tribe, buff); break;
+            case WeatherType.Night: buff = ApplyNightBuff(tribe, buff); break;
+            case WeatherType.Windy: buff = ApplyWindyBuff(tribe, buff); break;
+        }
+
+        if (buff.attackPercent > 0 || buff.defensePercent > 0 || buff.hpPercent > 0 || buff.speedPercent > 0) return 1;
+        if (buff.attackPercent < 0 || buff.defensePercent < 0 || buff.hpPercent < 0 || buff.speedPercent < 0) return -1;
+        return 0;
+    }
 }

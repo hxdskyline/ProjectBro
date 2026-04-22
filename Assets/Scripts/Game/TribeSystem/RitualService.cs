@@ -48,11 +48,27 @@ namespace TribeSystem
             if (tier?.blessings == null || tier.blessings.Count == 0) return result;
 
             int count = Mathf.Max(1, tier.drawCount);
-            for (int i = 0; i < count; i++)
+            HashSet<string> generatedKeys = new HashSet<string>();
+
+            int maxAttempts = count * 10;
+            int attempts = 0;
+
+            while (result.Count < count && attempts < maxAttempts)
             {
+                attempts++;
                 var item = SelectAndCreateBlessing(tier);
-                if (item != null) result.Add(item);
+                if (item != null)
+                {
+                    // 生成唯一标识，避免同一类型和子类型的重复
+                    string key = $"{item.rewardType}_{item.statType}_{item.catQuality}";
+                    if (!generatedKeys.Contains(key))
+                    {
+                        generatedKeys.Add(key);
+                        result.Add(item);
+                    }
+                }
             }
+
             return result;
         }
 

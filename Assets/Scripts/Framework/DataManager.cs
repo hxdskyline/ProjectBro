@@ -119,6 +119,22 @@ public class DataManager : MonoBehaviour
         Debug.Log("[DataManager] Player data reset");
     }
 
+    /// <summary>
+    /// 删除存档数据
+    /// </summary>
+    public void DeleteSaveData()
+    {
+        string filePath = Path.Combine(_savePath, "playerdata.json");
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+
+        // 创建一个全新且干净的数据覆盖当前内存
+        CreateNewPlayerData();
+        Debug.Log("[DataManager] Player save data deleted and reset to initial state");
+    }
+
     public long GetCurrencyAmount(string currencyId)
     {
         if (_playerData == null || string.IsNullOrEmpty(currencyId))

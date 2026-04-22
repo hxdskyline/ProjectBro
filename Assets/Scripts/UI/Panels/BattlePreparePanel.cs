@@ -14,17 +14,11 @@ public class BattlePreparePanel : UIPanel
     private const string SummaryName = "PrepareSummaryText";
     private const string StatusName = "PrepareStatusText";
     private const string TribesRootName = "TribesRoot";
-    private const string EnemyRootName = "EnemyCardsRoot";
+    private const string EnemyRootName = "BattleOptionsRoot";
     private const string StartButtonName = "PrepareStartButton";
     private const string BackButtonName = "PrepareBackButton";
-    private const string ScenarioTabsName = "ScenarioTabsRoot";
-    private const string DifficultyTabsName = "DifficultyTabsRoot";
-    private const string DeployCostName = "DeployCostText";
-    private const string BuffPreviewName = "BuffPreviewText";
-    private const string EnemyInfoName = "EnemyInfoText";
 
     private readonly List<TribeRecord> _deployedTribes = new List<TribeRecord>();
-    private readonly Dictionary<int, int> _deployCatCounts = new Dictionary<int, int>();
 
     [SerializeField] private Text _titleText;
     [SerializeField] private Text _summaryText;
@@ -32,24 +26,23 @@ public class BattlePreparePanel : UIPanel
     [SerializeField] private Button _startBattleButton;
     [SerializeField] private Button _backButton;
     [SerializeField] private RectTransform _tribesRoot;
-    [SerializeField] private RectTransform _enemyCardsRoot;
+    [SerializeField] private RectTransform _battleOptionsRoot;
     private Font _uiFont;
-
-    // New: scenario/difficulty/cost UI
-    private RectTransform _scenarioTabsRoot;
-    private RectTransform _difficultyTabsRoot;
-    private Text _deployCostText;
-    private Text _buffPreviewText;
-    private Text _enemyInfoText;
 
     // State
     private int _currentLevel;
-    private List<BattleScenarioOption> _scenarioOptions = new List<BattleScenarioOption>();
-    private List<DifficultyLevel> _difficultyOptions = new List<DifficultyLevel>();
-    private int _selectedScenarioIndex;
-    private int _selectedDifficultyIndex;
-    private int _freeDeployQuota;
     private int _currentCatFood;
+
+    private class BattleChoice
+    {
+        public TerrainType terrain;
+        public WeatherType weather;
+        public DifficultyLevel difficulty;
+        public int[] enemyUnitIds;
+    }
+
+    private List<BattleChoice> _battleChoices = new List<BattleChoice>();
+    private int _selectedChoiceIndex = 0;
 
     // Colors
     private static readonly Color TabActiveColor = new Color(0.2f, 0.6f, 0.3f, 0.95f);
@@ -85,30 +78,57 @@ public class BattlePreparePanel : UIPanel
         _currentLevel = levelId;
 
         _deployedTribes.Clear();
-        _deployCatCounts.Clear();
 
         if (allTribes != null)
         {
             _deployedTribes.AddRange(allTribes);
-            foreach (TribeRecord tribe in allTribes)
-            {
-                _deployCatCounts[tribe.tribeId] = Mathf.Min(GetCommandLimit(tribe), tribe.GetCatCount());
-            }
         }
 
-        // Load scenario/difficulty options from campaign config
+        // Generate 2 random battle choices
+        _battleChoices.Clear();
         BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
-        if (campaign != null)
+
+        // Ensure distinct terrain (currently 2 terrains: Plain=0, Brush=1)
+        TerrainType terrain1 = (TerrainType)Random.Range(0, 2);
+        TerrainType terrain2 = terrain1 == TerrainType.Plain ? TerrainType.Brush : TerrainType.Plain;
+
+        // Ensure distinct weather (currently 4 weathers: Sunny=0, Rainy=1, Night=2, Windy=3)
+        WeatherType weather1 = (WeatherType)Random.Range(0, 4);
+        WeatherType weather2;
+        do { weather2 = (WeatherType)Random.Range(0, 4); } while (weather1 == weather2);
+
+        // Ensure distinct difficulty: one Normal (0), one Hard (1) or Bloodbath (2)
+        DifficultyLevel diffEasy = DifficultyLevel.Normal;
+        DifficultyLevel diffHard = Random.value < 0.5f ? DifficultyLevel.Hard : DifficultyLevel.Bloodbath;
+
+        // Randomize which choice gets the harder difficulty
+        bool swapDifficulty = Random.value < 0.5f;
+        DifficultyLevel diff1 = swapDifficulty ? diffHard : diffEasy;
+        DifficultyLevel diff2 = swapDifficulty ? diffEasy : diffHard;
+
+        for (int i = 0; i < 2; i++)
         {
-            _scenarioOptions = campaign.GetScenarioOptions(levelId);
-            _difficultyOptions = campaign.GetDifficultyOptions(levelId);
-            _freeDeployQuota = campaign.GetFreeDeployQuota(levelId);
+            var choice = new BattleChoice
+            {
+                terrain = i == 0 ? terrain1 : terrain2,
+                weather = i == 0 ? weather1 : weather2,
+                difficulty = i == 0 ? diff1 : diff2
+            };
+
+            if (campaign != null)
+            {
+                choice.enemyUnitIds = campaign.GetEnemyUnitIdsForBattle(_currentLevel);
+            }
+            else
+            {
+                choice.enemyUnitIds = new int[] { 1, 2, 3 };
+            }
+
+            _battleChoices.Add(choice);
         }
 
-        _selectedScenarioIndex = 0;
-        _selectedDifficultyIndex = 0;
+        _selectedChoiceIndex = 0;
 
-        // Load current cat food
         DataManager dataManager = GameManager.Instance?.DataManager;
         _currentCatFood = dataManager != null ? (int)dataManager.GetCatFood() : 0;
 
@@ -118,13 +138,8 @@ public class BattlePreparePanel : UIPanel
     private void RefreshUI()
     {
         RefreshTexts();
-        RebuildScenarioTabs();
-        RebuildDifficultyTabs();
         RebuildTribeViews();
-        RebuildEnemyViews();
-        RefreshDeployCost();
-        RefreshBuffPreview();
-        RefreshEnemyInfo();
+        RebuildBattleOptions();
         RefreshStartButtonState();
     }
 
@@ -137,12 +152,6 @@ public class BattlePreparePanel : UIPanel
         }
 
         int totalCatCount = GetTotalSelectedCatCount();
-        int restingLeaderCount = 0;
-        foreach (TribeRecord tribe in _deployedTribes)
-        {
-            if (tribe.leader?.restTurns > 0)
-                restingLeaderCount++;
-        }
 
         if (_summaryText != null)
         {
@@ -154,237 +163,84 @@ public class BattlePreparePanel : UIPanel
 
         if (_statusText != null && string.IsNullOrEmpty(_statusText.text))
         {
-            _statusText.text = "点击族群卡片进行上阵/下阵操作。族长休息中的族群无法上阵。";
+            _statusText.text = "请在右侧选择一场战斗，然后点击进入战斗。";
         }
-    }
-
-    // --- Scenario Tabs ---
-
-    private void RebuildScenarioTabs()
-    {
-        if (_scenarioTabsRoot == null) return;
-        ClearChildren(_scenarioTabsRoot);
-
-        if (_scenarioOptions == null || _scenarioOptions.Count == 0)
-            return;
-
-        // Configure horizontal layout
-        HorizontalLayoutGroup hLayout = _scenarioTabsRoot.GetComponent<HorizontalLayoutGroup>();
-        if (hLayout == null)
-        {
-            hLayout = GetOrAddComponent<HorizontalLayoutGroup>(_scenarioTabsRoot.gameObject);
-            hLayout.spacing = 6f;
-            hLayout.childAlignment = TextAnchor.MiddleLeft;
-            hLayout.childControlHeight = true;
-            hLayout.childControlWidth = false;
-            hLayout.childForceExpandHeight = false;
-            hLayout.childForceExpandWidth = false;
-            hLayout.padding = new RectOffset(4, 4, 4, 4);
-        }
-
-        // Label
-        GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
-        labelGo.transform.SetParent(_scenarioTabsRoot, false);
-        Text label = labelGo.GetComponent<Text>();
-        label.font = _uiFont;
-        label.fontSize = 16;
-        label.color = Color.white;
-        label.text = "敌人情况:";
-        label.alignment = TextAnchor.MiddleLeft;
-        LayoutElement labelLe = labelGo.GetComponent<LayoutElement>();
-        labelLe.preferredWidth = 80f;
-        labelLe.minHeight = 30f;
-
-        for (int i = 0; i < _scenarioOptions.Count; i++)
-        {
-            int capturedIndex = i;
-            BattleScenarioOption option = _scenarioOptions[i];
-
-            GameObject tabGo = new GameObject($"Scenario_{i}", typeof(RectTransform), typeof(Image),
-                typeof(Button), typeof(LayoutElement));
-            tabGo.transform.SetParent(_scenarioTabsRoot, false);
-
-            LayoutElement le = tabGo.GetComponent<LayoutElement>();
-            le.preferredWidth = 140f;
-            le.minHeight = 32f;
-
-            Image bg = tabGo.GetComponent<Image>();
-            bg.color = (i == _selectedScenarioIndex) ? TabActiveColor : TabInactiveColor;
-
-            Button btn = tabGo.GetComponent<Button>();
-            btn.targetGraphic = bg;
-            btn.onClick.AddListener(() => OnScenarioTabClicked(capturedIndex));
-
-            // Tab text
-            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            textGo.transform.SetParent(tabGo.transform, false);
-            RectTransform textRect = textGo.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
-
-            Text tabText = textGo.GetComponent<Text>();
-            tabText.font = _uiFont;
-            tabText.fontSize = 15;
-            tabText.color = Color.white;
-            tabText.alignment = TextAnchor.MiddleCenter;
-            tabText.text = $"{option.GetDisplayName()}\n{BattleScenarioOption.GetFormationName(option.formationType)}";
-            tabText.raycastTarget = false;
-        }
-    }
-
-    private void OnScenarioTabClicked(int index)
-    {
-        if (index == _selectedScenarioIndex) return;
-        _selectedScenarioIndex = index;
-        RefreshUI();
-    }
-
-    // --- Difficulty Tabs ---
-
-    private void RebuildDifficultyTabs()
-    {
-        if (_difficultyTabsRoot == null) return;
-        ClearChildren(_difficultyTabsRoot);
-
-        if (_difficultyOptions == null || _difficultyOptions.Count == 0)
-            return;
-
-        HorizontalLayoutGroup hLayout = _difficultyTabsRoot.GetComponent<HorizontalLayoutGroup>();
-        if (hLayout == null)
-        {
-            hLayout = GetOrAddComponent<HorizontalLayoutGroup>(_difficultyTabsRoot.gameObject);
-            hLayout.spacing = 6f;
-            hLayout.childAlignment = TextAnchor.MiddleLeft;
-            hLayout.childControlHeight = true;
-            hLayout.childControlWidth = false;
-            hLayout.childForceExpandHeight = false;
-            hLayout.childForceExpandWidth = false;
-            hLayout.padding = new RectOffset(4, 4, 4, 4);
-        }
-
-        // Label
-        GameObject labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
-        labelGo.transform.SetParent(_difficultyTabsRoot, false);
-        Text label = labelGo.GetComponent<Text>();
-        label.font = _uiFont;
-        label.fontSize = 16;
-        label.color = Color.white;
-        label.text = "难度:";
-        label.alignment = TextAnchor.MiddleLeft;
-        LayoutElement labelLe = labelGo.GetComponent<LayoutElement>();
-        labelLe.preferredWidth = 50f;
-        labelLe.minHeight = 30f;
-
-        for (int i = 0; i < _difficultyOptions.Count; i++)
-        {
-            int capturedIndex = i;
-            DifficultyLevel diff = _difficultyOptions[i];
-
-            GameObject tabGo = new GameObject($"Difficulty_{i}", typeof(RectTransform), typeof(Image),
-                typeof(Button), typeof(LayoutElement));
-            tabGo.transform.SetParent(_difficultyTabsRoot, false);
-
-            LayoutElement le = tabGo.GetComponent<LayoutElement>();
-            le.preferredWidth = 80f;
-            le.minHeight = 32f;
-
-            Image bg = tabGo.GetComponent<Image>();
-            bg.color = (i == _selectedDifficultyIndex) ? GetDifficultyActiveColor(diff) : TabInactiveColor;
-
-            Button btn = tabGo.GetComponent<Button>();
-            btn.targetGraphic = bg;
-            btn.onClick.AddListener(() => OnDifficultyTabClicked(capturedIndex));
-
-            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            textGo.transform.SetParent(tabGo.transform, false);
-            RectTransform textRect = textGo.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
-
-            Text tabText = textGo.GetComponent<Text>();
-            tabText.font = _uiFont;
-            tabText.fontSize = 16;
-            tabText.color = Color.white;
-            tabText.alignment = TextAnchor.MiddleCenter;
-            tabText.text = GetDifficultyName(diff);
-            tabText.raycastTarget = false;
-        }
-    }
-
-    private void OnDifficultyTabClicked(int index)
-    {
-        if (index == _selectedDifficultyIndex) return;
-        _selectedDifficultyIndex = index;
-        RefreshUI();
-    }
-
-    // --- Deploy Cost ---
-
-    private void RefreshDeployCost()
-    {
-        if (_deployCostText == null) return;
-
-        int totalCost = CalculateSliderTotalCost();
-        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
-        bool canAfford = _currentCatFood >= actualCost;
-
-        string text = $"出战消耗: {totalCost}猫粮  免费额度: {_freeDeployQuota}  " +
-                       $"实际消耗: {actualCost}猫粮  (持有: {_currentCatFood})";
-
-        if (!canAfford)
-        {
-            text += "  <color=#ff4444>猫粮不足!</color>";
-        }
-
-        _deployCostText.text = text;
-    }
-
-    private void RefreshStartButtonState()
-    {
-        if (_startBattleButton == null) return;
-
-        int totalCost = CalculateSliderTotalCost();
-        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
-        bool canAfford = _currentCatFood >= actualCost;
-
-        _startBattleButton.interactable = canAfford;
-    }
-
-    private int CalculateSliderTotalCost()
-    {
-        int total = 0;
-        foreach (var tribe in _deployedTribes)
-        {
-            int count = _deployCatCounts.TryGetValue(tribe.tribeId, out int c) ? c : 0;
-            total += GetDeployCostPerCat(tribe.tribeType) * count;
-        }
-        return total;
     }
 
     private int GetTotalSelectedCatCount()
     {
         int total = 0;
-        foreach (var c in _deployCatCounts.Values)
-            total += c;
+        foreach (var tribe in _deployedTribes)
+        {
+            total += Mathf.Min(GetCommandLimit(tribe), tribe.GetCatCount());
+        }
         return total;
     }
 
-    private static int GetDeployCostPerCat(TribeType tribeType)
-    {
-        TribeConfig config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-        if (config != null && config.deployCostPerCat > 0)
-            return config.deployCostPerCat;
+    // --- Battle Options ---
 
-        switch (tribeType)
+    private void RebuildBattleOptions()
+    {
+        if (_battleOptionsRoot == null) return;
+        ClearChildren(_battleOptionsRoot);
+
+        for (int i = 0; i < _battleChoices.Count; i++)
         {
-            case TribeType.Siamese: return 12;
-            case TribeType.Cow: return 8;
-            default: return 10;
+            int capturedIndex = i;
+            BattleChoice choice = _battleChoices[i];
+
+            GameObject btnGo = new GameObject($"BattleOption_{i}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            btnGo.transform.SetParent(_battleOptionsRoot, false);
+
+            LayoutElement le = btnGo.GetComponent<LayoutElement>();
+            le.preferredHeight = 120f;
+            le.flexibleWidth = 1f;
+
+            Image bg = btnGo.GetComponent<Image>();
+            bg.color = (i == _selectedChoiceIndex) ? TabActiveColor : TabInactiveColor;
+
+            Button btn = btnGo.GetComponent<Button>();
+            btn.targetGraphic = bg;
+            btn.onClick.AddListener(() => OnBattleOptionClicked(capturedIndex));
+
+            // Content text
+            string terrainName = BattleScenarioOption.GetTerrainName(choice.terrain);
+            string weatherName = BattleScenarioOption.GetWeatherName(choice.weather);
+            string diffName = GetDifficultyName(choice.difficulty);
+            int enemyCount = choice.enemyUnitIds != null ? choice.enemyUnitIds.Length : 0;
+
+            string contentStr = $"<size=24>战斗选项 {i + 1} ({diffName})</size>\n\n地形: {terrainName}    天气: {weatherName}\n敌人数量: {enemyCount}";
+
+            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.transform.SetParent(btnGo.transform, false);
+            RectTransform textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = new Vector2(0.05f, 0.05f);
+            textRect.anchorMax = new Vector2(0.95f, 0.95f);
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            Text text = textGo.GetComponent<Text>();
+            text.font = _uiFont;
+            text.fontSize = 18;
+            text.color = Color.white;
+            text.alignment = TextAnchor.MiddleLeft;
+            text.supportRichText = true;
+            text.text = contentStr;
+            text.raycastTarget = false;
         }
+    }
+
+    private void OnBattleOptionClicked(int index)
+    {
+        if (index == _selectedChoiceIndex) return;
+        _selectedChoiceIndex = index;
+        RefreshUI(); // Refresh UI to update tribe buff indicators
+    }
+
+    private void RefreshStartButtonState()
+    {
+        if (_startBattleButton == null) return;
+        _startBattleButton.interactable = true;
     }
 
     private static int GetCommandLimit(TribeRecord tribe)
@@ -392,62 +248,6 @@ public class BattlePreparePanel : UIPanel
         if (tribe.leader != null && tribe.leader.command > 0)
             return tribe.leader.command;
         return tribe.GetCatCount();
-    }
-
-    // --- Buff Preview ---
-
-    private void RefreshBuffPreview()
-    {
-        if (_buffPreviewText == null) return;
-
-        if (_scenarioOptions == null || _scenarioOptions.Count == 0 ||
-            _selectedScenarioIndex >= _scenarioOptions.Count)
-        {
-            _buffPreviewText.text = "";
-            return;
-        }
-
-        BattleScenarioOption selectedScenario = _scenarioOptions[_selectedScenarioIndex];
-
-        string text = $"战场: {BattleScenarioOption.GetTerrainName(selectedScenario.terrain)} / " +
-                       $"{BattleScenarioOption.GetWeatherName(selectedScenario.weather)}\n";
-
-        if (_deployedTribes.Count == 0)
-        {
-            text += "上阵族群后显示 buff 预览";
-        }
-        else
-        {
-            foreach (TribeRecord tribe in _deployedTribes)
-            {
-                TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(
-                    tribe.tribeType, selectedScenario.terrain, selectedScenario.weather);
-
-                text += $"{GetTribeTypeName(tribe.tribeType)}: {buff.GetDescription()}\n";
-            }
-        }
-
-        _buffPreviewText.text = text.TrimEnd('\n');
-    }
-
-    // --- Enemy Info ---
-
-    private void RefreshEnemyInfo()
-    {
-        if (_enemyInfoText == null) return;
-
-        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
-        if (campaign == null) return;
-
-        DifficultyLevel selectedDifficulty = GetSelectedDifficulty();
-        UnitStaticAttributes enemyStats = campaign.GetEnemyStats(_currentLevel, selectedDifficulty);
-        int reward = campaign.GetCatFoodReward(_currentLevel, selectedDifficulty);
-
-        string text = $"难度: {GetDifficultyName(selectedDifficulty)}  " +
-                       $"敌人 ATK={enemyStats.Attack} DEF={enemyStats.Defense} HP={enemyStats.MaxHp}  " +
-                       $"奖励: {reward}猫粮";
-
-        _enemyInfoText.text = text;
     }
 
     // --- Tribe Views ---
@@ -462,41 +262,8 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
-    private void RebuildEnemyViews()
-    {
-        ClearChildren(_enemyCardsRoot);
-
-        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
-        if (campaign == null) return;
-
-        // Determine formation type from selected scenario
-        EnemyFormationType formation = EnemyFormationType.Single;
-        if (_scenarioOptions != null && _selectedScenarioIndex < _scenarioOptions.Count)
-        {
-            formation = _scenarioOptions[_selectedScenarioIndex].formationType;
-        }
-
-        int[] enemyUnitIds = campaign.GetEnemyUnitIds(_currentLevel, formation);
-        if (enemyUnitIds == null || enemyUnitIds.Length == 0)
-        {
-            enemyUnitIds = campaign.GetEnemyUnitIdsForBattle(_currentLevel);
-        }
-
-        if (enemyUnitIds == null || enemyUnitIds.Length == 0)
-        {
-            CreateEnemyItem(_enemyCardsRoot, 1, 1);
-            return;
-        }
-
-        for (int i = 0; i < enemyUnitIds.Length; i++)
-        {
-            CreateEnemyItem(_enemyCardsRoot, i + 1, enemyUnitIds[i]);
-        }
-    }
-
     private void CreateTribeCard(RectTransform parent, TribeRecord tribe)
     {
-        bool isLeaderResting = IsLeaderResting(tribe);
         GameObject cardGo = new GameObject($"PrepareTribe_{tribe.tribeId}",
             typeof(RectTransform),
             typeof(Image),
@@ -514,9 +281,7 @@ public class BattlePreparePanel : UIPanel
         layoutElement.flexibleWidth = 1f;
 
         Image cardBg = cardGo.GetComponent<Image>();
-        cardBg.color = isLeaderResting
-            ? new Color(0.4f, 0.25f, 0.25f, 0.95f)
-            : GetTribeTypeColor(tribe.tribeType);
+        cardBg.color = GetTribeTypeColor(tribe.tribeType);
 
         CreateTribeCardContent(cardRect, tribe);
     }
@@ -527,7 +292,7 @@ public class BattlePreparePanel : UIPanel
         nameText.alignment = TextAnchor.UpperLeft;
         nameText.text = $"{GetTribeTypeName(tribe.tribeType)}族 (ID:{tribe.tribeId})";
 
-        string statusInfo = $"族长: {(tribe.leader?.restTurns > 0 ? $"休息中({tribe.leader.restTurns}回)" : "可出战")}  小猫: {tribe.GetCatCount()}只";
+        string statusInfo = $"族长: 可出战  小猫: {tribe.GetCatCount()}只";
         Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 14);
         statText.alignment = TextAnchor.LowerLeft;
         statText.text = statusInfo;
@@ -536,56 +301,38 @@ public class BattlePreparePanel : UIPanel
         {
             Text detailText = CreateCardText(cardRect.transform, "Detail", new Vector2(0f, 0.5f), new Vector2(1f, 0.8f), new Vector2(10f, 0f), 12);
             detailText.alignment = TextAnchor.MiddleLeft;
-            int costPerCat = 0;
-            TribeConfig config = TribeConfigLoader.Instance?.GetTribeConfig(tribe.tribeType);
-            if (config != null) costPerCat = config.deployCostPerCat;
-            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 统{tribe.leader.command}  消耗{costPerCat}/猫";
+            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 统{tribe.leader.command}";
         }
 
-        // Slider row for controlling deploy count
-        CreateSliderRow(cardRect, tribe);
+        // Add buff indicators
+        if (_battleChoices.Count > 0 && _selectedChoiceIndex >= 0 && _selectedChoiceIndex < _battleChoices.Count)
+        {
+            BattleChoice choice = _battleChoices[_selectedChoiceIndex];
+
+            int weatherBuff = TribeBattleBuffProvider.GetWeatherBuffStatus(tribe.tribeType, choice.weather);
+            int terrainBuff = TribeBattleBuffProvider.GetTerrainBuffStatus(tribe.tribeType, choice.terrain);
+
+            string weatherSymbol = weatherBuff > 0 ? "↑" : (weatherBuff < 0 ? "↓" : "-");
+            string terrainSymbol = terrainBuff > 0 ? "↑" : (terrainBuff < 0 ? "↓" : "-");
+
+            string weatherColor = weatherBuff > 0 ? "#00FF00" : (weatherBuff < 0 ? "#FF0000" : "#FFFFFF");
+            string terrainColor = terrainBuff > 0 ? "#00FF00" : (terrainBuff < 0 ? "#FF0000" : "#FFFFFF");
+
+            Text buffText = CreateCardText(cardRect.transform, "BuffIndicators", new Vector2(0.5f, 1f), new Vector2(1f, 1f), new Vector2(-10f, -10f), 20);
+            buffText.alignment = TextAnchor.UpperRight;
+            buffText.supportRichText = true;
+            buffText.text = $"天气: <color={weatherColor}>{weatherSymbol}</color>  地形: <color={terrainColor}>{terrainSymbol}</color>";
+        }
+
+        CreateCatCountRow(cardRect, tribe);
     }
 
-    private void CreateEnemyItem(RectTransform parent, int displayIndex, int enemyUnitId)
-    {
-        GameObject enemyGo = new GameObject($"Enemy_{displayIndex}",
-            typeof(RectTransform),
-            typeof(Image),
-            typeof(LayoutElement));
-        enemyGo.transform.SetParent(parent, false);
-
-        RectTransform enemyRect = enemyGo.GetComponent<RectTransform>();
-        enemyRect.anchorMin = new Vector2(0f, 1f);
-        enemyRect.anchorMax = new Vector2(1f, 1f);
-        enemyRect.pivot = new Vector2(0.5f, 1f);
-
-        LayoutElement layoutElement = enemyGo.GetComponent<LayoutElement>();
-        layoutElement.minHeight = 72f;
-        layoutElement.preferredHeight = 72f;
-        layoutElement.flexibleWidth = 1f;
-
-        Image enemyBg = enemyGo.GetComponent<Image>();
-        enemyBg.color = new Color(0.45f, 0.2f, 0.2f, 0.92f);
-
-        Text titleText = CreateCardText(enemyGo.transform, "EnemyName", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 17);
-        titleText.alignment = TextAnchor.UpperLeft;
-        titleText.text = $"敌人 {displayIndex}: {ResolveEnemyName(enemyUnitId)}";
-
-        Text detailText = CreateCardText(enemyGo.transform, "EnemyDetail", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 13);
-        detailText.alignment = TextAnchor.LowerLeft;
-        detailText.text = $"兵种ID {enemyUnitId}";
-    }
-
-    private void CreateSliderRow(RectTransform cardRect, TribeRecord tribe)
+    private void CreateCatCountRow(RectTransform cardRect, TribeRecord tribe)
     {
         int commandLimit = GetCommandLimit(tribe);
-        int maxSlider = Mathf.Min(commandLimit, tribe.GetCatCount());
-        int current = _deployCatCounts.TryGetValue(tribe.tribeId, out int c) ? c : maxSlider;
-        int costPerCat = GetDeployCostPerCat(tribe.tribeType);
-        int tribeId = tribe.tribeId;
+        int deployed = Mathf.Min(commandLimit, tribe.GetCatCount());
 
-        // Slider row container
-        GameObject rowGo = new GameObject("SliderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        GameObject rowGo = new GameObject("CatCountRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         rowGo.transform.SetParent(cardRect, false);
         RectTransform rowRect = rowGo.GetComponent<RectTransform>();
         rowRect.anchorMin = new Vector2(0f, 0f);
@@ -601,130 +348,17 @@ public class BattlePreparePanel : UIPanel
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = true;
 
-        // Count label
         GameObject countGo = new GameObject("CountLabel", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
         countGo.transform.SetParent(rowGo.transform, false);
         LayoutElement countLe = countGo.GetComponent<LayoutElement>();
-        countLe.preferredWidth = 80f;
-        countLe.minWidth = 80f;
+        countLe.flexibleWidth = 1f;
+        countLe.minWidth = 150f;
         Text countText = countGo.GetComponent<Text>();
         countText.font = _uiFont;
-        countText.fontSize = 14;
+        countText.fontSize = 16;
         countText.color = new Color(0.9f, 0.95f, 1f, 1f);
         countText.alignment = TextAnchor.MiddleLeft;
-        countText.text = $"猫:{current}/{maxSlider}";
-
-        // Slider
-        GameObject sliderGo = CreateSliderGo(rowGo.transform, maxSlider, current);
-        LayoutElement sliderLe = sliderGo.GetComponent<LayoutElement>();
-        if (sliderLe == null) sliderLe = sliderGo.AddComponent<LayoutElement>();
-        sliderLe.preferredWidth = 140f;
-        sliderLe.minHeight = 24f;
-        sliderLe.flexibleWidth = 1f;
-
-        Slider slider = sliderGo.GetComponent<Slider>();
-
-        // Cost label
-        GameObject costGo = new GameObject("SliderCost", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
-        costGo.transform.SetParent(rowGo.transform, false);
-        LayoutElement costLe = costGo.GetComponent<LayoutElement>();
-        costLe.preferredWidth = 90f;
-        costLe.minWidth = 90f;
-        Text costText = costGo.GetComponent<Text>();
-        costText.font = _uiFont;
-        costText.fontSize = 13;
-        costText.color = new Color(0.85f, 0.75f, 0.2f, 1f);
-        costText.alignment = TextAnchor.MiddleRight;
-        costText.text = $"{costPerCat}粮/猫×{current}";
-
-        // Slider callback
-        slider.onValueChanged.AddListener((value) =>
-        {
-            int count = Mathf.RoundToInt(value);
-            _deployCatCounts[tribeId] = count;
-            countText.text = $"猫:{count}/{commandLimit}";
-            costText.text = $"{costPerCat}粮/猫×{count}";
-            RefreshDeployCost();
-            RefreshTexts();
-            RefreshStartButtonState();
-        });
-    }
-
-    private GameObject CreateSliderGo(Transform parent, int max, int current)
-    {
-        // Root — anchor at center, sizeDelta set by LayoutElement via HLG
-        GameObject sliderGo = new GameObject("Slider", typeof(RectTransform), typeof(Image), typeof(Slider));
-        sliderGo.transform.SetParent(parent, false);
-        RectTransform sliderRect = sliderGo.GetComponent<RectTransform>();
-        sliderRect.anchorMin = new Vector2(0.5f, 0.5f);
-        sliderRect.anchorMax = new Vector2(0.5f, 0.5f);
-        sliderRect.sizeDelta = new Vector2(140f, 24f);
-        Image sliderBg = sliderGo.GetComponent<Image>();
-        sliderBg.color = new Color(0.15f, 0.15f, 0.15f, 0.5f); // visible for raycast
-
-        // Background (track)
-        GameObject bgGo = new GameObject("Background", typeof(RectTransform), typeof(Image));
-        bgGo.transform.SetParent(sliderGo.transform, false);
-        RectTransform bgRect = bgGo.GetComponent<RectTransform>();
-        bgRect.anchorMin = new Vector2(0f, 0.25f);
-        bgRect.anchorMax = new Vector2(1f, 0.75f);
-        bgRect.offsetMin = Vector2.zero;
-        bgRect.offsetMax = Vector2.zero;
-        Image bgImage = bgGo.GetComponent<Image>();
-        bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-
-        // Fill Area
-        GameObject fillAreaGo = new GameObject("Fill Area", typeof(RectTransform));
-        fillAreaGo.transform.SetParent(sliderGo.transform, false);
-        RectTransform fillAreaRect = fillAreaGo.GetComponent<RectTransform>();
-        fillAreaRect.anchorMin = new Vector2(0f, 0.25f);
-        fillAreaRect.anchorMax = new Vector2(1f, 0.75f);
-        fillAreaRect.offsetMin = Vector2.zero;
-        fillAreaRect.offsetMax = Vector2.zero;
-
-        // Fill
-        GameObject fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-        fillGo.transform.SetParent(fillAreaGo.transform, false);
-        RectTransform fillRect = fillGo.GetComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = Vector2.zero;
-        fillRect.offsetMax = Vector2.zero;
-        Image fillImage = fillGo.GetComponent<Image>();
-        fillImage.color = new Color(0.25f, 0.65f, 0.35f, 0.9f);
-
-        // Handle Slide Area
-        GameObject handleAreaGo = new GameObject("Handle Slide Area", typeof(RectTransform));
-        handleAreaGo.transform.SetParent(sliderGo.transform, false);
-        RectTransform handleAreaRect = handleAreaGo.GetComponent<RectTransform>();
-        handleAreaRect.anchorMin = Vector2.zero;
-        handleAreaRect.anchorMax = Vector2.one;
-        handleAreaRect.offsetMin = Vector2.zero;
-        handleAreaRect.offsetMax = Vector2.zero;
-
-        // Handle
-        GameObject handleGo = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-        handleGo.transform.SetParent(handleAreaGo.transform, false);
-        RectTransform handleRect = handleGo.GetComponent<RectTransform>();
-        handleRect.anchorMin = new Vector2(0f, 0f);
-        handleRect.anchorMax = new Vector2(0f, 1f);
-        handleRect.sizeDelta = new Vector2(24f, 0f);
-        handleRect.pivot = new Vector2(0.5f, 0.5f);
-        Image handleImage = handleGo.GetComponent<Image>();
-        handleImage.color = new Color(0.9f, 0.9f, 0.9f, 1f);
-
-        // Configure slider
-        Slider slider = sliderGo.GetComponent<Slider>();
-        slider.fillRect = fillRect;
-        slider.handleRect = handleRect;
-        slider.targetGraphic = handleImage;
-        slider.direction = Slider.Direction.LeftToRight;
-        slider.minValue = 0;
-        slider.maxValue = max;
-        slider.wholeNumbers = true;
-        slider.value = current;
-
-        return sliderGo;
+        countText.text = $"出战小猫: {deployed} / {tribe.GetCatCount()} (统御上限:{commandLimit})";
     }
 
     private Text CreateCardText(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, int fontSize)
@@ -759,48 +393,19 @@ public class BattlePreparePanel : UIPanel
             return;
         }
 
-
-        foreach (TribeRecord tribe in _deployedTribes)
+        if (_battleChoices.Count == 0 || _selectedChoiceIndex < 0 || _selectedChoiceIndex >= _battleChoices.Count)
         {
-            if (IsLeaderResting(tribe))
-            {
-                SetStatusText($"{GetTribeTypeName(tribe.tribeType)}族长正在休息，无法出战。", true);
-                return;
-            }
-        }
-
-        // Check deploy cost
-        int totalCost = CalculateSliderTotalCost();
-        int actualCost = DeployCostCalculator.CalculateActualCost(totalCost, _freeDeployQuota);
-        if (_currentCatFood < actualCost)
-        {
-            SetStatusText($"猫粮不足! 需要 {actualCost} 猫粮，当前持有 {_currentCatFood}。", true);
+            SetStatusText("未选择战斗场景。", true);
             return;
         }
 
-        // Deduct cat food
-        if (actualCost > 0)
-        {
-            DataManager dataManager = GameManager.Instance?.DataManager;
-            if (dataManager != null)
-            {
-                dataManager.TrySpendCatFood(actualCost);
-                dataManager.SavePlayerData();
-            }
-        }
+        BattleChoice selectedChoice = _battleChoices[_selectedChoiceIndex];
 
-        // Get selected scenario and difficulty
-        TerrainType terrain = TerrainType.Plain;
-        WeatherType weather = WeatherType.Sunny;
-        if (_scenarioOptions != null && _selectedScenarioIndex < _scenarioOptions.Count)
-        {
-            terrain = _scenarioOptions[_selectedScenarioIndex].terrain;
-            weather = _scenarioOptions[_selectedScenarioIndex].weather;
-        }
+        TerrainType terrain = selectedChoice.terrain;
+        WeatherType weather = selectedChoice.weather;
+        DifficultyLevel difficulty = selectedChoice.difficulty;
 
-        DifficultyLevel difficulty = GetSelectedDifficulty();
-
-        // Build filtered tribe list based on slider counts
+        // Build filtered tribe list based on all deployed tribes
         List<TribeRecord> filteredTribes = BuildFilteredTribeList();
 
         GameManager.Instance.UIManager.HidePanel("ui/BattlePreparePanel");
@@ -817,8 +422,6 @@ public class BattlePreparePanel : UIPanel
         var result = new List<TribeRecord>();
         foreach (var tribe in _deployedTribes)
         {
-            int selectedCount = _deployCatCounts.TryGetValue(tribe.tribeId, out int c) ? c : 0;
-
             var copy = new TribeRecord
             {
                 tribeId = tribe.tribeId,
@@ -829,9 +432,9 @@ public class BattlePreparePanel : UIPanel
                 cats = new List<CatData>()
             };
 
-            if (tribe.cats != null && selectedCount > 0)
+            if (tribe.cats != null)
             {
-                int take = Mathf.Min(selectedCount, tribe.cats.Count);
+                int take = Mathf.Min(GetCommandLimit(tribe), tribe.cats.Count);
                 for (int i = 0; i < take; i++)
                 {
                     copy.cats.Add(tribe.cats[i]);
@@ -873,7 +476,6 @@ public class BattlePreparePanel : UIPanel
             contentRoot = GetOrCreateChildRect(panelRect, RootName, new Vector2(0.04f, 0.05f), new Vector2(0.96f, 0.95f));
             Image contentBackgroundFallback = GetOrAddComponent<Image>(contentRoot.gameObject);
             contentBackgroundFallback.color = new Color(0.87f, 0.91f, 0.96f, 0.98f);
-            Debug.LogWarning("[BattlePreparePanel] Content root not found on prefab; created runtime fallback.");
         }
 
         if (_titleText == null)
@@ -896,28 +498,6 @@ public class BattlePreparePanel : UIPanel
             _summaryText = GetOrCreateText(contentRoot, SummaryName, _uiFont, 20, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.84f), new Vector2(0.97f, 0.9f), new Color(0.15f, 0.19f, 0.26f, 1f));
         }
 
-        // Scenario tabs row (between summary and status)
-        if (_scenarioTabsRoot == null)
-        {
-            var tf = contentRoot.Find(ScenarioTabsName);
-            if (tf != null) _scenarioTabsRoot = tf as RectTransform;
-        }
-        if (_scenarioTabsRoot == null)
-        {
-            _scenarioTabsRoot = GetOrCreateChildRect(contentRoot, ScenarioTabsName, new Vector2(0.03f, 0.78f), new Vector2(0.5f, 0.84f));
-        }
-
-        // Difficulty tabs row (right of scenario tabs)
-        if (_difficultyTabsRoot == null)
-        {
-            var tf = contentRoot.Find(DifficultyTabsName);
-            if (tf != null) _difficultyTabsRoot = tf as RectTransform;
-        }
-        if (_difficultyTabsRoot == null)
-        {
-            _difficultyTabsRoot = GetOrCreateChildRect(contentRoot, DifficultyTabsName, new Vector2(0.5f, 0.78f), new Vector2(0.97f, 0.84f));
-        }
-
         // Status text
         if (_statusText == null)
         {
@@ -934,50 +514,17 @@ public class BattlePreparePanel : UIPanel
             _tribesRoot = contentRoot.Find(TribesRootName) as RectTransform;
             if (_tribesRoot == null)
             {
-                _tribesRoot = CreateRuntimeZone(contentRoot, TribesRootName, "出战族群", new Vector2(0.03f, 0.3f), new Vector2(0.62f, 0.72f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
+                _tribesRoot = CreateRuntimeZone(contentRoot, TribesRootName, "出战族群", new Vector2(0.03f, 0.16f), new Vector2(0.62f, 0.72f), new Color(0.13f, 0.23f, 0.39f, 0.72f));
             }
         }
 
-        if (_enemyCardsRoot == null)
+        if (_battleOptionsRoot == null)
         {
-            _enemyCardsRoot = contentRoot.Find(EnemyRootName) as RectTransform;
-            if (_enemyCardsRoot == null)
+            _battleOptionsRoot = contentRoot.Find(EnemyRootName) as RectTransform;
+            if (_battleOptionsRoot == null)
             {
-                _enemyCardsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "敌人列表", new Vector2(0.68f, 0.3f), new Vector2(0.97f, 0.72f), new Color(0.42f, 0.18f, 0.18f, 0.72f));
+                _battleOptionsRoot = CreateRuntimeZone(contentRoot, EnemyRootName, "选择战斗场景", new Vector2(0.68f, 0.16f), new Vector2(0.97f, 0.72f), new Color(0.18f, 0.2f, 0.25f, 0.72f));
             }
-        }
-
-        // Deploy cost text
-        if (_deployCostText == null)
-        {
-            var tf = contentRoot.Find(DeployCostName);
-            if (tf != null) _deployCostText = tf.GetComponent<Text>();
-        }
-        if (_deployCostText == null)
-        {
-            _deployCostText = GetOrCreateText(contentRoot, DeployCostName, _uiFont, 16, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.24f), new Vector2(0.65f, 0.3f), new Color(0.85f, 0.75f, 0.2f, 1f));
-        }
-
-        // Buff preview text
-        if (_buffPreviewText == null)
-        {
-            var tf = contentRoot.Find(BuffPreviewName);
-            if (tf != null) _buffPreviewText = tf.GetComponent<Text>();
-        }
-        if (_buffPreviewText == null)
-        {
-            _buffPreviewText = GetOrCreateText(contentRoot, BuffPreviewName, _uiFont, 14, TextAnchor.UpperLeft, new Vector2(0.68f, 0.08f), new Vector2(0.97f, 0.3f), new Color(0.7f, 0.85f, 0.7f, 1f));
-        }
-
-        // Enemy info text
-        if (_enemyInfoText == null)
-        {
-            var tf = contentRoot.Find(EnemyInfoName);
-            if (tf != null) _enemyInfoText = tf.GetComponent<Text>();
-        }
-        if (_enemyInfoText == null)
-        {
-            _enemyInfoText = GetOrCreateText(contentRoot, EnemyInfoName, _uiFont, 15, TextAnchor.MiddleLeft, new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.24f), new Color(0.8f, 0.5f, 0.5f, 1f));
         }
 
         if (_backButton == null)
@@ -1008,7 +555,7 @@ public class BattlePreparePanel : UIPanel
     private void EnsureZoneLayouts()
     {
         ConfigureVerticalLayout(_tribesRoot);
-        ConfigureVerticalLayout(_enemyCardsRoot);
+        ConfigureVerticalLayout(_battleOptionsRoot);
     }
 
     private static void ConfigureVerticalLayout(RectTransform zoneRoot)
@@ -1127,15 +674,10 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
-    private bool IsLeaderResting(TribeRecord tribe)
-    {
-        return tribe.leader != null && tribe.leader.restTurns > 0;
-    }
-
     private DifficultyLevel GetSelectedDifficulty()
     {
-        if (_difficultyOptions != null && _selectedDifficultyIndex < _difficultyOptions.Count)
-            return _difficultyOptions[_selectedDifficultyIndex];
+        if (_battleChoices != null && _selectedChoiceIndex >= 0 && _selectedChoiceIndex < _battleChoices.Count)
+            return _battleChoices[_selectedChoiceIndex].difficulty;
         return DifficultyLevel.Normal;
     }
 

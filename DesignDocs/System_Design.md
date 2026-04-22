@@ -164,7 +164,6 @@ public class TribeRecord
 
     // 辅助方法
     public int GetCatCount();        // 获取小猫总数
-    public bool IsLeaderResting();   // 检查族长是否在休息
 }
 ```
 
@@ -183,7 +182,6 @@ public class LeaderData
     public List<int> skillIds;       // 技能ID列表（最多3个）
     public PermanentBuffs permanentBuffs;   // 永久加成
     public TemporaryBuff temporaryBuff;     // 限时加成
-    public int restTurns;            // 休息剩余回合
 }
 ```
 
@@ -226,7 +224,7 @@ public class CatData
 ### 2.4 族群获得与成长
 
 #### 初始选择
-- 游戏开始：六选二，玩家选择2个族群作为初始战力
+- 游戏开始：六选一，玩家选择1个族群作为初始战力
 - 初始小猫品质：固定白色
 
 #### 游戏中扩容
@@ -753,8 +751,8 @@ public class ShopItem
 - 下回合立即恢复
 
 #### 族长阵亡
-- 需休息一回合
-- 休息期间该族群不能参战
+- 无特殊惩罚（已移除休息回合机制）
+- 随时可以再次出战
 
 ---
 
@@ -766,7 +764,7 @@ public class ShopItem
 
 #### 第一回合
 1. **战前准备**
-   - 六选二部族组建初始猫村（新游戏开局）
+   - 六选一部族组建初始猫村（新游戏开局）
    - 可使用一次性道具
    - 查看饰品图鉴
    - 查看族群效果
