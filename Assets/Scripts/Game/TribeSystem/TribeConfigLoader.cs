@@ -30,6 +30,7 @@ namespace TribeSystem
         private RecruitmentConfig _recruitmentConfig;
         private RitualConfig _ritualConfig;
         private ShopConfig _shopConfig;
+        private List<CatStaticStats> _catStaticStats;
 
         // 配置文件路径 (StreamingAssets)
         private const string TRIBE_CONFIG_PATH = "Tables/tribe_config.json";
@@ -37,6 +38,7 @@ namespace TribeSystem
         private const string RECRUITMENT_CONFIG_PATH = "Tables/recruitment_config.json";
         private const string RITUAL_CONFIG_PATH = "Tables/ritual_config.json";
         private const string SHOP_CONFIG_PATH = "Tables/shop_config.json";
+        private const string CAT_STATS_TABLE_PATH = "Tables/cat_stats_table.json";
 
         private string GetStreamingAssetsPath(string relativePath)
         {
@@ -69,6 +71,7 @@ namespace TribeSystem
             _recruitmentConfig = LoadRecruitmentConfig();
             _ritualConfig = LoadRitualConfig();
             _shopConfig = LoadShopConfig();
+            _catStaticStats = LoadCatStaticStats();
 
             _isLoaded = true;
 
@@ -91,6 +94,15 @@ namespace TribeSystem
         {
             EnsureLoaded();
             return _tribeConfigs;
+        }
+
+        /// <summary>
+        /// 获取指定种族和品质的小猫静态属性
+        /// </summary>
+        public CatStaticStats GetCatStaticStats(TribeType tribeType, CatQuality quality)
+        {
+            EnsureLoaded();
+            return _catStaticStats?.Find(s => s.tribeType == (int)tribeType && s.quality == (int)quality);
         }
 
         /// <summary>
@@ -271,6 +283,29 @@ namespace TribeSystem
             }
         }
 
+        private List<CatStaticStats> LoadCatStaticStats()
+        {
+            string filePath = GetStreamingAssetsPath(CAT_STATS_TABLE_PATH);
+            if (!File.Exists(filePath))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] cat_stats_table.json not found at {filePath}, cat static stats unavailable");
+                return new List<CatStaticStats>();
+            }
+
+            try
+            {
+                string jsonText = File.ReadAllText(filePath);
+                var json = JsonUtility.FromJson<CatStaticStatsWrapper>(jsonText);
+                Debug.Log($"[TribeConfigLoader] Loaded {json.catStats.Count} cat static stats entries");
+                return json.catStats;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[TribeConfigLoader] Error parsing cat stats table: {e.Message}");
+                return new List<CatStaticStats>();
+            }
+        }
+
         #endregion
 
         #region Default Config Creators
@@ -386,6 +421,12 @@ namespace TribeSystem
         public int shopInterval;
         public int startRound;
         public ShopItemConfig items;
+    }
+
+    [System.Serializable]
+    public class CatStaticStatsWrapper
+    {
+        public List<CatStaticStats> catStats;
     }
 
     #endregion

@@ -293,8 +293,8 @@ public class BattlePreparePanel : UIPanel
         nameText.text = $"{GetTribeTypeName(tribe.tribeType)}族 (ID:{tribe.tribeId})";
 
         string statusInfo = $"族长: 可出战  小猫: {tribe.GetCatCount()}只";
-        Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 10f), 14);
-        statText.alignment = TextAnchor.LowerLeft;
+        Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0.38f), new Vector2(1f, 0.55f), new Vector2(10f, 0f), 14);
+        statText.alignment = TextAnchor.MiddleLeft;
         statText.text = statusInfo;
 
         if (tribe.leader != null)

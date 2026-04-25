@@ -547,7 +547,7 @@ namespace TribeSystem
         private void AddCatsToTribe(TribeRecord tribe, int count, CatQuality quality)
         {
             for (int i = 0; i < count; i++)
-                tribe.cats.Add(CatData.CreateWithQuality(quality));
+                tribe.cats.Add(CatData.CreateWithQuality(quality, tribe.tribeType));
         }
 
         private TribeRecord GetRandomActiveTribe()

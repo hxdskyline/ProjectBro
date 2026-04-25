@@ -161,10 +161,17 @@ namespace TribeSystem
     {
         public long catId;
         public CatQuality quality;
+        public TribeType tribeType;
+        // 旧字段保留兼容旧存档，新小猫不再使用
         public float attackMultiplier;
         public float defenseMultiplier;
         public float hpMultiplier;
         public float speedMultiplier;
+        // 静态属性（新系统，从 cat_stats_table.json 读取）
+        public int staticAttack;
+        public int staticDefense;
+        public int staticHp;
+        public int staticSpeed;
 
         public CatData()
         {
@@ -174,51 +181,33 @@ namespace TribeSystem
             defenseMultiplier = 0.35f;
             hpMultiplier = 0.35f;
             speedMultiplier = 1.0f;
+            staticAttack = 0;
+            staticDefense = 0;
+            staticHp = 0;
+            staticSpeed = 0;
         }
 
         /// <summary>
-        /// 创建指定品质的小猫
+        /// 创建指定品质的小猫（从 cat_stats_table.json 读取静态属性）
         /// </summary>
-        public static CatData CreateWithQuality(CatQuality quality)
+        public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType)
         {
             var cat = new CatData
             {
                 catId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                quality = quality
+                quality = quality,
+                tribeType = tribeType
             };
 
-            // 根据品质设置属性比例范围
-            float minRatio, maxRatio;
-            switch (quality)
+            // 从配置表读取静态属性
+            var stats = TribeConfigLoader.Instance?.GetCatStaticStats(tribeType, quality);
+            if (stats != null)
             {
-                case CatQuality.White:
-                    minRatio = 0.3f;
-                    maxRatio = 0.4f;
-                    break;
-                case CatQuality.Blue:
-                    minRatio = 0.4f;
-                    maxRatio = 0.5f;
-                    break;
-                case CatQuality.Purple:
-                    minRatio = 0.5f;
-                    maxRatio = 0.6f;
-                    break;
-                case CatQuality.Gold:
-                    minRatio = 0.6f;
-                    maxRatio = 0.7f;
-                    break;
-                default:
-                    minRatio = 0.3f;
-                    maxRatio = 0.4f;
-                    break;
+                cat.staticAttack = stats.attack;
+                cat.staticDefense = stats.defense;
+                cat.staticHp = stats.hp;
+                cat.staticSpeed = stats.speed;
             }
-
-            // 在范围内随机生成
-            float ratio = UnityEngine.Random.Range(minRatio, maxRatio);
-            cat.attackMultiplier = ratio;
-            cat.defenseMultiplier = ratio;
-            cat.hpMultiplier = ratio;
-            cat.speedMultiplier = 1.0f; // 移动速度全继承族长
 
             return cat;
         }
@@ -226,7 +215,7 @@ namespace TribeSystem
         /// <summary>
         /// 创建随机品质的小猫（白40% 蓝30% 紫20% 金10%）
         /// </summary>
-        public static CatData CreateWithRandomQuality()
+        public static CatData CreateWithRandomQuality(TribeType tribeType)
         {
             float roll = UnityEngine.Random.value;
             CatQuality quality;
@@ -234,7 +223,7 @@ namespace TribeSystem
             else if (roll < 0.7f)  quality = CatQuality.Blue;
             else if (roll < 0.9f)  quality = CatQuality.Purple;
             else                   quality = CatQuality.Gold;
-            return CreateWithQuality(quality);
+            return CreateWithQuality(quality, tribeType);
         }
 
         /// <summary>
@@ -248,17 +237,72 @@ namespace TribeSystem
                 if (quality < CatQuality.Gold)
                 {
                     quality++;
-                    // 重新生成属性比例
-                    var newCat = CreateWithQuality(quality);
-                    attackMultiplier = newCat.attackMultiplier;
-                    defenseMultiplier = newCat.defenseMultiplier;
-                    hpMultiplier = newCat.hpMultiplier;
-                    speedMultiplier = 1.0f; // 移动速度始终全继承
+                    // 从配置表读取新品质的静态属性
+                    var stats = TribeConfigLoader.Instance?.GetCatStaticStats(tribeType, quality);
+                    if (stats != null)
+                    {
+                        staticAttack = stats.attack;
+                        staticDefense = stats.defense;
+                        staticHp = stats.hp;
+                        staticSpeed = stats.speed;
+                    }
                     return true;
                 }
             }
             return false;
         }
+    }
+
+    /// <summary>
+    /// 小猫静态属性（从 cat_stats_table.json 读取）
+    /// </summary>
+    [Serializable]
+    public class CatStaticStats
+    {
+        public int tribeType;
+        public int quality;
+        public int attack;
+        public int defense;
+        public int hp;
+        public int speed;
+    }
+
+    /// <summary>
+    /// Buff 类别
+    /// </summary>
+    public enum BuffCategory
+    {
+        StatModifier,   // 纯属性修改，visible=false
+        Special         // 特殊逻辑buff，visible=true
+    }
+
+    /// <summary>
+    /// 通用 Buff 条目（用于 UI 显示的特殊 buff）
+    /// </summary>
+    [Serializable]
+    public class TribeBuff
+    {
+        public string buffId;
+        public string displayName;
+        public string description;
+        public BuffCategory category;
+        public bool visible;
+        public int iconColorIndex;  // 0红,1蓝,2绿,3金,4紫
+        public int duration;        // -1=永久
+
+        public TribeBuff()
+        {
+            buffId = "";
+            displayName = "";
+            description = "";
+            category = BuffCategory.Special;
+            visible = true;
+            iconColorIndex = 0;
+            duration = -1;
+        }
+
+        public bool IsPermanent => duration < 0;
+        public bool IsExpired => !IsPermanent && duration <= 0;
     }
 
     /// <summary>
@@ -277,6 +321,7 @@ namespace TribeSystem
         public float speedPercent;
         public int commandBonus;
         public float commandPercent;
+        public List<TribeBuff> specialBuffs;
 
         public PermanentBuffs()
         {
@@ -290,6 +335,7 @@ namespace TribeSystem
             speedPercent = 0f;
             commandBonus = 0;
             commandPercent = 0f;
+            specialBuffs = new List<TribeBuff>();
         }
     }
 
@@ -351,6 +397,8 @@ namespace TribeSystem
         public int targetTribeId;          // 目标族群ID（已有族群操作时）
         public StatType targetStatType;    // 目标属性类型（族长强化时）
         public float boostValue;           // 属性提升的百分比值（例如0.2代表20%）
+        public int bonusAttack;            // 固定攻击加成
+        public int bonusHp;                // 固定血量加成
         public string description;
 
         public RecruitmentOption()
@@ -360,6 +408,8 @@ namespace TribeSystem
             targetTribeType = null;
             targetTribeId = -1;
             boostValue = 0.2f;
+            bonusAttack = 0;
+            bonusHp = 0;
             description = "";
         }
     }

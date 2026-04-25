@@ -360,7 +360,7 @@ namespace TribeSystem.UI
                 // 添加初始小猫（白色品质）
                 for (int i = 0; i < config.initialCatCount; i++)
                 {
-                    tribe.cats.Add(CatData.CreateWithQuality(CatQuality.White));
+                    tribe.cats.Add(CatData.CreateWithQuality(CatQuality.White, tribeType));
                 }
 
                 dataManager.AddTribe(tribe);

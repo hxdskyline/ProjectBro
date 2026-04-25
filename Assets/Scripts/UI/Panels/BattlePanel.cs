@@ -376,7 +376,7 @@ public class BattlePanel : UIPanel
             0
         );
 
-        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, catBaseStatsAsLeader);
+        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, catBaseStatsAsLeader, tribe.leader?.permanentBuffs);
 
         int catCount = tribe.cats?.Count ?? 0;
         int command = tribe.leader.command;

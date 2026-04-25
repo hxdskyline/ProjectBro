@@ -289,7 +289,7 @@ namespace TribeSystem
 
             if (targetTribe != null)
             {
-                targetTribe.cats.Add(CatData.CreateWithQuality(quality));
+                targetTribe.cats.Add(CatData.CreateWithQuality(quality, targetTribe.tribeType));
                 Debug.Log($"[ShopService] Added {quality} cat to tribe {tribeType}");
             }
             else
