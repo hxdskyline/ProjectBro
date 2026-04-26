@@ -72,11 +72,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 724621a6f29ff9442afebc6d7517ff9e
-    m_Address: avatartemp/buou1
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8604f9eab07b52c4ca9fdea2b9c8e08c
     m_Address: avatartemp/hero/attack/attack_01
     m_ReadOnly: 0
@@ -99,11 +94,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a315d99ac6f96c34da8c583631b9e288
     m_Address: avatartemp/hero/attack/attack_04
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a45c9f036526916498bdfd75c1d20c9b
-    m_Address: avatartemp/mianyin2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -132,11 +122,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d318b9e3edc47254c9bbb9248aea02bc
-    m_Address: avatartemp/buou2
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d604e4fe50ce2ae4d89f4b95e360354f
     m_Address: avatartemp/hero/idle/idle_04
     m_ReadOnly: 0
@@ -159,11 +144,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e6e47aaeeb2e50c4c91d41dff25a0ced
     m_Address: avatartemp/enemy/die/die_01
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e8007f28587a5c04987170d2d355aa19
-    m_Address: avatartemp/mianyin1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

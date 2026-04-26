@@ -34,12 +34,14 @@ public class VictoryPanel : UIPanel
         _currentLevel = levelId;
         _lastVictory = true;
 
+        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
+        bool isCampaignComplete = battleCampaignRuntime != null && levelId >= battleCampaignRuntime.MaxBattleCount;
+
         if (_victoryText != null)
         {
-            _victoryText.text = "VICTORY!";
+            _victoryText.text = isCampaignComplete ? "通关！" : "VICTORY!";
         }
 
-        BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
         int catFoodReward = battleCampaignRuntime?.GetCatFoodRewardForBattle(levelId) ?? 200;
         string battleProgressText = BuildBattleProgressText(levelId, battleCampaignRuntime);
 
@@ -65,7 +67,7 @@ public class VictoryPanel : UIPanel
 
         if (_victoryText != null)
         {
-            _victoryText.text = "DEFEAT";
+            _victoryText.text = "战败！";
         }
 
         BattleCampaignRuntime battleCampaignRuntime = GameManager.Instance.BattleCampaignRuntime;
@@ -90,17 +92,17 @@ public class VictoryPanel : UIPanel
     {
         if (battleCampaignRuntime == null)
         {
-            return $"Cleared: Battle {levelId}";
+            return $"已通过: 第{levelId}关";
         }
 
         if (levelId >= battleCampaignRuntime.MaxBattleCount)
         {
-            return $"Cleared: Battle {levelId}\nNext: Campaign completed for this run";
+            return $"已通过: 第{levelId}关\n恭喜通关！猫村重获和平！";
         }
 
         int nextBattleNumber = battleCampaignRuntime.GetNextBattleNumber(levelId);
         int nextEnemyCount = battleCampaignRuntime.GetEnemyCountForBattle(nextBattleNumber);
-        return $"Cleared: Battle {levelId}\nNext: Battle {nextBattleNumber}, Enemies {nextEnemyCount}";
+        return $"已通过: 第{levelId}关\n下一关: 第{nextBattleNumber}关, 敌人{nextEnemyCount}只";
     }
 
     private IEnumerator PlayVictoryAnimation()
@@ -131,13 +133,38 @@ public class VictoryPanel : UIPanel
         GameManager.Instance.UIManager.ClosePanel("ui/VictoryPanel");
         GameManager.Instance.UIManager.HidePanel("ui/BattlePanel");
 
-        // 回调TribeBuildPanel处理战斗结束
-        // 直接激活已有实例，不重新创建（重新创建会触发 Start→LoadPlayerData，重置回合）
-        TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
-        if (tribeBuildPanel != null)
+        // 检查是否通关了最后一关
+        BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
+        bool isCampaignComplete = campaign != null && _currentLevel >= campaign.MaxBattleCount;
+
+        if (isCampaignComplete)
         {
-            tribeBuildPanel.gameObject.SetActive(true);
-            tribeBuildPanel.OnBattleEnded(_lastVictory);
+            Debug.Log("[VictoryPanel] 通关！清除游戏数据，返回主界面");
+
+            // 清除存档数据
+            var dataManager = GameManager.Instance.DataManager;
+            if (dataManager != null)
+            {
+                dataManager.DeleteSaveData();
+            }
+
+            // 重置 GameFlowController 状态
+            var gfc = GameFlowController.Instance;
+            if (gfc != null)
+            {
+                gfc.ReturnToMainMenu();
+            }
+        }
+        else
+        {
+            // 回调TribeBuildPanel处理战斗结束
+            // 直接激活已有实例，不重新创建（重新创建会触发 Start→LoadPlayerData，重置回合）
+            TribeBuildPanel tribeBuildPanel = GameManager.Instance.UIManager.GetPanel<TribeBuildPanel>("ui/tribebuild/tribebuildpanel");
+            if (tribeBuildPanel != null)
+            {
+                tribeBuildPanel.gameObject.SetActive(true);
+                tribeBuildPanel.OnBattleEnded(_lastVictory);
+            }
         }
     }
 }

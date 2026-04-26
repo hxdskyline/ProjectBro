@@ -17,12 +17,10 @@ public class BattlePanel : UIPanel
     [SerializeField] private AvatarAnimationDefinition _enemyAvatarDefinition;
 
     [Header("各品种Avatar定义")]
-    [SerializeField] private AvatarAnimationDefinition _mianyinAvatarDef;
     [SerializeField] private AvatarAnimationDefinition _lihuaAvatarDef;
     [SerializeField] private AvatarAnimationDefinition _dajuAvatarDef;
     [SerializeField] private AvatarAnimationDefinition _nainiuAvatarDef;
     [SerializeField] private AvatarAnimationDefinition _xianluoAvatarDef;
-    [SerializeField] private AvatarAnimationDefinition _buouAvatarDef;
 
     private BattleFlowController _flowController;
     private int _currentLevel;
@@ -44,12 +42,10 @@ public class BattlePanel : UIPanel
     // 族群类型 → 品种名前缀（对应 avatartemp/{breed}1 和 {breed}2）
     private static readonly Dictionary<TribeType, string> s_tribeBreedNames = new Dictionary<TribeType, string>
     {
-        { TribeType.Maine,   "mianyin" },
         { TribeType.Tabby,   "lihua"   },
         { TribeType.Orange,  "daju"    },
         { TribeType.Cow,     "nainiu"  },
         { TribeType.Siamese, "xianluo" },
-        { TribeType.Ragdoll, "buou"    },
     };
 
     // 每个族群类型的运行时 AvatarAnimationDefinition 缓存
@@ -63,8 +59,6 @@ public class BattlePanel : UIPanel
         { "大橘", TribeType.Orange  },
         { "奶牛", TribeType.Cow     },
         { "暹罗", TribeType.Siamese },
-        { "布偶", TribeType.Ragdoll },
-        { "缅因", TribeType.Maine   },
     };
 
     // 品种 → card_build_cards.json 中的 avatarDefinitionAddress
@@ -120,12 +114,10 @@ public class BattlePanel : UIPanel
     {
         switch (tribeType)
         {
-            case TribeType.Maine:   return _mianyinAvatarDef;
             case TribeType.Tabby:   return _lihuaAvatarDef;
             case TribeType.Orange:  return _dajuAvatarDef;
             case TribeType.Cow:     return _nainiuAvatarDef;
             case TribeType.Siamese: return _xianluoAvatarDef;
-            case TribeType.Ragdoll: return _buouAvatarDef;
             default: return null;
         }
     }
@@ -327,13 +319,16 @@ public class BattlePanel : UIPanel
         LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId);
         float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed);
 
+        // 狸花射程4倍
+        float attackRange = tribe.tribeType == TribeType.Tabby ? 6.0f : 1.5f;
+
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
             MaxHp = Mathf.Max(1, Mathf.RoundToInt(leaderStats.hp)),
             Attack = Mathf.Max(1, Mathf.RoundToInt(leaderStats.attack)),
             Defense = Mathf.Max(0, Mathf.RoundToInt(leaderStats.defense)),
             MoveSpeed = Mathf.Max(0.1f, baseSpeed),
-            AttackRange = Mathf.Max(0.1f, 1.5f)
+            AttackRange = Mathf.Max(0.1f, attackRange)
         };
 
         // BUFF 预览文本（实际 BUFF 在 BattleManager 中通过运行时修正生效）
@@ -341,12 +336,16 @@ public class BattlePanel : UIPanel
         string buffTag = buff.IsNeutral ? "" : $" [{buff.GetDescription()}]";
         string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}{buffTag}";
 
+        // 传递天生特殊 buff
+        var innateBuffs = tribe.leader?.permanentBuffs?.specialBuffs;
+
         definition = new BattleFighterSpawnDefinition(
             leaderName,
             staticAttributes,
             GetTribeAvatarDefinition(tribe.tribeType),
             1.0f,
-            tribe.tribeType);
+            tribe.tribeType,
+            innateBuffs);
 
         return true;
     }
@@ -383,13 +382,16 @@ public class BattlePanel : UIPanel
         int penalizedSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
         float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(penalizedSpeed);
 
+        // 狸花小猫射程4倍
+        float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
+
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
             MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
             Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
             Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
             MoveSpeed = Mathf.Max(0.1f, baseSpeed),
-            AttackRange = Mathf.Max(0.1f, 1.0f)
+            AttackRange = Mathf.Max(0.1f, catAttackRange)
         };
 
         string catName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
@@ -431,12 +433,10 @@ public class BattlePanel : UIPanel
     {
         switch (type)
         {
-            case TribeType.Maine: return "缅因";
             case TribeType.Tabby: return "狸花";
             case TribeType.Orange: return "大橘";
             case TribeType.Cow: return "奶牛";
             case TribeType.Siamese: return "暹罗";
-            case TribeType.Ragdoll: return "布偶";
             default: return type.ToString();
         }
     }

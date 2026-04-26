@@ -315,6 +315,7 @@ namespace TribeSystem
             var configs = new List<TribeConfig>();
             foreach (TribeType type in System.Enum.GetValues(typeof(TribeType)))
             {
+                if (type == TribeType.None) continue;
                 configs.Add(new TribeConfig
                 {
                     tribeType = type,

@@ -515,7 +515,7 @@ namespace TribeSystem
                 case StatType.Hp: buff.hpPercent += pct; break;
                 case StatType.Speed: buff.speedPercent += pct; break;
             }
-            buff.duration = 1;
+            buff.duration = 3;
         }
 
         private void ApplyPermanentStatBoost(TribeRecord tribe, StatType stat, int amount)

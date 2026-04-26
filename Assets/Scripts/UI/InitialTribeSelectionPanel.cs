@@ -164,6 +164,7 @@ namespace TribeSystem.UI
             // 为每个族群创建按钮
             foreach (TribeType type in System.Enum.GetValues(typeof(TribeType)))
             {
+                if (type == TribeType.None) continue;
                 CreateTribeButton(type);
             }
         }
@@ -376,12 +377,10 @@ namespace TribeSystem.UI
         {
             return type switch
             {
-                TribeType.Maine => new Color(0.3f, 0.5f, 0.7f, 1f),
                 TribeType.Tabby => new Color(0.6f, 0.4f, 0.3f, 1f),
                 TribeType.Orange => new Color(0.7f, 0.5f, 0.2f, 1f),
                 TribeType.Cow => new Color(0.4f, 0.4f, 0.5f, 1f),
                 TribeType.Siamese => new Color(0.5f, 0.4f, 0.6f, 1f),
-                TribeType.Ragdoll => new Color(0.7f, 0.5f, 0.6f, 1f),
                 _ => new Color(0.5f, 0.5f, 0.5f, 1f)
             };
         }
@@ -390,28 +389,20 @@ namespace TribeSystem.UI
         {
             return type switch
             {
-                TribeType.Maine => "缅因猫族",
                 TribeType.Tabby => "狸花猫族",
                 TribeType.Orange => "大橘猫族",
                 TribeType.Cow => "奶牛猫族",
                 TribeType.Siamese => "暹罗猫族",
-                TribeType.Ragdoll => "布偶猫族",
                 _ => type.ToString()
             };
         }
 
         private string GetTribeDescription(TribeType type)
         {
-            return type switch
-            {
-                TribeType.Maine => "均衡型\n攻防兼备",
-                TribeType.Tabby => "攻击型\n高攻低防",
-                TribeType.Orange => "坦克型\n高血厚防",
-                TribeType.Cow => "防御型\n防御最高",
-                TribeType.Siamese => "敏捷型\n速度最快",
-                TribeType.Ragdoll => "特殊型\n独特优势",
-                _ => "???"
-            };
+            var config = TribeConfigLoader.Instance?.GetTribeConfig(type);
+            if (config != null && !string.IsNullOrEmpty(config.description))
+                return config.description;
+            return "???";
         }
 
         #endregion

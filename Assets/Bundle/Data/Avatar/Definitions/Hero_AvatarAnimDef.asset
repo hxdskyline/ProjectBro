@@ -12,25 +12,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ae7c7f810433614b86aebeaee55ec11, type: 3}
   m_Name: Hero_AvatarAnimDef
   m_EditorClassIdentifier:
-  _avatarId:
+  _avatarId: lihua
   _actions:
-  - _actionType: 2
-    _frameAddresses:
-    - avatartemp/buou2
-    _fps: 10
-    _loop: 0
   - _actionType: 0
     _frameAddresses:
-    - avatartemp/buou1
+    - avatartemp/lihua1
     _fps: 10
     _loop: 1
   - _actionType: 1
     _frameAddresses:
-    - avatartemp/buou1
+    - avatartemp/lihua1
     _fps: 10
     _loop: 1
+  - _actionType: 2
+    _frameAddresses:
+    - avatartemp/lihua2
+    _fps: 10
+    _loop: 0
   - _actionType: 5
     _frameAddresses:
-    - avatartemp/buou1
+    - avatartemp/lihua1
     _fps: 10
-    _loop: 1
+    _loop: 0

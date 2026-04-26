@@ -104,6 +104,9 @@ public class BattleManager : MonoBehaviour
         // 应用饰品属性加成
         ApplyAccessoryBuffs();
 
+        // 应用天生特殊 buff
+        ApplyInnateBuffs();
+
         _simulation = new BattleSimulation(
             _playerFighters,
             _enemyFighters,
@@ -114,6 +117,7 @@ public class BattleManager : MonoBehaviour
                 SeekDelay = _seekDelay,
                 DeathDuration = _deathDuration
             });
+        BattleSimulation.OnBulletFired += SpawnBullet;
         _battleCoroutine = StartCoroutine(DemoBattleLoop());
     }
 
@@ -125,6 +129,7 @@ public class BattleManager : MonoBehaviour
         }
 
         _isInBattle = false;
+        BattleSimulation.OnBulletFired -= SpawnBullet;
 
         if (_battleCoroutine != null)
         {
@@ -176,6 +181,7 @@ public class BattleManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        BattleSimulation.OnBulletFired -= SpawnBullet;
         if (_battleCoroutine != null)
         {
             StopCoroutine(_battleCoroutine);
@@ -367,6 +373,92 @@ public class BattleManager : MonoBehaviour
         {
             Debug.LogWarning($"[BattleManager] Failed to apply accessory buffs: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// 应用族长天生特殊 buff 效果
+    /// </summary>
+    private void ApplyInnateBuffs()
+    {
+        if (_playerFighters == null || _playerFighters.Length == 0)
+            return;
+
+        // 先统计各族小猫数量（用于奶牛 buff）
+        var catCounts = new System.Collections.Generic.Dictionary<TribeSystem.TribeType, int>();
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || f.InnateBuffs == null) continue;
+            // 有天生 buff 的是族长，没有的是小猫
+            if (f.InnateBuffs.Count == 0)
+            {
+                if (!catCounts.ContainsKey(f.TribeType))
+                    catCounts[f.TribeType] = 0;
+                catCounts[f.TribeType]++;
+            }
+        }
+
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            BattleFighter fighter = _playerFighters[i];
+            if (fighter == null || fighter.InnateBuffs == null || fighter.InnateBuffs.Count == 0)
+                continue;
+
+            UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
+            if (attrs == null) continue;
+
+            foreach (var buff in fighter.InnateBuffs)
+            {
+                switch (buff.buffId)
+                {
+                    case "innate_damage_reduce":
+                        // 大橘：受到的所有伤害-1
+                        attrs.DamageReceiveFlatBuff -= 1;
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 厚甲（伤害-1）");
+                        break;
+
+                    case "innate_cat_attack":
+                        // 奶牛：每有一只本族小猫，+3攻击力
+                        int catCount = catCounts.ContainsKey(fighter.TribeType) ? catCounts[fighter.TribeType] : 0;
+                        int bonus = catCount * 3;
+                        if (bonus > 0)
+                        {
+                            attrs.AttackFlatBuff += bonus;
+                            attrs.Recalculate();
+                            Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 猫群之力（{catCount}只小猫，+{bonus}攻击）");
+                        }
+                        break;
+
+                    case "innate_double_hit":
+                        // 狸花：攻击时造成两次伤害
+                        fighter.HasDoubleHit = true;
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 连击（双倍伤害）");
+                        break;
+
+                    case "innate_teleport":
+                        // 暹罗：传送（速度+99999）
+                        attrs.SpeedFlatBuff += 99999;
+                        attrs.Recalculate();
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 传送（速度+99999）");
+                        break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 生成子弹（狸花远程攻击）
+    /// </summary>
+    private void SpawnBullet(BulletData data)
+    {
+        if (data.Attacker == null || data.Target == null) return;
+
+        GameObject bulletGo = new GameObject("Bullet");
+        bulletGo.transform.position = data.Attacker.Transform.position;
+        bulletGo.transform.SetParent(transform);
+
+        var bullet = bulletGo.AddComponent<BattleBullet>();
+        bullet.Setup(data.Target, data.Damage, data.IsCritical);
     }
 
     private void LogBattleSummary(bool victory)

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using TribeSystem;
 using TribeSystem.UI;
 
@@ -29,6 +31,15 @@ public class BattlePreparePanel : UIPanel
     [SerializeField] private RectTransform _battleOptionsRoot;
     private Font _uiFont;
 
+    // Avatar state (同 TribeAvatarRoot 功能)
+    private readonly List<AsyncOperationHandle<Sprite>> _avatarHandles = new List<AsyncOperationHandle<Sprite>>();
+    private readonly Dictionary<GameObject, Sprite> _avatarIdleSprites = new Dictionary<GameObject, Sprite>();
+    private readonly Dictionary<GameObject, Sprite> _avatarAttackSprites = new Dictionary<GameObject, Sprite>();
+    private GameObject _selectedAvatarGo;
+    private GameObject _selectionIndicator;
+    private int _selectedCatIndex = -1;
+    private int _selectedCatTribeId = -1;
+
     // State
     private int _currentLevel;
     private int _currentCatFood;
@@ -39,6 +50,7 @@ public class BattlePreparePanel : UIPanel
         public WeatherType weather;
         public DifficultyLevel difficulty;
         public int[] enemyUnitIds;
+        public bool isBoss;
     }
 
     private List<BattleChoice> _battleChoices = new List<BattleChoice>();
@@ -84,47 +96,68 @@ public class BattlePreparePanel : UIPanel
             _deployedTribes.AddRange(allTribes);
         }
 
-        // Generate 2 random battle choices
+        // 根据关卡生成战斗选项
         _battleChoices.Clear();
         BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
 
-        // Ensure distinct terrain (currently 2 terrains: Plain=0, Brush=1)
-        TerrainType terrain1 = (TerrainType)Random.Range(0, 2);
-        TerrainType terrain2 = terrain1 == TerrainType.Plain ? TerrainType.Brush : TerrainType.Plain;
+        bool isBossLevel = (levelId == 5 || levelId == 10);
+        bool hasExtremeChallenge = (levelId == 3 || levelId == 6 || levelId == 9);
 
-        // Ensure distinct weather (currently 4 weathers: Sunny=0, Rainy=1, Night=2, Windy=3)
-        WeatherType weather1 = (WeatherType)Random.Range(0, 4);
-        WeatherType weather2;
-        do { weather2 = (WeatherType)Random.Range(0, 4); } while (weather1 == weather2);
-
-        // Ensure distinct difficulty: one Normal (0), one Hard (1) or Bloodbath (2)
-        DifficultyLevel diffEasy = DifficultyLevel.Normal;
-        DifficultyLevel diffHard = Random.value < 0.5f ? DifficultyLevel.Hard : DifficultyLevel.Bloodbath;
-
-        // Randomize which choice gets the harder difficulty
-        bool swapDifficulty = Random.value < 0.5f;
-        DifficultyLevel diff1 = swapDifficulty ? diffHard : diffEasy;
-        DifficultyLevel diff2 = swapDifficulty ? diffEasy : diffHard;
-
-        for (int i = 0; i < 2; i++)
+        if (isBossLevel)
         {
+            // Boss关：只有一个选项，Boss挑战，使用血战数值
             var choice = new BattleChoice
             {
-                terrain = i == 0 ? terrain1 : terrain2,
-                weather = i == 0 ? weather1 : weather2,
-                difficulty = i == 0 ? diff1 : diff2
+                terrain = TerrainType.Plain,
+                weather = WeatherType.Sunny,
+                difficulty = DifficultyLevel.Bloodbath,
+                isBoss = true,
+                enemyUnitIds = campaign != null ? campaign.GetEnemyUnitIdsForBattle(_currentLevel) : new int[] { 1, 2, 3 }
             };
-
-            if (campaign != null)
-            {
-                choice.enemyUnitIds = campaign.GetEnemyUnitIdsForBattle(_currentLevel);
-            }
-            else
-            {
-                choice.enemyUnitIds = new int[] { 1, 2, 3 };
-            }
-
             _battleChoices.Add(choice);
+        }
+        else
+        {
+            // 生成不同的地形和天气组合
+            TerrainType terrain1 = (TerrainType)Random.Range(0, 2);
+            TerrainType terrain2 = terrain1 == TerrainType.Plain ? TerrainType.Brush : TerrainType.Plain;
+
+            WeatherType weather1 = (WeatherType)Random.Range(0, 4);
+            WeatherType weather2;
+            do { weather2 = (WeatherType)Random.Range(0, 4); } while (weather1 == weather2);
+
+            // 两个普通选项
+            for (int i = 0; i < 2; i++)
+            {
+                var choice = new BattleChoice
+                {
+                    terrain = i == 0 ? terrain1 : terrain2,
+                    weather = i == 0 ? weather1 : weather2,
+                    difficulty = DifficultyLevel.Normal,
+                    isBoss = false,
+                    enemyUnitIds = campaign != null ? campaign.GetEnemyUnitIdsForBattle(_currentLevel) : new int[] { 1, 2, 3 }
+                };
+                _battleChoices.Add(choice);
+            }
+
+            // 第三六九关额外增加一个极难选项
+            if (hasExtremeChallenge)
+            {
+                // 只有2种地形，随机选一个
+                TerrainType terrain3 = (TerrainType)Random.Range(0, 2);
+                WeatherType weather3;
+                do { weather3 = (WeatherType)Random.Range(0, 4); } while (weather3 == weather1 || weather3 == weather2);
+
+                var extremeChoice = new BattleChoice
+                {
+                    terrain = terrain3,
+                    weather = weather3,
+                    difficulty = DifficultyLevel.Bloodbath,
+                    isBoss = false,
+                    enemyUnitIds = campaign != null ? campaign.GetEnemyUnitIdsForBattle(_currentLevel) : new int[] { 1, 2, 3 }
+                };
+                _battleChoices.Add(extremeChoice);
+            }
         }
 
         _selectedChoiceIndex = 0;
@@ -138,7 +171,7 @@ public class BattlePreparePanel : UIPanel
     private void RefreshUI()
     {
         RefreshTexts();
-        RebuildTribeViews();
+        RebuildAllTribeAvatars();
         RebuildBattleOptions();
         RefreshStartButtonState();
     }
@@ -209,7 +242,16 @@ public class BattlePreparePanel : UIPanel
             string diffName = GetDifficultyName(choice.difficulty);
             int enemyCount = choice.enemyUnitIds != null ? choice.enemyUnitIds.Length : 0;
 
-            string contentStr = $"<size=24>战斗选项 {i + 1} ({diffName})</size>\n\n地形: {terrainName}    天气: {weatherName}\n敌人数量: {enemyCount}";
+            // 猫粮奖励
+            int catFoodReward = 0;
+            var campaign = GameManager.Instance?.BattleCampaignRuntime;
+            if (campaign != null)
+            {
+                catFoodReward = campaign.GetCatFoodReward(_currentLevel, choice.difficulty);
+            }
+
+            string titleLabel = choice.isBoss ? "Boss挑战" : $"战斗选项 {i + 1} ({diffName})";
+            string contentStr = $"<size=24>{titleLabel}</size>\n\n地形: {terrainName}    天气: {weatherName}\n敌人数量: {enemyCount}    猫粮: +{catFoodReward}";
 
             GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textGo.transform.SetParent(btnGo.transform, false);
@@ -234,7 +276,28 @@ public class BattlePreparePanel : UIPanel
     {
         if (index == _selectedChoiceIndex) return;
         _selectedChoiceIndex = index;
-        RefreshUI(); // Refresh UI to update tribe buff indicators
+        RefreshBattleOptionUI();
+    }
+
+    private void RefreshBattleOptionUI()
+    {
+        // 更新战斗选项按钮颜色
+        if (_battleOptionsRoot != null)
+        {
+            for (int i = 0; i < _battleOptionsRoot.childCount; i++)
+            {
+                var child = _battleOptionsRoot.GetChild(i);
+                var img = child.GetComponent<Image>();
+                if (img != null)
+                    img.color = (i == _selectedChoiceIndex) ? TabActiveColor : TabInactiveColor;
+            }
+        }
+
+        // 刷新 buff 指示器
+        RefreshBuffIndicators();
+
+        // 刷新文本（天气/地形信息可能变化）
+        RefreshTexts();
     }
 
     private void RefreshStartButtonState()
@@ -250,137 +313,316 @@ public class BattlePreparePanel : UIPanel
         return tribe.GetCatCount();
     }
 
-    // --- Tribe Views ---
+    // --- Tribe Avatar Views (同 TribeAvatarRoot 功能) ---
 
-    private void RebuildTribeViews()
+    private void RebuildAllTribeAvatars()
     {
-        ClearChildren(_tribesRoot);
+        if (_tribesRoot == null) return;
 
-        for (int i = 0; i < _deployedTribes.Count; i++)
+        // 移除可能残留的布局组件（头像手动定位）
+        var vlg = _tribesRoot.GetComponent<VerticalLayoutGroup>();
+        if (vlg != null) Object.Destroy(vlg);
+        var hlg = _tribesRoot.GetComponent<HorizontalLayoutGroup>();
+        if (hlg != null) Object.Destroy(hlg);
+
+        // 清空旧头像
+        for (int i = _tribesRoot.childCount - 1; i >= 0; i--)
+            Destroy(_tribesRoot.GetChild(i).gameObject);
+
+        // 释放旧句柄
+        foreach (var h in _avatarHandles)
         {
-            CreateTribeCard(_tribesRoot, _deployedTribes[i]);
+            if (h.IsValid()) Addressables.Release(h);
+        }
+        _avatarHandles.Clear();
+        _avatarIdleSprites.Clear();
+        _avatarAttackSprites.Clear();
+        _selectedAvatarGo = null;
+
+        // 创建选中指示器（▼）
+        _selectionIndicator = new GameObject("SelectionIndicator", typeof(RectTransform), typeof(Text));
+        _selectionIndicator.transform.SetParent(_tribesRoot, false);
+        RectTransform indRt = _selectionIndicator.GetComponent<RectTransform>();
+        indRt.anchorMin = new Vector2(0.5f, 0.5f);
+        indRt.anchorMax = new Vector2(0.5f, 0.5f);
+        indRt.sizeDelta = new Vector2(65f, 65f);
+        Text indText = _selectionIndicator.GetComponent<Text>();
+        indText.font = _uiFont ?? LoadBuiltinFont();
+        indText.fontSize = 56;
+        indText.alignment = TextAnchor.MiddleCenter;
+        indText.color = new Color(0.286f, 1f, 0.2f, 1f);
+        indText.text = "▼";
+        _selectionIndicator.SetActive(false);
+
+        if (_deployedTribes == null || _deployedTribes.Count == 0) return;
+
+        int tribeCount = _deployedTribes.Count;
+        float spacing = 400f;
+
+        for (int t = 0; t < tribeCount; t++)
+        {
+            var tribe = _deployedTribes[t];
+            string breed = GetTribeBreedName(tribe.tribeType);
+            if (string.IsNullOrEmpty(breed)) continue;
+
+            string idleAddr = $"avatartemp/{breed}1";
+            string attackAddr = $"avatartemp/{breed}2";
+
+            float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
+            int clickedTribeId = tribe.tribeId;
+
+            var idleHandle = Addressables.LoadAssetAsync<Sprite>(idleAddr);
+            var attackHandle = Addressables.LoadAssetAsync<Sprite>(attackAddr);
+            _avatarHandles.Add(idleHandle);
+            _avatarHandles.Add(attackHandle);
+
+            int pending = 2;
+            Sprite idleSprite = null;
+            Sprite attackSprite = null;
+
+            System.Action onBothLoaded = () =>
+            {
+                if (_tribesRoot == null) return;
+                Sprite defaultSprite = idleSprite ?? attackSprite;
+                if (defaultSprite == null) return;
+
+                bool tribeIsSelected = (_selectedCatTribeId == clickedTribeId);
+                bool leaderIsSelected = tribeIsSelected && _selectedCatIndex < 0;
+                int selectedCat = tribeIsSelected ? _selectedCatIndex : -1;
+
+                // Leader
+                GameObject leaderGo = new GameObject($"Leader_{tribe.tribeType}", typeof(RectTransform), typeof(Image), typeof(Button));
+                leaderGo.transform.SetParent(_tribesRoot, false);
+                RectTransform leaderRt = leaderGo.GetComponent<RectTransform>();
+                leaderRt.anchorMin = new Vector2(0.5f, 0.5f);
+                leaderRt.anchorMax = new Vector2(0.5f, 0.5f);
+                float leaderX = tribeCenterX + Random.Range(-30f, 30f);
+                float leaderY = Random.Range(-30f, 30f);
+                leaderRt.anchoredPosition = new Vector2(leaderX, leaderY);
+                float leaderScale = Random.Range(160f, 220f);
+                leaderRt.sizeDelta = new Vector2(leaderScale, leaderScale);
+                Image leaderImg = leaderGo.GetComponent<Image>();
+                leaderImg.sprite = leaderIsSelected && attackSprite != null ? attackSprite : defaultSprite;
+                leaderImg.color = new Color(1f, 1f, 1f, Random.Range(0.85f, 1f));
+                Button leaderBtn = leaderGo.GetComponent<Button>();
+                leaderBtn.transition = Selectable.Transition.None;
+                leaderBtn.onClick.AddListener(() => OnLeaderAvatarClicked(clickedTribeId));
+
+                if (idleSprite != null) _avatarIdleSprites[leaderGo] = idleSprite;
+                if (attackSprite != null) _avatarAttackSprites[leaderGo] = attackSprite;
+                if (leaderIsSelected)
+                {
+                    _selectedAvatarGo = leaderGo;
+                    PositionIndicatorAbove(leaderRt);
+                }
+
+                // Buff 指示器（地形+天气加减益）
+                CreateBuffIndicator(leaderGo.transform, tribe.tribeType, new Vector2(66f, -59f));
+
+                // Cats
+                int catCount = tribe.GetCatCount();
+                if (catCount > 0)
+                {
+                    for (int i = 0; i < catCount; i++)
+                    {
+                        GameObject catGo = new GameObject($"Cat_{tribe.tribeType}_{i}", typeof(RectTransform), typeof(Image), typeof(Button));
+                        catGo.transform.SetParent(_tribesRoot, false);
+                        RectTransform catRt = catGo.GetComponent<RectTransform>();
+                        catRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        catRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                        float baseX = tribeCenterX + (i - (catCount - 1) / 2f) * 80f;
+                        float catX = baseX + Random.Range(-30f, 30f);
+                        float catY = Random.Range(-200f, -120f);
+                        catRt.anchoredPosition = new Vector2(catX, catY);
+
+                        float catSize = Random.Range(50f, 80f);
+                        catRt.sizeDelta = new Vector2(catSize, catSize);
+
+                        bool catIsSelected = (i == selectedCat);
+                        Image catImg = catGo.GetComponent<Image>();
+                        catImg.sprite = catIsSelected && attackSprite != null ? attackSprite : defaultSprite;
+                        catImg.color = new Color(1f, 1f, 1f, Random.Range(0.6f, 0.95f));
+                        Button catBtn = catGo.GetComponent<Button>();
+                        catBtn.transition = Selectable.Transition.None;
+                        int catIdx = i;
+                        catBtn.onClick.AddListener(() => OnCatAvatarClicked(clickedTribeId, catIdx));
+
+                        if (idleSprite != null) _avatarIdleSprites[catGo] = idleSprite;
+                        if (attackSprite != null) _avatarAttackSprites[catGo] = attackSprite;
+
+                        // 小猫也加 Buff 指示器
+                        CreateBuffIndicator(catGo.transform, tribe.tribeType, new Vector2(26f, -11f));
+
+                        if (catIsSelected)
+                        {
+                            _selectedAvatarGo = catGo;
+                            PositionIndicatorAbove(catRt);
+                        }
+                    }
+                }
+            };
+
+            idleHandle.Completed += (op) =>
+            {
+                if (op.Status == AsyncOperationStatus.Succeeded) idleSprite = op.Result;
+                if (--pending == 0) onBothLoaded();
+            };
+            attackHandle.Completed += (op) =>
+            {
+                if (op.Status == AsyncOperationStatus.Succeeded) attackSprite = op.Result;
+                if (--pending == 0) onBothLoaded();
+            };
         }
     }
 
-    private void CreateTribeCard(RectTransform parent, TribeRecord tribe)
+    private void SetAvatarSelected(GameObject avatarGo, bool selected)
     {
-        GameObject cardGo = new GameObject($"PrepareTribe_{tribe.tribeId}",
-            typeof(RectTransform),
-            typeof(Image),
-            typeof(LayoutElement));
-        cardGo.transform.SetParent(parent, false);
+        if (avatarGo == null) return;
+        var img = avatarGo.GetComponent<Image>();
+        if (img == null) return;
 
-        RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-        cardRect.anchorMin = new Vector2(0f, 1f);
-        cardRect.anchorMax = new Vector2(1f, 1f);
-        cardRect.pivot = new Vector2(0.5f, 1f);
-
-        LayoutElement layoutElement = cardGo.GetComponent<LayoutElement>();
-        layoutElement.minHeight = 155f;
-        layoutElement.preferredHeight = 155f;
-        layoutElement.flexibleWidth = 1f;
-
-        Image cardBg = cardGo.GetComponent<Image>();
-        cardBg.color = GetTribeTypeColor(tribe.tribeType);
-
-        CreateTribeCardContent(cardRect, tribe);
+        if (selected)
+        {
+            if (_avatarAttackSprites.TryGetValue(avatarGo, out var atkSprite))
+                img.sprite = atkSprite;
+            var rt = avatarGo.GetComponent<RectTransform>();
+            if (rt != null) PositionIndicatorAbove(rt);
+        }
+        else
+        {
+            if (_avatarIdleSprites.TryGetValue(avatarGo, out var idleSprite))
+                img.sprite = idleSprite;
+        }
     }
 
-    private void CreateTribeCardContent(RectTransform cardRect, TribeRecord tribe)
+    private void PositionIndicatorAbove(RectTransform target)
     {
-        Text nameText = CreateCardText(cardRect.transform, "Name", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -10f), 18);
-        nameText.alignment = TextAnchor.UpperLeft;
-        nameText.text = $"{GetTribeTypeName(tribe.tribeType)}族 (ID:{tribe.tribeId})";
+        if (_selectionIndicator == null || target == null) return;
+        _selectionIndicator.SetActive(true);
+        var indRt = _selectionIndicator.GetComponent<RectTransform>();
+        indRt.anchoredPosition = new Vector2(
+            target.anchoredPosition.x,
+            target.anchoredPosition.y + target.sizeDelta.y * 0.5f + 12f
+        );
+    }
 
-        string statusInfo = $"族长: 可出战  小猫: {tribe.GetCatCount()}只";
-        Text statText = CreateCardText(cardRect.transform, "Stats", new Vector2(0f, 0.38f), new Vector2(1f, 0.55f), new Vector2(10f, 0f), 14);
-        statText.alignment = TextAnchor.MiddleLeft;
-        statText.text = statusInfo;
+    private void OnLeaderAvatarClicked(int tribeId)
+    {
+        var tribe = _deployedTribes?.Find(t => t.tribeId == tribeId);
+        if (tribe == null) return;
 
-        if (tribe.leader != null)
+        GameObject clickedGo = FindAvatarGoByTribe(tribeId, -1);
+        if (_selectedAvatarGo != null && _selectedAvatarGo != clickedGo)
+            SetAvatarSelected(_selectedAvatarGo, false);
+        SetAvatarSelected(clickedGo, true);
+        _selectedAvatarGo = clickedGo;
+
+        _selectedCatIndex = -1;
+        _selectedCatTribeId = -1;
+    }
+
+    private void OnCatAvatarClicked(int tribeId, int catIndex)
+    {
+        var tribe = _deployedTribes?.Find(t => t.tribeId == tribeId);
+        if (tribe == null || tribe.cats == null || catIndex >= tribe.cats.Count) return;
+
+        GameObject clickedGo = FindAvatarGoByTribe(tribeId, catIndex);
+        if (_selectedAvatarGo != null && _selectedAvatarGo != clickedGo)
+            SetAvatarSelected(_selectedAvatarGo, false);
+        SetAvatarSelected(clickedGo, true);
+        _selectedAvatarGo = clickedGo;
+
+        _selectedCatIndex = catIndex;
+        _selectedCatTribeId = tribeId;
+    }
+
+    private GameObject FindAvatarGoByTribe(int tribeId, int catIndex)
+    {
+        var tribe = _deployedTribes?.Find(t => t.tribeId == tribeId);
+        if (tribe == null) return null;
+        string name = catIndex < 0
+            ? $"Leader_{tribe.tribeType}"
+            : $"Cat_{tribe.tribeType}_{catIndex}";
+        return _tribesRoot?.Find(name)?.gameObject;
+    }
+
+    private string GetTribeBreedName(TribeType tribeType)
+    {
+        switch (tribeType)
         {
-            Text detailText = CreateCardText(cardRect.transform, "Detail", new Vector2(0f, 0.5f), new Vector2(1f, 0.8f), new Vector2(10f, 0f), 12);
-            detailText.alignment = TextAnchor.MiddleLeft;
-            detailText.text = $"攻{tribe.leader.baseAttack} 防{tribe.leader.baseDefense} 血{tribe.leader.baseHp} 统{tribe.leader.command}";
+            case TribeType.Tabby: return "lihua";
+            case TribeType.Orange: return "daju";
+            case TribeType.Cow: return "nainiu";
+            case TribeType.Siamese: return "xianluo";
+            default: return null;
+        }
+    }
+
+    private void CreateBuffIndicator(Transform parent, TribeType tribeType, Vector2 position)
+    {
+        GameObject buffIndGo = new GameObject("BuffIndicator", typeof(RectTransform), typeof(Text));
+        buffIndGo.transform.SetParent(parent, false);
+        RectTransform buffIndRt = buffIndGo.GetComponent<RectTransform>();
+        buffIndRt.anchorMin = new Vector2(0.5f, 0.5f);
+        buffIndRt.anchorMax = new Vector2(0.5f, 0.5f);
+        buffIndRt.pivot = new Vector2(0.5f, 0.5f);
+        buffIndRt.sizeDelta = new Vector2(210f, 31f);
+        buffIndRt.anchoredPosition = position;
+        Text buffIndText = buffIndGo.GetComponent<Text>();
+        buffIndText.font = _uiFont ?? LoadBuiltinFont();
+        buffIndText.fontSize = 28;
+        buffIndText.alignment = TextAnchor.MiddleCenter;
+        buffIndText.raycastTarget = false;
+        buffIndText.supportRichText = true;
+        SetBuffIndicatorText(buffIndText, tribeType);
+    }
+
+    private void SetBuffIndicatorText(Text text, TribeType tribeType)
+    {
+        if (text == null || _battleChoices == null || _selectedChoiceIndex < 0 || _selectedChoiceIndex >= _battleChoices.Count)
+        {
+            if (text != null) text.text = "";
+            return;
         }
 
-        // Add buff indicators
-        if (_battleChoices.Count > 0 && _selectedChoiceIndex >= 0 && _selectedChoiceIndex < _battleChoices.Count)
+        BattleChoice choice = _battleChoices[_selectedChoiceIndex];
+        int weatherBuff = TribeBattleBuffProvider.GetWeatherBuffStatus(tribeType, choice.weather);
+        int terrainBuff = TribeBattleBuffProvider.GetTerrainBuffStatus(tribeType, choice.terrain);
+        int totalBuff = weatherBuff + terrainBuff;
+
+        if (totalBuff > 1) text.text = "<color=#00FF00>↑↑</color>";
+        else if (totalBuff == 1) text.text = "<color=#00FF00>↑</color>";
+        else if (totalBuff == -1) text.text = "<color=#FF0000>↓</color>";
+        else if (totalBuff < -1) text.text = "<color=#FF0000>↓↓</color>";
+        else text.text = "";
+    }
+
+    private void RefreshBuffIndicators()
+    {
+        if (_tribesRoot == null || _deployedTribes == null) return;
+
+        foreach (var tribe in _deployedTribes)
         {
-            BattleChoice choice = _battleChoices[_selectedChoiceIndex];
+            // Leader
+            RefreshBuffIndicatorOn(_tribesRoot.Find($"Leader_{tribe.tribeType}"), tribe.tribeType);
 
-            int weatherBuff = TribeBattleBuffProvider.GetWeatherBuffStatus(tribe.tribeType, choice.weather);
-            int terrainBuff = TribeBattleBuffProvider.GetTerrainBuffStatus(tribe.tribeType, choice.terrain);
-
-            string weatherSymbol = weatherBuff > 0 ? "↑" : (weatherBuff < 0 ? "↓" : "-");
-            string terrainSymbol = terrainBuff > 0 ? "↑" : (terrainBuff < 0 ? "↓" : "-");
-
-            string weatherColor = weatherBuff > 0 ? "#00FF00" : (weatherBuff < 0 ? "#FF0000" : "#FFFFFF");
-            string terrainColor = terrainBuff > 0 ? "#00FF00" : (terrainBuff < 0 ? "#FF0000" : "#FFFFFF");
-
-            Text buffText = CreateCardText(cardRect.transform, "BuffIndicators", new Vector2(0.5f, 1f), new Vector2(1f, 1f), new Vector2(-10f, -10f), 20);
-            buffText.alignment = TextAnchor.UpperRight;
-            buffText.supportRichText = true;
-            buffText.text = $"天气: <color={weatherColor}>{weatherSymbol}</color>  地形: <color={terrainColor}>{terrainSymbol}</color>";
+            // Cats
+            int catCount = tribe.GetCatCount();
+            for (int i = 0; i < catCount; i++)
+            {
+                RefreshBuffIndicatorOn(_tribesRoot.Find($"Cat_{tribe.tribeType}_{i}"), tribe.tribeType);
+            }
         }
-
-        CreateCatCountRow(cardRect, tribe);
     }
 
-    private void CreateCatCountRow(RectTransform cardRect, TribeRecord tribe)
+    private void RefreshBuffIndicatorOn(Transform avatarTf, TribeType tribeType)
     {
-        int commandLimit = GetCommandLimit(tribe);
-        int deployed = Mathf.Min(commandLimit, tribe.GetCatCount());
-
-        GameObject rowGo = new GameObject("CatCountRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-        rowGo.transform.SetParent(cardRect, false);
-        RectTransform rowRect = rowGo.GetComponent<RectTransform>();
-        rowRect.anchorMin = new Vector2(0f, 0f);
-        rowRect.anchorMax = new Vector2(1f, 0.38f);
-        rowRect.offsetMin = new Vector2(8f, 2f);
-        rowRect.offsetMax = new Vector2(-8f, -2f);
-
-        HorizontalLayoutGroup hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 6f;
-        hlg.childAlignment = TextAnchor.MiddleLeft;
-        hlg.childControlWidth = false;
-        hlg.childControlHeight = true;
-        hlg.childForceExpandWidth = false;
-        hlg.childForceExpandHeight = true;
-
-        GameObject countGo = new GameObject("CountLabel", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
-        countGo.transform.SetParent(rowGo.transform, false);
-        LayoutElement countLe = countGo.GetComponent<LayoutElement>();
-        countLe.flexibleWidth = 1f;
-        countLe.minWidth = 150f;
-        Text countText = countGo.GetComponent<Text>();
-        countText.font = _uiFont;
-        countText.fontSize = 16;
-        countText.color = new Color(0.9f, 0.95f, 1f, 1f);
-        countText.alignment = TextAnchor.MiddleLeft;
-        countText.text = $"出战小猫: {deployed} / {tribe.GetCatCount()} (统御上限:{commandLimit})";
-    }
-
-    private Text CreateCardText(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, int fontSize)
-    {
-        GameObject textGo = new GameObject(objectName, typeof(RectTransform), typeof(Text));
-        textGo.transform.SetParent(parent, false);
-
-        RectTransform textRect = textGo.GetComponent<RectTransform>();
-        textRect.anchorMin = anchorMin;
-        textRect.anchorMax = anchorMax;
-        textRect.pivot = new Vector2(0f, anchorMin.y);
-        textRect.anchoredPosition = anchoredPos;
-        textRect.sizeDelta = new Vector2(-16f, 42f);
-
-        Text text = textGo.GetComponent<Text>();
-        text.font = _uiFont;
-        text.fontSize = fontSize;
-        text.color = Color.white;
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Overflow;
-        text.raycastTarget = false;
-        return text;
+        if (avatarTf == null) return;
+        Transform buffIndTf = avatarTf.Find("BuffIndicator");
+        if (buffIndTf == null) return;
+        Text buffText = buffIndTf.GetComponent<Text>();
+        SetBuffIndicatorText(buffText, tribeType);
     }
 
     // --- Battle Start ---
@@ -554,7 +796,7 @@ public class BattlePreparePanel : UIPanel
 
     private void EnsureZoneLayouts()
     {
-        ConfigureVerticalLayout(_tribesRoot);
+        // TribesRoot 不使用布局组件，头像由代码手动定位
         ConfigureVerticalLayout(_battleOptionsRoot);
     }
 
@@ -700,7 +942,7 @@ public class BattlePreparePanel : UIPanel
         {
             case DifficultyLevel.Normal: return "普通";
             case DifficultyLevel.Hard: return "困难";
-            case DifficultyLevel.Bloodbath: return "血战";
+            case DifficultyLevel.Bloodbath: return "极难";
             default: return diff.ToString();
         }
     }
@@ -716,34 +958,6 @@ public class BattlePreparePanel : UIPanel
         }
     }
 
-    private Color GetTribeTypeColor(TribeType type)
-    {
-        switch (type)
-        {
-            case TribeType.Maine: return new Color(0.3f, 0.5f, 0.7f, 0.95f);
-            case TribeType.Tabby: return new Color(0.6f, 0.4f, 0.3f, 0.95f);
-            case TribeType.Orange: return new Color(0.7f, 0.5f, 0.2f, 0.95f);
-            case TribeType.Cow: return new Color(0.4f, 0.4f, 0.5f, 0.95f);
-            case TribeType.Siamese: return new Color(0.5f, 0.4f, 0.6f, 0.95f);
-            case TribeType.Ragdoll: return new Color(0.7f, 0.5f, 0.6f, 0.95f);
-            default: return new Color(0.5f, 0.5f, 0.5f, 0.95f);
-        }
-    }
-
-    private string GetTribeTypeName(TribeType type)
-    {
-        switch (type)
-        {
-            case TribeType.Maine: return "缅因";
-            case TribeType.Tabby: return "狸花";
-            case TribeType.Orange: return "大橘";
-            case TribeType.Cow: return "奶牛";
-            case TribeType.Siamese: return "暹罗";
-            case TribeType.Ragdoll: return "布偶";
-            default: return type.ToString();
-        }
-    }
-
     private string ResolveEnemyName(int enemyUnitId)
     {
         switch (enemyUnitId)
@@ -753,6 +967,15 @@ public class BattlePreparePanel : UIPanel
             case 3: return "敌方精英猫";
             default: return $"敌方兵种 {enemyUnitId}";
         }
+    }
+
+    private void OnDestroy()
+    {
+        foreach (var h in _avatarHandles)
+        {
+            if (h.IsValid()) Addressables.Release(h);
+        }
+        _avatarHandles.Clear();
     }
 
     private void SetStatusText(string message, bool overwrite)

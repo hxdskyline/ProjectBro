@@ -45,14 +45,12 @@ public static class TribeBattleBuffProvider
     }
 
     // 平地 buff
-    // 缅因、大橘、布偶: 移速+20%
+    // 大橘: 移速+20%
     private static TerrainWeatherBuff ApplyPlainBuff(TribeType tribe, TerrainWeatherBuff buff)
     {
         switch (tribe)
         {
-            case TribeType.Maine:
             case TribeType.Orange:
-            case TribeType.Ragdoll:
                 buff.speedPercent += 0.2f;
                 break;
         }
@@ -76,7 +74,6 @@ public static class TribeBattleBuffProvider
 
     // 晴天 buff
     // 暹罗: 攻击+20%
-    // 布偶、缅因: 防御-20%
     private static TerrainWeatherBuff ApplySunnyBuff(TribeType tribe, TerrainWeatherBuff buff)
     {
         switch (tribe)
@@ -84,17 +81,12 @@ public static class TribeBattleBuffProvider
             case TribeType.Siamese:
                 buff.attackPercent += 0.2f;
                 break;
-            case TribeType.Ragdoll:
-            case TribeType.Maine:
-                buff.defensePercent -= 0.2f;
-                break;
         }
         return buff;
     }
 
     // 雨天 buff
     // 奶牛: 攻击+20%
-    // 布偶: 防御+20%
     // 大橘: 攻击-20%
     private static TerrainWeatherBuff ApplyRainyBuff(TribeType tribe, TerrainWeatherBuff buff)
     {
@@ -102,9 +94,6 @@ public static class TribeBattleBuffProvider
         {
             case TribeType.Cow:
                 buff.attackPercent += 0.2f;
-                break;
-            case TribeType.Ragdoll:
-                buff.defensePercent += 0.2f;
                 break;
             case TribeType.Orange:
                 buff.attackPercent -= 0.2f;
@@ -114,7 +103,7 @@ public static class TribeBattleBuffProvider
     }
 
     // 夜晚 buff
-    // 狸花、缅因: 攻击+20%
+    // 狸花: 攻击+20%
     // 奶牛: 防御-20%
     // 暹罗: 血量-20%
     private static TerrainWeatherBuff ApplyNightBuff(TribeType tribe, TerrainWeatherBuff buff)
@@ -122,7 +111,6 @@ public static class TribeBattleBuffProvider
         switch (tribe)
         {
             case TribeType.Tabby:
-            case TribeType.Maine:
                 buff.attackPercent += 0.2f;
                 break;
             case TribeType.Cow:

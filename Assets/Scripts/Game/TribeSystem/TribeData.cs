@@ -44,16 +44,15 @@ namespace TribeSystem
     }
 
     /// <summary>
-    /// 六大族群类型
+    /// 四大族群类型
     /// </summary>
     public enum TribeType
     {
-        Maine = 0,      // 缅因猫族 - 均衡型
+        None = 0,       // 无（敌人等非族长单位）
         Tabby = 1,      // 狸花猫族 - 攻击型
         Orange = 2,     // 大橘猫族 - 坦克型
         Cow = 3,        // 奶牛猫族 - 防御型
         Siamese = 4,    // 暹罗猫族 - 敏捷型
-        Ragdoll = 5     // 布偶猫族 - 特殊型
     }
 
     /// <summary>
@@ -95,7 +94,7 @@ namespace TribeSystem
         public TribeRecord()
         {
             tribeId = -1;
-            tribeType = TribeType.Maine;
+            tribeType = TribeType.Tabby;
             leader = new LeaderData();
             cats = new List<CatData>();
             moodId = null;
@@ -323,6 +322,13 @@ namespace TribeSystem
         public float commandPercent;
         public List<TribeBuff> specialBuffs;
 
+        // 显示控制：false = 在 buff 栏中隐藏该属性
+        public bool attackVisible = true;
+        public bool defenseVisible = true;
+        public bool hpVisible = true;
+        public bool speedVisible = true;
+        public bool commandVisible = true;
+
         public PermanentBuffs()
         {
             attackBonus = 0;
@@ -337,11 +343,90 @@ namespace TribeSystem
             commandPercent = 0f;
             specialBuffs = new List<TribeBuff>();
         }
-    }
 
-    /// <summary>
-    /// 限时加成
-    /// </summary>
+        /// <summary>
+        /// 确保族长拥有天生特殊 buff（加载存档时调用）
+        /// </summary>
+        public void EnsureInnateBuffs(TribeType tribeType)
+        {
+            if (specialBuffs == null) specialBuffs = new List<TribeBuff>();
+            string innateId = GetInnateBuffId(tribeType);
+            if (string.IsNullOrEmpty(innateId)) return;
+            for (int i = 0; i < specialBuffs.Count; i++)
+            {
+                if (specialBuffs[i].buffId == innateId) return; // 已存在
+            }
+            specialBuffs.Add(CreateInnateBuff(tribeType));
+        }
+
+        private static string GetInnateBuffId(TribeType tribeType)
+        {
+            switch (tribeType)
+            {
+                case TribeType.Orange:  return "innate_damage_reduce";
+                case TribeType.Cow:     return "innate_cat_attack";
+                case TribeType.Tabby:   return "innate_double_hit";
+                case TribeType.Siamese: return "innate_teleport";
+                default: return null;
+            }
+        }
+
+        /// <summary>
+        /// 创建各族天生 buff
+        /// </summary>
+        public static TribeBuff CreateInnateBuff(TribeType tribeType)
+        {
+            switch (tribeType)
+            {
+                case TribeType.Orange:
+                    return new TribeBuff
+                    {
+                        buffId = "innate_damage_reduce",
+                        displayName = "厚甲",
+                        description = "受到的所有伤害-1",
+                        category = BuffCategory.Special,
+                        visible = true,
+                        iconColorIndex = 3, // 金
+                        duration = -1
+                    };
+                case TribeType.Cow:
+                    return new TribeBuff
+                    {
+                        buffId = "innate_cat_attack",
+                        displayName = "猫群之力",
+                        description = "每有一只本族小猫，+3攻击力",
+                        category = BuffCategory.Special,
+                        visible = true,
+                        iconColorIndex = 2, // 绿
+                        duration = -1
+                    };
+                case TribeType.Tabby:
+                    return new TribeBuff
+                    {
+                        buffId = "innate_double_hit",
+                        displayName = "致命射击",
+                        description = "15%概率造成双倍伤害",
+                        category = BuffCategory.Special,
+                        visible = true,
+                        iconColorIndex = 0, // 红
+                        duration = -1
+                    };
+                case TribeType.Siamese:
+                    return new TribeBuff
+                    {
+                        buffId = "innate_teleport",
+                        displayName = "传送",
+                        description = "瞬移代替走路",
+                        category = BuffCategory.Special,
+                        visible = true,
+                        iconColorIndex = 4, // 紫
+                        duration = -1
+                    };
+                default:
+                    return null;
+            }
+        }
+    }
     [Serializable]
     public class TemporaryBuff
     {
@@ -485,7 +570,7 @@ namespace TribeSystem
             statType = null;
             amount = 0;
             catCount = 0;
-            catTribeType = TribeType.Maine;
+            catTribeType = TribeType.Tabby;
             catQuality = null;
             consumableId = -1;
             accessoryId = -1;
@@ -586,6 +671,7 @@ namespace TribeSystem
     {
         public TribeType tribeType;
         public string tribeName;
+        public string description;
         public int initialCatCount;
         public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
         public LeaderBaseStats leaderBaseStats;
@@ -593,8 +679,9 @@ namespace TribeSystem
 
         public TribeConfig()
         {
-            tribeType = TribeType.Maine;
+            tribeType = TribeType.Tabby;
             tribeName = "";
+            description = "";
             initialCatCount = 3;
             deployCostPerCat = 10;
             leaderBaseStats = new LeaderBaseStats();

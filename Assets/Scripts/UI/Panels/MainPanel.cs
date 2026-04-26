@@ -58,11 +58,11 @@ public class MainPanel : UIPanel
             GameManager.Instance.DataManager.DeleteSaveData();
             Debug.Log("[MainPanel] 存档已删除");
 
-            // 可选：弹个提示或刷新UI状态
-            var uiManager = GameManager.Instance.UIManager;
-            if (uiManager != null)
+            // 重置 GameFlowController 状态，否则下次点开始会走 EnterGameRound 而非 Initialize
+            var gfc = GameFlowController.Instance;
+            if (gfc != null)
             {
-                // 如果有公用提示面板可以弹一下
+                gfc.ReturnToMainMenu();
             }
         }
     }

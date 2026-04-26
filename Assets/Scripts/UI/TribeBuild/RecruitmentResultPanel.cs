@@ -378,12 +378,10 @@ namespace TribeSystem.UI
         {
             switch (tribeType)
             {
-                case TribeType.Maine: return "avatartemp/mianyin1";
                 case TribeType.Tabby: return "avatartemp/lihua1";
                 case TribeType.Orange: return "avatartemp/daju1";
                 case TribeType.Cow: return "avatartemp/nainiu1";
                 case TribeType.Siamese: return "avatartemp/xianluo1";
-                case TribeType.Ragdoll: return "avatartemp/buou1";
                 default: return null;
             }
         }
@@ -585,12 +583,10 @@ namespace TribeSystem.UI
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因";
                 case TribeType.Tabby: return "狸花";
                 case TribeType.Orange: return "大橘";
                 case TribeType.Cow: return "奶牛";
                 case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
                 default: return type.ToString();
             }
         }

@@ -1,38 +1,6 @@
 {
   "catStats": [
     {
-      "tribeType": 0,
-      "quality": 0,
-      "attack": 2,
-      "defense": 15,
-      "hp": 56,
-      "speed": 3000
-    },
-    {
-      "tribeType": 0,
-      "quality": 1,
-      "attack": 3,
-      "defense": 19,
-      "hp": 72,
-      "speed": 3000
-    },
-    {
-      "tribeType": 0,
-      "quality": 2,
-      "attack": 3,
-      "defense": 23,
-      "hp": 88,
-      "speed": 3000
-    },
-    {
-      "tribeType": 0,
-      "quality": 3,
-      "attack": 4,
-      "defense": 27,
-      "hp": 104,
-      "speed": 3000
-    },
-    {
       "tribeType": 1,
       "quality": 0,
       "attack": 2,
@@ -159,38 +127,6 @@
       "defense": 21,
       "hp": 84,
       "speed": 1200
-    },
-    {
-      "tribeType": 5,
-      "quality": 0,
-      "attack": 2,
-      "defense": 14,
-      "hp": 54,
-      "speed": 1050
-    },
-    {
-      "tribeType": 5,
-      "quality": 1,
-      "attack": 3,
-      "defense": 18,
-      "hp": 70,
-      "speed": 1050
-    },
-    {
-      "tribeType": 5,
-      "quality": 2,
-      "attack": 3,
-      "defense": 22,
-      "hp": 85,
-      "speed": 1050
-    },
-    {
-      "tribeType": 5,
-      "quality": 3,
-      "attack": 4,
-      "defense": 26,
-      "hp": 101,
-      "speed": 1050
     }
   ]
 }

@@ -91,7 +91,7 @@ namespace TribeSystem
 
         private string GetCoreLogicDescription(RecruitmentOption opt)
         {
-            TribeType tType = TribeType.Maine;
+            TribeType tType = TribeType.Tabby;
             if (opt.targetTribeType.HasValue)
             {
                 tType = opt.targetTribeType.Value;
@@ -147,6 +147,10 @@ namespace TribeSystem
             var buffs = tribe.leader.permanentBuffs;
             buffs.attackBonus += attackBonus;
             buffs.hpBonus += hpBonus;
+
+            // 招募给的简单加血加攻 buff 配置为不显示
+            if (attackBonus != 0) buffs.attackVisible = false;
+            if (hpBonus != 0) buffs.hpVisible = false;
 
             _dataManager.SavePlayerData();
             Debug.Log($"[RecruitmentService] Boosted leader in tribe {tribe.tribeType}: +{attackBonus} atk, +{hpBonus} hp (free)");
@@ -219,6 +223,7 @@ namespace TribeSystem
 
             foreach (TribeType type in System.Enum.GetValues(typeof(TribeType)))
             {
+                if (type == TribeType.None) continue;
                 bool hasType = false;
                 foreach (var tribe in playerData.tribes)
                 {
@@ -247,6 +252,12 @@ namespace TribeSystem
         /// </summary>
         private LeaderData CreateLeader(TribeConfig config)
         {
+            var buffs = new PermanentBuffs();
+            // 添加天生特殊 buff
+            var innateBuff = PermanentBuffs.CreateInnateBuff(config.tribeType);
+            if (innateBuff != null)
+                buffs.specialBuffs.Add(innateBuff);
+
             return new LeaderData
             {
                 leaderId = Random.Range(1000, 9999),
@@ -257,7 +268,7 @@ namespace TribeSystem
                 baseSpeed = config.leaderBaseStats.speed,
                 command = config.leaderBaseStats.command,
                 skillIds = new List<int>(),
-                permanentBuffs = new PermanentBuffs(),
+                permanentBuffs = buffs,
                 temporaryBuff = null
             };
         }
@@ -306,12 +317,10 @@ namespace TribeSystem
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因猫族";
                 case TribeType.Tabby: return "狸花猫族";
                 case TribeType.Orange: return "大橘猫族";
                 case TribeType.Cow: return "奶牛猫族";
                 case TribeType.Siamese: return "暹罗猫族";
-                case TribeType.Ragdoll: return "布偶猫族";
                 default: return type.ToString();
             }
         }

@@ -120,12 +120,10 @@ namespace TribeSystem.UI
         {
             switch (tribeType)
             {
-                case TribeType.Maine: return $"avatartemp/mianyin{variant}";
                 case TribeType.Tabby: return $"avatartemp/lihua{variant}";
                 case TribeType.Orange: return $"avatartemp/daju{variant}";
                 case TribeType.Cow: return $"avatartemp/nainiu{variant}";
                 case TribeType.Siamese: return $"avatartemp/xianluo{variant}";
-                case TribeType.Ragdoll: return $"avatartemp/buou{variant}";
                 default: return null;
             }
         }
@@ -223,10 +221,8 @@ namespace TribeSystem.UI
                 if (leader.temporaryBuff != null && leader.temporaryBuff.IsActive())
                     AddTemporaryBuffEntry(leader.temporaryBuff, font);
 
-                // 3. 地形天气buff
-                TerrainWeatherBuff twBuff = TribeBattleBuffProvider.GetBuff(_tribe.tribeType, _currentTerrain, _currentWeather);
-                if (!twBuff.IsNeutral)
-                    AddTerrainWeatherBuffEntry(twBuff, font);
+                // 3. 天生特殊buff（specialBuffs 中 visible=true 的条目）
+                AddInnateBuffEntries(leader.permanentBuffs, font);
             }
 
             // 根据条目数量设置 Buff 高度
@@ -246,15 +242,15 @@ namespace TribeSystem.UI
         {
             if (pb == null) return;
 
-            if (pb.attackBonus != 0 || pb.attackPercent != 0f)
+            if (pb.attackVisible && (pb.attackBonus != 0 || pb.attackPercent != 0f))
                 CreateBuffEntry("atk_icon", "攻击强化", FormatStatBuff("攻击", pb.attackBonus, pb.attackPercent), font, new Color(0.9f, 0.3f, 0.2f, 0.8f));
-            if (pb.defenseBonus != 0 || pb.defensePercent != 0f)
+            if (pb.defenseVisible && (pb.defenseBonus != 0 || pb.defensePercent != 0f))
                 CreateBuffEntry("def_icon", "防御强化", FormatStatBuff("防御", pb.defenseBonus, pb.defensePercent), font, new Color(0.3f, 0.5f, 0.9f, 0.8f));
-            if (pb.hpBonus != 0 || pb.hpPercent != 0f)
+            if (pb.hpVisible && (pb.hpBonus != 0 || pb.hpPercent != 0f))
                 CreateBuffEntry("hp_icon", "生命强化", FormatStatBuff("生命", pb.hpBonus, pb.hpPercent), font, new Color(0.2f, 0.8f, 0.3f, 0.8f));
-            if (pb.speedBonus != 0 || pb.speedPercent != 0f)
+            if (pb.speedVisible && (pb.speedBonus != 0 || pb.speedPercent != 0f))
                 CreateBuffEntry("spd_icon", "速度强化", FormatStatBuff("速度", pb.speedBonus, pb.speedPercent), font, new Color(0.8f, 0.6f, 0.1f, 0.8f));
-            if (pb.commandBonus != 0 || pb.commandPercent != 0f)
+            if (pb.commandVisible && (pb.commandBonus != 0 || pb.commandPercent != 0f))
                 CreateBuffEntry("cmd_icon", "统御强化", FormatStatBuff("统御", pb.commandBonus, pb.commandPercent), font, new Color(0.6f, 0.3f, 0.8f, 0.8f));
         }
 
@@ -274,6 +270,24 @@ namespace TribeSystem.UI
         private void AddTerrainWeatherBuffEntry(TerrainWeatherBuff twBuff, Font font)
         {
             CreateBuffEntry("env_icon", "环境修正", twBuff.GetDescription(), font, new Color(0.4f, 0.7f, 0.5f, 0.8f));
+        }
+
+        private void AddInnateBuffEntries(PermanentBuffs pb, Font font)
+        {
+            if (pb == null || pb.specialBuffs == null) return;
+            Color[] colors = {
+                new Color(0.9f, 0.3f, 0.2f, 0.8f), // 0红
+                new Color(0.3f, 0.5f, 0.9f, 0.8f), // 1蓝
+                new Color(0.2f, 0.8f, 0.3f, 0.8f), // 2绿
+                new Color(0.9f, 0.7f, 0.1f, 0.8f), // 3金
+                new Color(0.6f, 0.3f, 0.8f, 0.8f)  // 4紫
+            };
+            foreach (var buff in pb.specialBuffs)
+            {
+                if (!buff.visible) continue;
+                int ci = Mathf.Clamp(buff.iconColorIndex, 0, colors.Length - 1);
+                CreateBuffEntry($"{buff.buffId}_icon", buff.displayName, buff.description, font, colors[ci]);
+            }
         }
 
         private string FormatStatBuff(string statName, int flatBonus, float percentBonus)
@@ -324,12 +338,10 @@ namespace TribeSystem.UI
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因";
                 case TribeType.Tabby: return "狸花";
                 case TribeType.Orange: return "大橘";
                 case TribeType.Cow: return "奶牛";
                 case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
                 default: return type.ToString();
             }
         }

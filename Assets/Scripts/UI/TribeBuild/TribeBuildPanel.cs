@@ -72,6 +72,9 @@ namespace TribeSystem.UI
 
         private System.Collections.Generic.List<AsyncOperationHandle<Sprite>> _avatarHandles = new System.Collections.Generic.List<AsyncOperationHandle<Sprite>>();
 
+        // 首次加载完成标记
+        private bool _isReady = false;
+
         // 头像 idle/attack 帧切换
         private GameObject _selectedAvatarGo;
         private Dictionary<GameObject, Sprite> _avatarIdleSprites = new Dictionary<GameObject, Sprite>();
@@ -158,6 +161,7 @@ namespace TribeSystem.UI
 
             LoadPlayerData();
             RefreshUI();
+            _isReady = true;
         }
 
         private void InitializeButtons()
@@ -209,6 +213,26 @@ namespace TribeSystem.UI
         {
             base.Initialize();
             Debug.Log("[TribeBuildPanel] Initialized");
+        }
+
+        public override void Show()
+        {
+            base.Show();
+
+            // 首次加载尚未完成时（Start 中的协程还没跑完），不处理
+            if (!_isReady) return;
+
+            // 检测 DataManager 中的族群列表是否与缓存不同（存档删除后重建等情况）
+            if (_dataManager != null)
+            {
+                var latest = _dataManager.GetTribes();
+                if (!ReferenceEquals(_tribes, latest))
+                {
+                    Debug.Log("[TribeBuildPanel] Show() 检测到族群数据已变更，重新加载");
+                    LoadPlayerData();
+                    RefreshUI();
+                }
+            }
         }
 
         private void InitializePanels()
@@ -538,12 +562,10 @@ namespace TribeSystem.UI
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因";
                 case TribeType.Tabby: return "狸花";
                 case TribeType.Orange: return "大橘";
                 case TribeType.Cow: return "奶牛";
                 case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
                 default: return type.ToString();
             }
         }
@@ -1020,7 +1042,7 @@ namespace TribeSystem.UI
             Debug.Log("[TribeBuildPanel] 显示初始族群选择界面");
 
             // 暂时自动选择一个族群
-            var maineTribe = CreateInitialTribe(TribeType.Maine);
+            var maineTribe = CreateInitialTribe(TribeType.Tabby);
 
             _dataManager.AddTribe(maineTribe);
 
@@ -1170,22 +1192,19 @@ namespace TribeSystem.UI
             _avatarAttackSprites.Clear();
             _selectedAvatarGo = null;
 
-            // 创建选中指示器（▼）
-            if (_selectionIndicator == null)
-            {
-                _selectionIndicator = new GameObject("SelectionIndicator", typeof(RectTransform), typeof(Text));
-                _selectionIndicator.transform.SetParent(_tribeAvatarRoot.transform, false);
-                RectTransform indRt = _selectionIndicator.GetComponent<RectTransform>();
-                indRt.anchorMin = new Vector2(0.5f, 0.5f);
-                indRt.anchorMax = new Vector2(0.5f, 0.5f);
-                indRt.sizeDelta = new Vector2(65f, 65f);
-                Text indText = _selectionIndicator.GetComponent<Text>();
-                indText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                indText.fontSize = 56;
-                indText.alignment = TextAnchor.MiddleCenter;
-                indText.color = new Color(0.286f, 1f, 0.2f, 1f); // #49FF33
-                indText.text = "▼";
-            }
+            // 创建选中指示器（▼）— 每次重建都重新创建，因为旧的已被销毁
+            _selectionIndicator = new GameObject("SelectionIndicator", typeof(RectTransform), typeof(Text));
+            _selectionIndicator.transform.SetParent(_tribeAvatarRoot.transform, false);
+            RectTransform indRt = _selectionIndicator.GetComponent<RectTransform>();
+            indRt.anchorMin = new Vector2(0.5f, 0.5f);
+            indRt.anchorMax = new Vector2(0.5f, 0.5f);
+            indRt.sizeDelta = new Vector2(65f, 65f);
+            Text indText = _selectionIndicator.GetComponent<Text>();
+            indText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            indText.fontSize = 56;
+            indText.alignment = TextAnchor.MiddleCenter;
+            indText.color = new Color(0.286f, 1f, 0.2f, 1f); // #49FF33
+            indText.text = "▼";
             _selectionIndicator.SetActive(false);
 
             if (_tribes == null || _tribes.Count == 0) return;
@@ -1431,12 +1450,10 @@ namespace TribeSystem.UI
         {
             switch (tribeType)
             {
-                case TribeType.Maine: return "mianyin";
                 case TribeType.Tabby: return "lihua";
                 case TribeType.Orange: return "daju";
                 case TribeType.Cow: return "nainiu";
                 case TribeType.Siamese: return "xianluo";
-                case TribeType.Ragdoll: return "buou";
                 default: return null;
             }
         }
@@ -1457,7 +1474,7 @@ namespace TribeSystem.UI
             if (option.targetTribeType.HasValue)
                 return option.targetTribeType.Value;
             var tribe = FindTribeById(option.targetTribeId);
-            return tribe?.tribeType ?? TribeType.Maine;
+            return tribe?.tribeType ?? TribeType.Tabby;
         }
     }
 }
