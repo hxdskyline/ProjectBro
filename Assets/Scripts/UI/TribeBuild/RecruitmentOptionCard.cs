@@ -65,12 +65,10 @@ namespace TribeSystem.UI
         {
             switch (tribeType)
             {
-                case TribeType.Maine: return "avatartemp/mianyin1";
                 case TribeType.Tabby: return "avatartemp/lihua1";
                 case TribeType.Orange: return "avatartemp/daju1";
                 case TribeType.Cow: return "avatartemp/nainiu1";
                 case TribeType.Siamese: return "avatartemp/xianluo1";
-                case TribeType.Ragdoll: return "avatartemp/buou1";
                 default: return null;
             }
         }

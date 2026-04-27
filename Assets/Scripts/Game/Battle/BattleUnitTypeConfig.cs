@@ -11,8 +11,8 @@ public struct UnitStaticAttributes
 
     public static UnitStaticAttributes Default => new UnitStaticAttributes
     {
-        MaxHp = 60,
-        Attack = 12,
+        MaxHp = 6,
+        Attack = 1,
         Defense = 3,
         MoveSpeed = 2.2f,
         AttackRange = 1.0f

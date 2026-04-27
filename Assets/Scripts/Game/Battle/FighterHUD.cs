@@ -92,21 +92,22 @@ public class FighterHUD : MonoBehaviour
         _fgQuad.transform.localPosition = new Vector3(-half + (BarWidth * t) * 0.5f, VerticalOffset, -0.01f);
     }
 
-    public void ShowDamage(int amount)
+    public void ShowDamage(int amount, bool isCritical = false)
     {
-        StartCoroutine(DoShowDamage(amount));
+        StartCoroutine(DoShowDamage(amount, isCritical));
     }
 
-    private IEnumerator DoShowDamage(int amount)
+    private IEnumerator DoShowDamage(int amount, bool isCritical)
     {
         GameObject txtGo = new GameObject("DamageText", typeof(TextMeshPro));
         txtGo.transform.SetParent(transform, false);
         txtGo.transform.localPosition = new Vector3(0f, VerticalOffset + 0.4f, -0.02f);
         var tmp = txtGo.GetComponent<TextMeshPro>();
         tmp.text = amount.ToString();
-        tmp.fontSize = 3f;
-        tmp.color = Color.red;
+        tmp.fontSize = isCritical ? 18f : 5f;
+        tmp.color = isCritical ? new Color(1f, 0.8f, 0f) : Color.red;
         tmp.alignment = TextAlignmentOptions.Center;
+        tmp.rectTransform.sizeDelta = new Vector2(3f, 1.5f);
 
         float elapsed = 0f;
         float duration = 0.9f;

@@ -360,12 +360,10 @@ public class BattleHUDPanel : MonoBehaviour
     {
         switch (type)
         {
-            case TribeType.Maine: return "缅因";
             case TribeType.Tabby: return "狸花";
             case TribeType.Orange: return "大橘";
             case TribeType.Cow: return "奶牛";
             case TribeType.Siamese: return "暹罗";
-            case TribeType.Ragdoll: return "布偶";
             default: return type.ToString();
         }
     }
@@ -374,12 +372,10 @@ public class BattleHUDPanel : MonoBehaviour
     {
         switch (type)
         {
-            case TribeType.Maine: return new Color(0.4f, 0.6f, 0.9f);
             case TribeType.Tabby: return new Color(0.8f, 0.6f, 0.3f);
             case TribeType.Orange: return new Color(0.9f, 0.7f, 0.2f);
             case TribeType.Cow: return new Color(0.6f, 0.6f, 0.7f);
             case TribeType.Siamese: return new Color(0.7f, 0.5f, 0.8f);
-            case TribeType.Ragdoll: return new Color(0.9f, 0.6f, 0.7f);
             default: return Color.white;
         }
     }

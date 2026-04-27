@@ -45,7 +45,7 @@ namespace TribeSystem.UI
             Show();
         }
 
-        public void ShowLeaderBoostResult(string tribeName, LeaderData leader, StatType boostedStat, TribeType tribeType, Action onConfirmed)
+        public void ShowLeaderBoostResult(string tribeName, LeaderData leader, int bonusAttack, int bonusHp, TribeType tribeType, Action onConfirmed)
         {
             EnsureUI();
             ClearContent();
@@ -61,17 +61,18 @@ namespace TribeSystem.UI
             hlg.childForceExpandHeight = true;
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
-            // 旧值面板：用旧 buff 值计算，不标记
-            float buffBefore = GetBuffPct(leader.permanentBuffs, boostedStat) - 0.2f;
-            BuildLeaderCard(_contentArea, leader, tribeType, boostedStat, buffBefore, false);
+            // 旧值面板：减去本次加成
+            BuildLeaderCardFlat(_contentArea, leader, tribeType,
+                -(bonusAttack), -(bonusHp), false);
 
             // 箭头
             var arrowGo = CreateText("Arrow", _contentArea, "→", 36, Color.white);
             var arrowRect = arrowGo.GetComponent<RectTransform>();
             arrowRect.sizeDelta = new Vector2(40f, 300f);
 
-            // 新值面板：当前 buff 值，标记提升属性为绿色 + ▲
-            BuildLeaderCard(_contentArea, leader, tribeType, boostedStat, null, true);
+            // 新值面板：当前值，标记提升属性
+            BuildLeaderCardFlat(_contentArea, leader, tribeType,
+                bonusAttack, bonusHp, true);
 
             WireConfirmButton(onConfirmed);
             Show();
@@ -290,6 +291,65 @@ namespace TribeSystem.UI
             }
         }
 
+        private void BuildLeaderCardFlat(RectTransform parent, LeaderData leader, TribeType tribeType,
+            int deltaAttack, int deltaHp, bool highlight)
+        {
+            var cardGo = new GameObject("LeaderCard", typeof(RectTransform), typeof(Image));
+            cardGo.transform.SetParent(parent, false);
+            var cardRt = cardGo.GetComponent<RectTransform>();
+            cardRt.sizeDelta = new Vector2(280f, 320f);
+            cardGo.GetComponent<Image>().color = new Color(0.12f, 0.1f, 0.15f, 0.9f);
+
+            var cardVlg = cardGo.AddComponent<VerticalLayoutGroup>();
+            cardVlg.spacing = 4f;
+            cardVlg.padding = new RectOffset(10, 10, 10, 10);
+            cardVlg.childAlignment = TextAnchor.UpperCenter;
+            cardVlg.childControlWidth = true;
+            cardVlg.childControlHeight = true;
+            cardVlg.childForceExpandWidth = true;
+            cardVlg.childForceExpandHeight = false;
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            // 头像
+            var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+            portraitGo.transform.SetParent(cardRt, false);
+            var portraitRt = portraitGo.GetComponent<RectTransform>();
+            portraitRt.sizeDelta = new Vector2(80, 80);
+            var portraitLe = portraitGo.AddComponent<LayoutElement>();
+            portraitLe.preferredHeight = 80f;
+            LoadPortrait(portraitGo.GetComponent<Image>(), tribeType, highlight);
+
+            // 种族名称
+            var nameGo = CreateText("TribeName", cardRt, GetTribeTypeName(tribeType), 22, new Color(1f, 0.85f, 0.4f));
+            var nameLe = nameGo.AddComponent<LayoutElement>();
+            nameLe.preferredHeight = 28f;
+
+            // 属性（攻击、防御、生命、速度、统御）
+            var buffs = leader.permanentBuffs;
+            int atk = leader.baseAttack + (buffs?.attackBonus ?? 0) + deltaAttack;
+            int def = leader.baseDefense + (buffs?.defenseBonus ?? 0);
+            int hp = leader.baseHp + (buffs?.hpBonus ?? 0) + deltaHp;
+            int spd = leader.baseSpeed + (buffs?.speedBonus ?? 0);
+            int cmd = leader.command + (buffs?.commandBonus ?? 0);
+
+            bool showAtk = highlight ? deltaAttack > 0 : deltaAttack < 0;
+            bool showHp = highlight ? deltaHp > 0 : deltaHp < 0;
+
+            string[] names = { "攻击", "防御", "生命", "速度", "统御" };
+            int[] vals = { atk, def, hp, spd, cmd };
+            bool[] boosted = { showAtk, false, showHp, false, false };
+
+            for (int i = 0; i < 5; i++)
+            {
+                Color textColor = boosted[i] ? new Color(0.2f, 0.9f, 0.3f) : new Color(0.984f, 0.965f, 0.855f);
+                string prefix = boosted[i] ? "▲ " : "";
+                var attrGo = CreateText($"Attr_{names[i]}", cardRt, $"{prefix}{names[i]}: {vals[i]}", 18, textColor);
+                var attrLe = attrGo.AddComponent<LayoutElement>();
+                attrLe.preferredHeight = 26f;
+            }
+        }
+
         private void LoadPortrait(Image portraitImage, TribeType tribeType, bool isAfter)
         {
             string address = GetTribePortraitAddress(tribeType);
@@ -318,12 +378,10 @@ namespace TribeSystem.UI
         {
             switch (tribeType)
             {
-                case TribeType.Maine: return "avatartemp/mianyin1";
                 case TribeType.Tabby: return "avatartemp/lihua1";
                 case TribeType.Orange: return "avatartemp/daju1";
                 case TribeType.Cow: return "avatartemp/nainiu1";
                 case TribeType.Siamese: return "avatartemp/xianluo1";
-                case TribeType.Ragdoll: return "avatartemp/buou1";
                 default: return null;
             }
         }
@@ -525,12 +583,10 @@ namespace TribeSystem.UI
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因";
                 case TribeType.Tabby: return "狸花";
                 case TribeType.Orange: return "大橘";
                 case TribeType.Cow: return "奶牛";
                 case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
                 default: return type.ToString();
             }
         }

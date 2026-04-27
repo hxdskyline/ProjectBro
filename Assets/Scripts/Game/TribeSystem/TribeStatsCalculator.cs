@@ -89,18 +89,26 @@ namespace TribeSystem
         /// 计算小猫的实际属性（基于小猫基础属性和品质乘数）
         /// 注：小猫现在有独立的catBaseStats配置，而不是基于族长属性
         /// </summary>
-        public static CatStats CalculateCatStats(CatData cat, LeaderStats catBaseStats)
+        public static CatStats CalculateCatStats(CatData cat, LeaderStats catBaseStats, PermanentBuffs leaderBuffs = null)
         {
             if (cat == null)
             {
                 return new CatStats(0, 0, 0, 0);
             }
 
-            // 使用小猫的基础属性（从tribe_config.json的catBaseStats）
-            int attack = Mathf.RoundToInt(catBaseStats.attack * cat.attackMultiplier);
-            int defense = Mathf.RoundToInt(catBaseStats.defense * cat.defenseMultiplier);
-            int hp = Mathf.RoundToInt(catBaseStats.hp * cat.hpMultiplier);
-            int speed = Mathf.RoundToInt(catBaseStats.speed * cat.speedMultiplier);
+            // 新系统：使用静态属性 + 大猫永久加成
+            if (cat.staticAttack > 0 || cat.staticDefense > 0 || cat.staticHp > 0)
+            {
+                int catAtk = cat.staticAttack + (leaderBuffs?.attackBonus ?? 0);
+                int catDef = cat.staticDefense + (leaderBuffs?.defenseBonus ?? 0);
+                int catHp = cat.staticHp + (leaderBuffs?.hpBonus ?? 0);
+                int catSpd = cat.staticSpeed + (leaderBuffs?.speedBonus ?? 0);
+                return new CatStats(
+                    Mathf.Max(1, catAtk),
+                    Mathf.Max(1, catDef),
+                    Mathf.Max(1, catHp),
+                    Mathf.Max(1, catSpd));
+            }
 
             // 应用全局饰品加成
             EnsureAccessoryCache();
@@ -109,11 +117,12 @@ namespace TribeSystem
             hp = Mathf.RoundToInt(hp * (1f + _cachedAccessoryHp));
             speed = Mathf.RoundToInt(speed * (1f + _cachedAccessorySpd));
 
-            // 确保属性不低于1
-            attack = Mathf.Max(1, attack);
-            defense = Mathf.Max(1, defense);
-            hp = Mathf.Max(1, hp);
-            speed = Mathf.Max(1, speed);
+
+            // 兼容旧存档：使用乘数计算
+            int attack = Mathf.Max(1, Mathf.RoundToInt(catBaseStats.attack * cat.attackMultiplier));
+            int defense = Mathf.Max(1, Mathf.RoundToInt(catBaseStats.defense * cat.defenseMultiplier));
+            int hp = Mathf.Max(1, Mathf.RoundToInt(catBaseStats.hp * cat.hpMultiplier));
+            int speed = Mathf.Max(1, Mathf.RoundToInt(catBaseStats.speed * cat.speedMultiplier));
 
             return new CatStats(attack, defense, hp, speed);
         }
@@ -150,10 +159,10 @@ namespace TribeSystem
         /// <summary>
         /// 计算小猫在实战中的实际速度（考虑统帅惩罚）
         /// </summary>
-        public static int CalculateCatEffectiveSpeed(CatData cat, LeaderStats catBaseStats, int totalCatCount, int command)
+        public static int CalculateCatEffectiveSpeed(CatData cat, LeaderStats catBaseStats, int totalCatCount, int command, PermanentBuffs leaderBuffs = null)
         {
             // 使用小猫的基础属性计算速度
-            CatStats catStats = CalculateCatStats(cat, catBaseStats);
+            CatStats catStats = CalculateCatStats(cat, catBaseStats, leaderBuffs);
             return ApplyCommandPenaltyToSpeed(catStats.speed, totalCatCount, command);
         }
 

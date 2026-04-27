@@ -613,6 +613,12 @@ public class DataManager : MonoBehaviour
                 {
                     tribe.leader.baseSpeed = config.leaderBaseStats.speed;
                 }
+
+                // 确保族长拥有天生特殊 buff（兼容旧存档）
+                if (tribe.leader.permanentBuffs != null)
+                {
+                    tribe.leader.permanentBuffs.EnsureInnateBuffs(tribe.tribeType);
+                }
             }
         }
 

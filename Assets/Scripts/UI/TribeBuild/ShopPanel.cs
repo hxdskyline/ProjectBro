@@ -719,12 +719,10 @@ namespace TribeSystem.UI
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因";
                 case TribeType.Tabby: return "狸花";
                 case TribeType.Orange: return "大橘";
                 case TribeType.Cow: return "奶牛";
                 case TribeType.Siamese: return "暹罗";
-                case TribeType.Ragdoll: return "布偶";
                 default: return type.ToString();
             }
         }

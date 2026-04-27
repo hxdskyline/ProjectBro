@@ -1,5 +1,14 @@
 using UnityEngine;
 using TribeSystem;
+using System;
+
+public struct BulletData
+{
+    public BattleFighter Attacker;
+    public BattleFighter Target;
+    public int Damage;
+    public bool IsCritical;
+}
 
 public struct BattleSimulationConfig
 {
@@ -11,6 +20,8 @@ public struct BattleSimulationConfig
 
 public class BattleSimulation
 {
+    public static event Action<BulletData> OnBulletFired;
+
     private readonly BattleFighter[] _playerFighters;
     private readonly BattleFighter[] _enemyFighters;
     private readonly BattleSimulationConfig _config;
@@ -329,9 +340,31 @@ public class BattleSimulation
             // 攻击速度: AS = CS/2000, 攻击间隔 = 1/AS
             float attackSpeed = self.RuntimeAttributes?.CorrectedAttackSpeed ?? 1f;
             self.AttackCooldownTimer = 1f / Mathf.Max(0.001f, attackSpeed);
+            self.Avatar?.PlayAttackAndReturnIdle();
+
+            // 狸花（远程）：发射子弹，不走 PendingHit
+            if (self.TribeType == TribeType.Tabby)
+            {
+                int damage = CalculateDamage(self, target);
+                bool isCritical = false;
+                // 15%概率造成双倍伤害（单次伤害，不再发射两颗子弹）
+                if (self.HasDoubleHit && UnityEngine.Random.value < 0.15f)
+                {
+                    damage *= 2;
+                    isCritical = true;
+                }
+                OnBulletFired?.Invoke(new BulletData
+                {
+                    Attacker = self,
+                    Target = target,
+                    Damage = damage,
+                    IsCritical = isCritical
+                });
+                return;
+            }
+
             self.PendingHitTimer = _config.AttackResolveDelay;
             self.PendingTarget = target;
-            self.Avatar?.PlayAttackAndReturnIdle();
             return;
         }
 
@@ -397,6 +430,13 @@ public class BattleSimulation
             return;
         }
 
+        // 狸花连击：攻击2次
+        int hitCount = attacker.HasDoubleHit ? 2 : 1;
+
+        for (int hit = 0; hit < hitCount; hit++)
+        {
+            if (!defender.IsAlive) break;
+
             // 需求公式: FDMG = MAX[DMG * DR * SKILLMULT * PBUFF + ABUFF, 1] + TD
             // DMG = MAX(CATK - CDEF, 0)
             // DR = MAX(1 - CDEF/(CDEF+100), 0.2)
@@ -420,11 +460,30 @@ public class BattleSimulation
                     hud.UpdateHp(defenderRuntime.CurrentHp);
                 }
             }
+        }
 
         if (defenderRuntime.CurrentHp <= 0)
         {
             StartDeath(defender);
         }
+    }
+
+    /// <summary>
+    /// 计算单次攻击伤害
+    /// </summary>
+    private int CalculateDamage(BattleFighter attacker, BattleFighter defender)
+    {
+        UnitRuntimeAttributes attackerRuntime = attacker.RuntimeAttributes;
+        UnitRuntimeAttributes defenderRuntime = defender.RuntimeAttributes;
+        if (attackerRuntime == null || defenderRuntime == null) return 0;
+
+        int rawDmg = Mathf.Max(0, attackerRuntime.Attack - defenderRuntime.Defense);
+        float dr = Mathf.Max(0.2f, 1f - (float)defenderRuntime.Defense / (defenderRuntime.Defense + 100f));
+        float skillMult = attackerRuntime.SkillMultiplier;
+        float dmgPercentMod = 1f + defenderRuntime.DamageReceivePercentBuff;
+        int dmgFlatMod = defenderRuntime.DamageReceiveFlatBuff;
+        float finalF = rawDmg * dr * skillMult * dmgPercentMod + dmgFlatMod;
+        return Mathf.Max(1, Mathf.RoundToInt(finalF)) + attackerRuntime.TrueDamage;
     }
 
     private float GetMoveSpeed(BattleFighter fighter)
@@ -488,7 +547,7 @@ public class BattleSimulation
 
             if (fighter.Transform != null)
             {
-                Object.Destroy(fighter.Transform.gameObject);
+                UnityEngine.Object.Destroy(fighter.Transform.gameObject);
             }
 
             fighter.Transform = null;

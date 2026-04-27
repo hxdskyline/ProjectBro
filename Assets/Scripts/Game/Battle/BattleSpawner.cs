@@ -98,7 +98,8 @@ public static class BattleSpawner
                 tint,
                 config,
                 fighterDefinition.ScaleMultiplier > 0f ? fighterDefinition.ScaleMultiplier : 1.0f,
-                fighterDefinition.TribeType);
+                fighterDefinition.TribeType,
+                fighterDefinition.InnateBuffs);
 
             occupiedPositions.Add(spawnPosition);
         }
@@ -190,7 +191,8 @@ public static class BattleSpawner
         Color tint,
         BattleSpawnConfig config,
         float scaleMultiplier = 1.0f,
-        TribeType tribeType = TribeType.Tabby)
+        TribeType tribeType = TribeType.None,
+        System.Collections.Generic.List<TribeSystem.TribeBuff> innateBuffs = null)
     {
         GameObject go;
         if (config.FighterPrefab != null)
@@ -261,7 +263,8 @@ public static class BattleSpawner
             Avatar = battleAvatar,
             Transform = go.transform,
             BaseScale = scale,
-            TribeType = tribeType
+            TribeType = tribeType,
+            InnateBuffs = innateBuffs
         };
     }
 

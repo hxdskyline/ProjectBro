@@ -1,41 +1,22 @@
 {
   "tribes": [
     {
-      "tribeType": 0,
-      "tribeName": "缅因猫族",
-      "initialCatCount": 3,
-      "leaderBaseStats": {
-        "attack": 100,
-        "defense": 20,
-        "hp": 1700,
-        "speed": 3000,
-        "command": 10
-      },
-      "deployCostPerCat": 10,
-      "catBaseStats": {
-        "attack": 62,
-        "defense": 42,
-        "hp": 1600,
-        "speed": 3000,
-        "command": 0
-      }
-    },
-    {
       "tribeType": 1,
       "tribeName": "狸花猫族",
+      "description": "致命的射手",
       "initialCatCount": 5,
       "deployCostPerCat": 10,
       "leaderBaseStats": {
-        "attack": 120,
+        "attack": 12,
         "defense": 15,
-        "hp": 1500,
+        "hp": 150,
         "speed": 1100,
         "command": 8
       },
       "catBaseStats": {
-        "attack": 68,
+        "attack": 7,
         "defense": 36,
-        "hp": 1400,
+        "hp": 140,
         "speed": 1100,
         "command": 0
       }
@@ -43,19 +24,20 @@
     {
       "tribeType": 2,
       "tribeName": "大橘猫族",
+      "description": "巨大体型\n无情碾压对手",
       "initialCatCount": 2,
       "deployCostPerCat": 10,
       "leaderBaseStats": {
-        "attack": 110,
+        "attack": 11,
         "defense": 25,
-        "hp": 1900,
+        "hp": 190,
         "speed": 2500,
         "command": 12
       },
       "catBaseStats": {
-        "attack": 65,
+        "attack": 6,
         "defense": 48,
-        "hp": 1800,
+        "hp": 180,
         "speed": 2500,
         "command": 0
       }
@@ -63,19 +45,20 @@
     {
       "tribeType": 3,
       "tribeName": "奶牛猫族",
+      "description": "增殖、分裂\n猫越多就越强",
       "initialCatCount": 4,
       "deployCostPerCat": 8,
       "leaderBaseStats": {
-        "attack": 88,
+        "attack": 9,
         "defense": 30,
-        "hp": 2100,
+        "hp": 210,
         "speed": 950,
         "command": 11
       },
       "catBaseStats": {
-        "attack": 55,
+        "attack": 6,
         "defense": 52,
-        "hp": 2000,
+        "hp": 200,
         "speed": 950,
         "command": 0
       }
@@ -83,40 +66,21 @@
     {
       "tribeType": 4,
       "tribeName": "暹罗猫族",
+      "description": "闪现、能量盾\n神秘魔法输出",
       "initialCatCount": 4,
       "deployCostPerCat": 12,
       "leaderBaseStats": {
-        "attack": 130,
+        "attack": 13,
         "defense": 12,
-        "hp": 1400,
+        "hp": 140,
         "speed": 1200,
         "command": 9
       },
       "catBaseStats": {
-        "attack": 72,
+        "attack": 7,
         "defense": 33,
-        "hp": 1300,
+        "hp": 130,
         "speed": 1200,
-        "command": 0
-      }
-    },
-    {
-      "tribeType": 5,
-      "tribeName": "布偶猫族",
-      "initialCatCount": 3,
-      "deployCostPerCat": 10,
-      "leaderBaseStats": {
-        "attack": 108,
-        "defense": 18,
-        "hp": 1600,
-        "speed": 1050,
-        "command": 10
-      },
-      "catBaseStats": {
-        "attack": 60,
-        "defense": 40,
-        "hp": 1550,
-        "speed": 1050,
         "command": 0
       }
     }

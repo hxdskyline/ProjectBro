@@ -17,6 +17,7 @@ namespace TribeSystem
 
         /// <summary>
         /// 生成招募选项（1个增加小猫 + 2个族长强化）
+        /// 族长强化固定为三种：+6攻击、+4攻击+50血、+80血
         /// </summary>
         public List<RecruitmentOption> GenerateOptions()
         {
@@ -33,33 +34,28 @@ namespace TribeSystem
             if (currentTribeCount == 0)
                 return options;
 
+            // 1. 随机选 1 个加小猫选项
             var addCatsOptions = new List<RecruitmentOption>();
             foreach (var tribe in playerData.tribes)
             {
                 addCatsOptions.Add(CreateAddCatsOption(tribe));
             }
-
-            var leaderBoostOptions = new List<RecruitmentOption>();
-            foreach (var tribe in playerData.tribes)
-            {
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, StatType.Attack));
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, StatType.Defense));
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, StatType.Hp));
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, StatType.Speed));
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, StatType.Command));
-            }
-
-            // 1. 随机选 1 个加小猫选项
             if (addCatsOptions.Count > 0)
             {
                 int idx = Random.Range(0, addCatsOptions.Count);
                 options.Add(addCatsOptions[idx]);
             }
 
-            // 2. 随机打乱并选 2 个不同的强化族长选项
-            var uniqueBoosts = new List<RecruitmentOption>();
-            var seenDescriptions = new HashSet<string>();
+            // 2. 随机选 2 个不同的族长强化选项（从3种固定奖励中选）
+            var leaderBoostOptions = new List<RecruitmentOption>();
+            foreach (var tribe in playerData.tribes)
+            {
+                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 6, 0));   // +6攻击
+                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 4, 50));  // +4攻击+50血
+                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 0, 80));  // +80血
+            }
 
+            // 打乱后选2个不同类型的
             for (int i = 0; i < leaderBoostOptions.Count; i++)
             {
                 int swapIdx = Random.Range(i, leaderBoostOptions.Count);
@@ -68,17 +64,18 @@ namespace TribeSystem
                 leaderBoostOptions[swapIdx] = temp;
             }
 
+            var selectedBoosts = new List<RecruitmentOption>();
+            var seenTypes = new HashSet<string>();
             foreach (var opt in leaderBoostOptions)
             {
-                string coreLogic = GetCoreLogicDescription(opt);
-                if (seenDescriptions.Add(coreLogic))
+                string typeKey = $"{opt.bonusAttack}_{opt.bonusHp}";
+                if (seenTypes.Add(typeKey))
                 {
-                    uniqueBoosts.Add(opt);
-                    if (uniqueBoosts.Count >= 2) break;
+                    selectedBoosts.Add(opt);
+                    if (selectedBoosts.Count >= 2) break;
                 }
             }
-
-            options.AddRange(uniqueBoosts);
+            options.AddRange(selectedBoosts);
 
             // 3. 随机打乱这 3 个选项的顺序
             for (int i = 0; i < options.Count; i++)
@@ -94,7 +91,7 @@ namespace TribeSystem
 
         private string GetCoreLogicDescription(RecruitmentOption opt)
         {
-            TribeType tType = TribeType.Maine;
+            TribeType tType = TribeType.Tabby;
             if (opt.targetTribeType.HasValue)
             {
                 tType = opt.targetTribeType.Value;
@@ -133,7 +130,7 @@ namespace TribeSystem
 
             for (int i = 0; i < catsToAdd; i++)
             {
-                tribe.cats.Add(CatData.CreateWithRandomQuality());
+                tribe.cats.Add(CatData.CreateWithRandomQuality(tribe.tribeType));
             }
 
             _dataManager.SavePlayerData();
@@ -143,34 +140,20 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 执行族长属性提升（不消耗猫粮）
+        /// 执行族长固定属性提升（不消耗猫粮）
         /// </summary>
-        public bool ExecuteLeaderBoost(TribeRecord tribe, StatType statType, float boostPercent)
+        public bool ExecuteLeaderBoost(TribeRecord tribe, int attackBonus, int hpBonus)
         {
-            // 不消耗猫粮
             var buffs = tribe.leader.permanentBuffs;
+            buffs.attackBonus += attackBonus;
+            buffs.hpBonus += hpBonus;
 
-            switch (statType)
-            {
-                case StatType.Attack:
-                    buffs.attackPercent += boostPercent;
-                    break;
-                case StatType.Defense:
-                    buffs.defensePercent += boostPercent;
-                    break;
-                case StatType.Hp:
-                    buffs.hpPercent += boostPercent;
-                    break;
-                case StatType.Speed:
-                    buffs.speedPercent += boostPercent;
-                    break;
-                case StatType.Command:
-                    buffs.commandPercent += boostPercent;
-                    break;
-            }
+            // 招募给的简单加血加攻 buff 配置为不显示
+            if (attackBonus != 0) buffs.attackVisible = false;
+            if (hpBonus != 0) buffs.hpVisible = false;
 
             _dataManager.SavePlayerData();
-            Debug.Log($"[RecruitmentService] Boosted {statType} of leader in tribe {tribe.tribeType} by {boostPercent * 100}% (free)");
+            Debug.Log($"[RecruitmentService] Boosted leader in tribe {tribe.tribeType}: +{attackBonus} atk, +{hpBonus} hp (free)");
 
             return true;
         }
@@ -199,7 +182,7 @@ namespace TribeSystem
 
             for (int i = 0; i < config.initialCatCount; i++)
             {
-                newTribe.cats.Add(CatData.CreateWithQuality(CatQuality.White));
+                newTribe.cats.Add(CatData.CreateWithQuality(CatQuality.White, tribeType));
             }
 
             _dataManager.AddTribe(newTribe);
@@ -240,6 +223,7 @@ namespace TribeSystem
 
             foreach (TribeType type in System.Enum.GetValues(typeof(TribeType)))
             {
+                if (type == TribeType.None) continue;
                 bool hasType = false;
                 foreach (var tribe in playerData.tribes)
                 {
@@ -268,6 +252,12 @@ namespace TribeSystem
         /// </summary>
         private LeaderData CreateLeader(TribeConfig config)
         {
+            var buffs = new PermanentBuffs();
+            // 添加天生特殊 buff
+            var innateBuff = PermanentBuffs.CreateInnateBuff(config.tribeType);
+            if (innateBuff != null)
+                buffs.specialBuffs.Add(innateBuff);
+
             return new LeaderData
             {
                 leaderId = Random.Range(1000, 9999),
@@ -278,7 +268,7 @@ namespace TribeSystem
                 baseSpeed = config.leaderBaseStats.speed,
                 command = config.leaderBaseStats.command,
                 skillIds = new List<int>(),
-                permanentBuffs = new PermanentBuffs(),
+                permanentBuffs = buffs,
                 temporaryBuff = null
             };
         }
@@ -297,10 +287,15 @@ namespace TribeSystem
             };
         }
 
-        private RecruitmentOption CreateLeaderBoostOption(TribeRecord tribe, StatType statType)
+        private RecruitmentOption CreateLeaderBoostOption(TribeRecord tribe, int attackBonus, int hpBonus)
         {
-            int randomPercent = Random.Range(20, 101);
-            float boostValue = randomPercent / 100f;
+            string bonusText = "";
+            if (attackBonus > 0 && hpBonus > 0)
+                bonusText = $"+{attackBonus}攻击 +{hpBonus}血";
+            else if (attackBonus > 0)
+                bonusText = $"+{attackBonus}攻击";
+            else
+                bonusText = $"+{hpBonus}血";
 
             return new RecruitmentOption
             {
@@ -308,9 +303,9 @@ namespace TribeSystem
                 cost = 0,
                 targetTribeType = null,
                 targetTribeId = tribe.tribeId,
-                targetStatType = statType,
-                boostValue = boostValue,
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n{GetStatTypeName(statType)}+{randomPercent}%"
+                bonusAttack = attackBonus,
+                bonusHp = hpBonus,
+                description = $"{GetTribeTypeName(tribe.tribeType)}\n{bonusText}"
             };
         }
 
@@ -322,12 +317,10 @@ namespace TribeSystem
         {
             switch (type)
             {
-                case TribeType.Maine: return "缅因猫族";
                 case TribeType.Tabby: return "狸花猫族";
                 case TribeType.Orange: return "大橘猫族";
                 case TribeType.Cow: return "奶牛猫族";
                 case TribeType.Siamese: return "暹罗猫族";
-                case TribeType.Ragdoll: return "布偶猫族";
                 default: return type.ToString();
             }
         }
