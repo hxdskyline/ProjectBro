@@ -100,8 +100,15 @@ namespace TribeSystem
             switch (item.itemType)
             {
                 case ShopItemType.Artifact:
-                    // TODO: 添加奇物到玩家背包
-                    Debug.Log($"[ShopService] Bought artifact: {item.name}");
+                    string accId = _dataManager.UnlockRandomAccessory(false);
+                    if (accId != null)
+                    {
+                        Debug.Log($"[ShopService] Bought artifact, unlocked accessory: {accId}");
+                    }
+                    else
+                    {
+                        Debug.Log("[ShopService] Bought artifact, but all accessories already unlocked");
+                    }
                     break;
 
                 case ShopItemType.Consumable:

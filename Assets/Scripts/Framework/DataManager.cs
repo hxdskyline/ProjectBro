@@ -401,6 +401,40 @@ public class DataManager : MonoBehaviour
         return new System.Collections.Generic.List<string>(_playerData.unlockedAccessories);
     }
 
+    /// <summary>
+    /// 随机解锁一个未获得的饰品，返回饰品ID（若已全部获得则返回null）
+    /// </summary>
+    public string UnlockRandomAccessory(bool saveImmediately = true)
+    {
+        if (_playerData == null) return null;
+        EnsurePlayerDataDefaults();
+
+        // 加载饰品配置获取所有饰品ID
+        string configPath = UnityEngine.Application.streamingAssetsPath + "/accessory_config.json";
+        if (!System.IO.File.Exists(configPath)) return null;
+
+        var configText = System.IO.File.ReadAllText(configPath);
+        var root = LitJson.JsonMapper.ToObject(configText);
+        var accessoriesJson = root["accessories"];
+
+        // 找出未解锁的饰品ID
+        var unaccessedIds = new System.Collections.Generic.List<string>();
+        for (int i = 0; i < accessoriesJson.Count; i++)
+        {
+            string accId = accessoriesJson[i]["id"].ToString();
+            if (!string.IsNullOrEmpty(accId) && !_playerData.unlockedAccessories.Contains(accId))
+            {
+                unaccessedIds.Add(accId);
+            }
+        }
+
+        if (unaccessedIds.Count == 0) return null;
+
+        var pickedId = unaccessedIds[UnityEngine.Random.Range(0, unaccessedIds.Count)];
+        UnlockAccessory(pickedId, saveImmediately);
+        return pickedId;
+    }
+
     public int GetShopRefreshCount()
     {
         if (_playerData == null) return 0;

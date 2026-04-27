@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections.Generic;
+using System.IO;
 
 namespace TribeSystem
 {
@@ -7,6 +9,13 @@ namespace TribeSystem
     /// </summary>
     public static class TribeStatsCalculator
     {
+        // 全局饰品加成缓存
+        private static float _cachedAccessoryAtk;
+        private static float _cachedAccessoryDef;
+        private static float _cachedAccessoryHp;
+        private static float _cachedAccessorySpd;
+        private static bool _accessoryCacheDirty = true;
+        private static List<string> _lastCachedAccessories;
         /// <summary>
         /// 通用属性修正方法
         /// 公式：final = base * (1 + SUM(percentBuffs) - SUM(percentDebuffs)) + SUM(flatBuffs) - SUM(flatDebuffs)
@@ -54,6 +63,9 @@ namespace TribeSystem
                 spd = ApplyModifiers(spd, t.speedPercent, 0f);
             }
 
+            // 应用全局饰品加成
+            ApplyGlobalAccessoryModifiers(ref atk, ref def, ref hp, ref spd);
+
             // 应用心情修正
             if (!string.IsNullOrEmpty(moodId))
             {
@@ -89,6 +101,13 @@ namespace TribeSystem
             int defense = Mathf.RoundToInt(catBaseStats.defense * cat.defenseMultiplier);
             int hp = Mathf.RoundToInt(catBaseStats.hp * cat.hpMultiplier);
             int speed = Mathf.RoundToInt(catBaseStats.speed * cat.speedMultiplier);
+
+            // 应用全局饰品加成
+            EnsureAccessoryCache();
+            attack = Mathf.RoundToInt(attack * (1f + _cachedAccessoryAtk));
+            defense = Mathf.RoundToInt(defense * (1f + _cachedAccessoryDef));
+            hp = Mathf.RoundToInt(hp * (1f + _cachedAccessoryHp));
+            speed = Mathf.RoundToInt(speed * (1f + _cachedAccessorySpd));
 
             // 确保属性不低于1
             attack = Mathf.Max(1, attack);
@@ -232,6 +251,92 @@ namespace TribeSystem
                 case "ecstatic": return new MoodModifier { atkPercent = 0.2f,  defPercent = 0.2f,  hpPercent = 0.2f,  spdPercent = 0.2f };
                 default:         return new MoodModifier { atkPercent = 0f,    defPercent = 0f,    hpPercent = 0f,    spdPercent = 0f };
             }
+        }
+
+        // ─── 全局饰品加成 ─────────────────────────────────────────────
+
+        /// <summary>
+        /// 刷新饰品加成缓存
+        /// </summary>
+        public static void RefreshAccessoryCache()
+        {
+            _accessoryCacheDirty = true;
+        }
+
+        private static void EnsureAccessoryCache()
+        {
+            if (!_accessoryCacheDirty) return;
+            _accessoryCacheDirty = false;
+
+            var dataManager = GameManager.Instance?.DataManager;
+            if (dataManager == null) return;
+
+            var unlocked = dataManager.GetUnlockedAccessories();
+
+            // 检查是否有变化
+            if (_lastCachedAccessories != null && ListsEqual(_lastCachedAccessories, unlocked))
+                return;
+            _lastCachedAccessories = new List<string>(unlocked);
+
+            _cachedAccessoryAtk = 0f;
+            _cachedAccessoryDef = 0f;
+            _cachedAccessoryHp = 0f;
+            _cachedAccessorySpd = 0f;
+
+            string configPath = Path.Combine(Application.streamingAssetsPath, "accessory_config.json");
+            if (!File.Exists(configPath)) return;
+
+            try
+            {
+                string json = File.ReadAllText(configPath);
+                LitJson.JsonData root = LitJson.JsonMapper.ToObject(json);
+                LitJson.JsonData accessoriesJson = root["accessories"];
+
+                for (int i = 0; i < accessoriesJson.Count; i++)
+                {
+                    var acc = accessoriesJson[i];
+                    string accId = acc["id"].ToString();
+                    if (!unlocked.Contains(accId)) continue;
+
+                    string effectType = acc["effectType"].ToString();
+                    float effectValue = float.TryParse(acc["effectValue"].ToString(), out float v) ? v : 0f;
+
+                    switch (effectType)
+                    {
+                        case "AttackPercent":  _cachedAccessoryAtk += effectValue; break;
+                        case "DefensePercent": _cachedAccessoryDef += effectValue; break;
+                        case "HpPercent":      _cachedAccessoryHp += effectValue; break;
+                        case "SpeedPercent":   _cachedAccessorySpd += effectValue; break;
+                        case "AllPercent":
+                            _cachedAccessoryAtk += effectValue;
+                            _cachedAccessoryDef += effectValue;
+                            _cachedAccessoryHp += effectValue;
+                            _cachedAccessorySpd += effectValue;
+                            break;
+                    }
+                }
+            }
+            catch (System.Exception) { }
+        }
+
+        private static bool ListsEqual(List<string> a, List<string> b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i] != b[i]) return false;
+            }
+            return true;
+        }
+
+        private static void ApplyGlobalAccessoryModifiers(ref float atk, ref float def, ref float hp, ref float spd)
+        {
+            EnsureAccessoryCache();
+            atk = ApplyModifiers(atk, _cachedAccessoryAtk, 0f);
+            def = ApplyModifiers(def, _cachedAccessoryDef, 0f);
+            hp = ApplyModifiers(hp, _cachedAccessoryHp, 0f);
+            spd = ApplyModifiers(spd, _cachedAccessorySpd, 0f);
         }
     }
 }
