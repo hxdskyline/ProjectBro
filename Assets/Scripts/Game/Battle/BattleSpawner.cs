@@ -227,6 +227,7 @@ public static class BattleSpawner
         }
         sortBy.BaseOrder = 10;
         sortBy.Multiplier = 100;
+        sortBy.IsLeader = innateBuffs != null && innateBuffs.Count > 0;
 
         AvatarSequencePlayer sequencePlayer = go.GetComponent<AvatarSequencePlayer>();
         if (sequencePlayer == null)

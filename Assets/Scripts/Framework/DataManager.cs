@@ -97,8 +97,11 @@ public class DataManager : MonoBehaviour
         _playerData.currentRound = 1;
         _playerData.catFood = 1000; // Initial cat food
         _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
+        _playerData.globalCatAttackFlatBonus = 0;
         _playerData.shopRefreshCount = 0;
         _playerData.lastShopRound = 0;
+        _playerData.runChoices = new System.Collections.Generic.List<TribeSystem.GameChoice>();
+        _playerData.runEquipments = new System.Collections.Generic.List<TribeSystem.EquipmentRecord>();
 
         SavePlayerData();
         Debug.Log("[DataManager] New player data created");
@@ -402,6 +405,19 @@ public class DataManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 清空本局获得的饰品（新游戏开始时调用）
+    /// </summary>
+    public void ClearRunAccessories()
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.unlockedAccessories.Clear();
+        _playerData.runChoices?.Clear();
+        _playerData.runEquipments?.Clear();
+        SavePlayerData();
+    }
+
+    /// <summary>
     /// 随机解锁一个未获得的饰品，返回饰品ID（若已全部获得则返回null）
     /// </summary>
     public string UnlockRandomAccessory(bool saveImmediately = true)
@@ -410,7 +426,7 @@ public class DataManager : MonoBehaviour
         EnsurePlayerDataDefaults();
 
         // 加载饰品配置获取所有饰品ID
-        string configPath = UnityEngine.Application.streamingAssetsPath + "/accessory_config.json";
+        string configPath = UnityEngine.Application.streamingAssetsPath + "/Tables/accessory_config.json";
         if (!System.IO.File.Exists(configPath)) return null;
 
         var configText = System.IO.File.ReadAllText(configPath);
@@ -595,7 +611,7 @@ public class DataManager : MonoBehaviour
             _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
         }
 
-        // 修复旧存档：确保每个族群的cats列表不为null，并刷新族长baseSpeed
+        // 修复旧存档：确保每个族群的cats列表不为null，并确保族长拥有天生buff
         foreach (var tribe in _playerData.tribes)
         {
             if (tribe == null) continue;
@@ -605,16 +621,9 @@ public class DataManager : MonoBehaviour
                 tribe.cats = new System.Collections.Generic.List<TribeSystem.CatData>();
             }
 
-            // 旧存档族长baseSpeed可能是默认值1000，从配置表刷新
             if (tribe.leader != null)
             {
-                var config = TribeSystem.TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-                if (config != null && config.leaderBaseStats != null)
-                {
-                    tribe.leader.baseSpeed = config.leaderBaseStats.speed;
-                }
-
-                // 确保族长拥有天生特殊 buff（兼容旧存档）
+                // 确保族长拥有天生特殊 buff
                 if (tribe.leader.permanentBuffs != null)
                 {
                     tribe.leader.permanentBuffs.EnsureInnateBuffs(tribe.tribeType);
@@ -630,6 +639,16 @@ public class DataManager : MonoBehaviour
         if (_playerData.consumables == null)
         {
             _playerData.consumables = new System.Collections.Generic.List<TribeSystem.ConsumableItem>();
+        }
+
+        if (_playerData.runChoices == null)
+        {
+            _playerData.runChoices = new System.Collections.Generic.List<TribeSystem.GameChoice>();
+        }
+
+        if (_playerData.runEquipments == null)
+        {
+            _playerData.runEquipments = new System.Collections.Generic.List<TribeSystem.EquipmentRecord>();
         }
 
         // Ensure new persistent collections exist for CatSystem integration (legacy)
@@ -722,6 +741,13 @@ public class PlayerData
     public int shopRefreshCount;
     public int lastShopRound;
     public System.Collections.Generic.List<TribeSystem.ConsumableItem> consumables;
+
+    // 奇物全局加成（累计值，新小猫自动继承）
+    public int globalCatAttackFlatBonus;
+
+    // 统一 Choice / Equipment 系统（本局记录）
+    public System.Collections.Generic.List<TribeSystem.GameChoice> runChoices;
+    public System.Collections.Generic.List<TribeSystem.EquipmentRecord> runEquipments;
 
     // 本回合事件完成标记（存回合号；与currentRound相同则表示本回合已完成）
     public int recruitmentCompletedRound;

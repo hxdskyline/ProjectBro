@@ -29,7 +29,7 @@ namespace TribeSystem.UI
 
             if (_titleText != null)
             {
-                _titleText.text = GetOptionTitle(option.optionType);
+                _titleText.text = GetTribeName(option.tribeType);
             }
             if (_descText != null)
             {
@@ -42,17 +42,12 @@ namespace TribeSystem.UI
             }
         }
 
-        private string GetOptionTitle(NewTribeEventOptionType optionType)
+        private string GetTribeName(TribeType tribeType)
         {
-            switch (optionType)
-            {
-                case NewTribeEventOptionType.NewRandomTribe:
-                    return "新部族";
-                case NewTribeEventOptionType.CatFoodReward:
-                    return "猫粮奖励";
-                default:
-                    return "未知选项";
-            }
+            var config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            if (config != null && !string.IsNullOrEmpty(config.tribeName))
+                return config.tribeName;
+            return tribeType.ToString();
         }
     }
 }

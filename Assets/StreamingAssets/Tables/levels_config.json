@@ -1,0 +1,840 @@
+{
+  "levels": [
+    {
+      "battleNumber": 1,
+      "levelType": "normal",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "sunny",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard"
+      ],
+      "freeDeployQuota": 0,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 13,
+          "defense": 0,
+          "hp": 170,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 15,
+          "defense": 0,
+          "hp": 230,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 100,
+        "hard": 150
+      },
+      "hasRecruitment": false,
+      "hasRitual": false,
+      "hasShop": false,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 2,
+      "levelType": "normal",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "sunny",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard"
+      ],
+      "freeDeployQuota": 50,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 15,
+          "defense": 0,
+          "hp": 180,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 17,
+          "defense": 0,
+          "hp": 243,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 120,
+        "hard": 180
+      },
+      "hasRecruitment": true,
+      "hasRitual": false,
+      "hasShop": true,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 3,
+      "levelType": "elite",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "sunny",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "rainy",
+          "formationType": "swarm"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard"
+      ],
+      "freeDeployQuota": 60,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 18,
+          "defense": 0,
+          "hp": 200,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 20,
+          "defense": 0,
+          "hp": 270,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 140,
+        "hard": 210
+      },
+      "hasRecruitment": true,
+      "hasRitual": true,
+      "hasShop": false,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 4,
+      "levelType": "normal",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "night",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "sunny",
+          "formationType": "swarm"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 80,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 20,
+          "defense": 0,
+          "hp": 223,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 22,
+          "defense": 0,
+          "hp": 300,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 24,
+          "defense": 0,
+          "hp": 340,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 160,
+        "hard": 240,
+        "bloodbath": 350
+      },
+      "hasRecruitment": true,
+      "hasRitual": false,
+      "hasShop": true,
+      "hasNewTribeEvent": true
+    },
+    {
+      "battleNumber": 5,
+      "levelType": "elite",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "sunny",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "rainy",
+          "formationType": "swarm"
+        },
+        {
+          "terrain": "brush",
+          "weather": "night",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 100,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 23,
+          "defense": 0,
+          "hp": 247,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 25,
+          "defense": 0,
+          "hp": 333,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 28,
+          "defense": 0,
+          "hp": 380,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 180,
+        "hard": 270,
+        "bloodbath": 400
+      },
+      "hasRecruitment": true,
+      "hasRitual": true,
+      "hasShop": false,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 6,
+      "levelType": "normal",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "windy",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "sunny",
+          "formationType": "swarm"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 120,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 25,
+          "defense": 0,
+          "hp": 270,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 29,
+          "defense": 0,
+          "hp": 365,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 31,
+          "defense": 0,
+          "hp": 413,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 200,
+        "hard": 300,
+        "bloodbath": 450
+      },
+      "hasRecruitment": true,
+      "hasRitual": false,
+      "hasShop": true,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 7,
+      "levelType": "elite",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "night",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "rainy",
+          "formationType": "swarm"
+        },
+        {
+          "terrain": "plain",
+          "weather": "windy",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 140,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 27,
+          "defense": 0,
+          "hp": 293,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 31,
+          "defense": 0,
+          "hp": 398,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 34,
+          "defense": 0,
+          "hp": 447,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 220,
+        "hard": 330,
+        "bloodbath": 500
+      },
+      "hasRecruitment": true,
+      "hasRitual": true,
+      "hasShop": false,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 8,
+      "levelType": "normal",
+      "scenarioOptions": [
+        {
+          "terrain": "brush",
+          "weather": "night",
+          "formationType": "single"
+        },
+        {
+          "terrain": "plain",
+          "weather": "rainy",
+          "formationType": "swarm"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 160,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 29,
+          "defense": 0,
+          "hp": 317,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 33,
+          "defense": 0,
+          "hp": 430,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 36,
+          "defense": 0,
+          "hp": 480,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 240,
+        "hard": 360,
+        "bloodbath": 550
+      },
+      "hasRecruitment": true,
+      "hasRitual": false,
+      "hasShop": true,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 9,
+      "levelType": "elite",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "sunny",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "windy",
+          "formationType": "swarm"
+        },
+        {
+          "terrain": "plain",
+          "weather": "night",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 180,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 31,
+          "defense": 0,
+          "hp": 340,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 35,
+          "defense": 0,
+          "hp": 463,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 38,
+          "defense": 0,
+          "hp": 513,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 260,
+        "hard": 390,
+        "bloodbath": 600
+      },
+      "hasRecruitment": true,
+      "hasRitual": true,
+      "hasShop": false,
+      "hasNewTribeEvent": false
+    },
+    {
+      "battleNumber": 10,
+      "levelType": "boss",
+      "scenarioOptions": [
+        {
+          "terrain": "plain",
+          "weather": "night",
+          "formationType": "single"
+        },
+        {
+          "terrain": "brush",
+          "weather": "rainy",
+          "formationType": "swarm"
+        },
+        {
+          "terrain": "plain",
+          "weather": "windy",
+          "formationType": "single"
+        }
+      ],
+      "difficultyOptions": [
+        "normal",
+        "hard",
+        "bloodbath"
+      ],
+      "freeDeployQuota": 200,
+      "enemyUnitIds": {
+        "single": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "swarm": [
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      "enemyStats": {
+        "normal": {
+          "attack": 33,
+          "defense": 0,
+          "hp": 363,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "hard": {
+          "attack": 37,
+          "defense": 0,
+          "hp": 495,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        },
+        "bloodbath": {
+          "attack": 41,
+          "defense": 0,
+          "hp": 550,
+          "moveSpeed": 1800,
+          "attackRange": 1.0,
+          "attackSpeed": 1250
+        }
+      },
+      "catFoodReward": {
+        "normal": 280,
+        "hard": 420,
+        "bloodbath": 650
+      },
+      "hasRecruitment": true,
+      "hasRitual": false,
+      "hasShop": true,
+      "hasNewTribeEvent": false
+    }
+  ],
+  "enemyTypes": {
+    "1": { "name": "敌方侦察猫" },
+    "2": { "name": "敌方突击猫" },
+    "3": { "name": "敌方精英猫" }
+  },
+  "popupPriorities": {
+    "newTribeEvent": 30,
+    "recruitment": 20,
+    "ritual": 10,
+    "shop": 0
+  }
+}

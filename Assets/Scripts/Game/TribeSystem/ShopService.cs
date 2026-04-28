@@ -9,11 +9,17 @@ namespace TribeSystem
     public class ShopService
     {
         private DataManager _dataManager;
+        private AuraService _auraService;
         private int _currentRound;
 
         public ShopService()
         {
             _dataManager = GameManager.Instance?.DataManager;
+        }
+
+        public void SetAuraService(AuraService auraService)
+        {
+            _auraService = auraService;
         }
 
         /// <summary>
@@ -32,10 +38,11 @@ namespace TribeSystem
         {
             var items = new List<ShopItem>();
             var config = TribeConfigLoader.Instance.GetShopConfig();
+            var usedKeys = new System.Collections.Generic.HashSet<string>();
 
             for (int i = 0; i < config.slotCount; i++)
             {
-                ShopItem item = GenerateRandomShopItem(config);
+                ShopItem item = GenerateRandomShopItemWithRetry(config, usedKeys);
                 if (item != null)
                 {
                     items.Add(item);
@@ -43,6 +50,68 @@ namespace TribeSystem
             }
 
             return items;
+        }
+
+        private ShopItem GenerateRandomShopItemWithRetry(ShopConfig config, System.Collections.Generic.HashSet<string> usedKeys)
+        {
+            // 最多重试 slotCount * 2 次，避免死循环
+            int maxRetry = config.slotCount * 2;
+            for (int i = 0; i < maxRetry; i++)
+            {
+                ShopItem item = GenerateRandomShopItem(config);
+                if (item == null) return null;
+
+                string key = GetItemKey(item);
+                if (usedKeys.Add(key))
+                    return item;
+            }
+            // 重试用尽，放一个不重复的
+            return GenerateNonDuplicateItem(config, usedKeys);
+        }
+
+        private string GetItemKey(ShopItem item)
+        {
+            switch (item.itemType)
+            {
+                case ShopItemType.Artifact:
+                    return $"Artifact_{item.artifactEffectType}";
+                case ShopItemType.Consumable:
+                    return $"Consumable_{item.consumableEffectType}";
+                case ShopItemType.Cat:
+                    return $"Cat_{item.catTribeType}_{item.catQuality}";
+                default:
+                    return $"{item.itemType}_{item.itemId}";
+            }
+        }
+
+        private ShopItem GenerateNonDuplicateItem(ShopConfig config, System.Collections.Generic.HashSet<string> usedKeys)
+        {
+            // 遍历所有消耗品类型，找一个没用过的
+            string[] consumableNames = { "炸弹", "冰冻陷阱", "回复药水", "攻击强化", "防御强化" };
+            foreach (string name in consumableNames)
+            {
+                ConsumableEffectType effectType = GetConsumableEffectType(name);
+                string key = $"Consumable_{effectType}";
+                if (!usedKeys.Contains(key))
+                {
+                    int price = GetConsumablePrice(effectType);
+                    string iconAddress = "";
+                    if (config.items.consumable.icons != null)
+                        config.items.consumable.icons.TryGetValue(effectType.ToString(), out iconAddress);
+
+                    return new ShopItem
+                    {
+                        itemId = Random.Range(200, 300),
+                        itemType = ShopItemType.Consumable,
+                        consumableEffectType = effectType,
+                        basePrice = price,
+                        name = name,
+                        description = GetConsumableDescription(effectType),
+                        iconAddress = iconAddress ?? ""
+                    };
+                }
+            }
+            return null;
         }
 
         /// <summary>
@@ -100,14 +169,9 @@ namespace TribeSystem
             switch (item.itemType)
             {
                 case ShopItemType.Artifact:
-                    string accId = _dataManager.UnlockRandomAccessory(false);
-                    if (accId != null)
+                    if (item.artifactEffectType.HasValue)
                     {
-                        Debug.Log($"[ShopService] Bought artifact, unlocked accessory: {accId}");
-                    }
-                    else
-                    {
-                        Debug.Log("[ShopService] Bought artifact, but all accessories already unlocked");
+                        ApplyArtifactEffect(item.artifactEffectType.Value);
                     }
                     break;
 
@@ -136,6 +200,57 @@ namespace TribeSystem
 
             _dataManager.SavePlayerData();
             return 1;
+        }
+
+        private void ApplyArtifactEffect(ArtifactEffectType effectType)
+        {
+            // 读取奇物配置获取效果值
+            var config = TribeConfigLoader.Instance.GetShopConfig();
+            int value = GetArtifactEffectValue(effectType, config);
+
+            string artifactName = effectType == ArtifactEffectType.LeaderHpFlat ? "猫爬架" : "苍蝇拍";
+            StatType stat = effectType == ArtifactEffectType.LeaderHpFlat ? StatType.Hp : StatType.Attack;
+
+            // 确定影响范围：族长加血→全体族长，小猫加攻→全体小猫
+            BuffApplyScope scope = effectType == ArtifactEffectType.LeaderHpFlat
+                ? BuffApplyScope.AllLeaders
+                : BuffApplyScope.AllCats;
+
+            // 小猫攻击力奇物：累计全局值，新小猫自动继承
+            if (effectType == ArtifactEffectType.CatAttackFlat)
+            {
+                _dataManager.PlayerData.globalCatAttackFlatBonus += value;
+            }
+
+            // 构造 EquipmentRecord 并注册
+            var equip = new EquipmentRecord
+            {
+                equipmentId = $"Artifact_{effectType}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                configId = $"Artifact_{effectType}",
+                displayName = artifactName,
+                description = effectType == ArtifactEffectType.LeaderHpFlat ? $"族长生命值+{value}" : $"小猫攻击力+{value}",
+                buffScope = scope,
+                buffApplyType = BuffApplyType.Aura,
+                acquiredRound = _dataManager.GetCurrentRound(),
+                effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, value) }
+            };
+
+            _auraService?.RegisterEquipment(equip);
+
+            // 同时记录到旧的 unlockedAccessories 保持兼容
+            _dataManager.UnlockAccessory($"Artifact_{effectType}");
+        }
+
+        private int GetArtifactEffectValue(ArtifactEffectType effectType, ShopConfig config)
+        {
+            // 从配置读取，JSON 中新增 artifactEffects 字段
+            if (config.items.artifactEffects != null &&
+                config.items.artifactEffects.ContainsKey(effectType.ToString()))
+            {
+                return config.items.artifactEffects[effectType.ToString()];
+            }
+            // 默认值
+            return effectType == ArtifactEffectType.LeaderHpFlat ? 500 : 20;
         }
 
         /// <summary>
@@ -188,21 +303,44 @@ namespace TribeSystem
 
         private ShopItem GenerateArtifactItem(ShopConfig config)
         {
+            // 两种奇物：族长加血 / 小猫加攻
+            bool isLeaderHp = Random.value < 0.5f;
+            ArtifactEffectType effectType = isLeaderHp ? ArtifactEffectType.LeaderHpFlat : ArtifactEffectType.CatAttackFlat;
+            string name = isLeaderHp ? "猫爬架" : "苍蝇拍";
+
+            // 从配置读取效果值
+            int value = GetArtifactEffectValue(effectType, config);
+            string desc = isLeaderHp ? $"族长生命值+{value}" : $"小猫攻击力+{value}";
+
+            // 从配置读取图标
+            string icon = config.items.artifact.icon ?? "";
+            if (config.items.artifact.icons != null &&
+                config.items.artifact.icons.ContainsKey(effectType.ToString()))
+            {
+                icon = config.items.artifact.icons[effectType.ToString()];
+            }
+
             return new ShopItem
             {
                 itemId = Random.Range(100, 200),
                 itemType = ShopItemType.Artifact,
+                artifactEffectType = effectType,
                 basePrice = config.items.artifact.basePrice,
-                name = "神秘奇物",
-                description = "提供强大的属性加成"
+                name = name,
+                description = desc,
+                iconAddress = icon
             };
         }
 
         private ShopItem GenerateConsumableItem(ShopConfig config)
         {
-            int price = Random.Range(config.items.consumable.basePriceMin, config.items.consumable.basePriceMax + 1);
             string name = GetRandomConsumableName();
             ConsumableEffectType effectType = GetConsumableEffectType(name);
+            int price = GetConsumablePrice(effectType);
+
+            string iconAddress = "";
+            if (config.items.consumable.icons != null)
+                config.items.consumable.icons.TryGetValue(effectType.ToString(), out iconAddress);
 
             return new ShopItem
             {
@@ -211,7 +349,8 @@ namespace TribeSystem
                 consumableEffectType = effectType,
                 basePrice = price,
                 name = name,
-                description = GetConsumableDescription(effectType)
+                description = GetConsumableDescription(effectType),
+                iconAddress = iconAddress ?? ""
             };
         }
 
@@ -241,7 +380,8 @@ namespace TribeSystem
                 catQuality = quality,
                 basePrice = basePrice,
                 name = $"{GetTribeTypeName(tribeType)}({GetQualityName(quality)})",
-                description = $"一只{GetQualityName(quality)}品质的小猫"
+                description = $"{TribeConfigLoader.Instance.GetTribeConfig(tribeType)?.initialCatCount ?? 1}只{GetQualityName(quality)}品质的小猫",
+                iconAddress = GetTribeIcon(tribeType, config)
             };
         }
 
@@ -296,8 +436,16 @@ namespace TribeSystem
 
             if (targetTribe != null)
             {
-                targetTribe.cats.Add(CatData.CreateWithQuality(quality, targetTribe.tribeType));
-                Debug.Log($"[ShopService] Added {quality} cat to tribe {tribeType}");
+                var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+                int catsToAdd = config != null ? config.initialCatCount : 1;
+                for (int i = 0; i < catsToAdd; i++)
+                {
+                    var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType);
+                    cat.ApplyGlobalArtifactBonus();
+                    _auraService?.ApplyAurasToNewCat(cat, targetTribe.tribeType);
+                    targetTribe.cats.Add(cat);
+                }
+                Debug.Log($"[ShopService] Added {catsToAdd} {quality} cats to tribe {tribeType}");
             }
             else
             {
@@ -309,6 +457,19 @@ namespace TribeSystem
         {
             string[] names = { "炸弹", "冰冻陷阱", "回复药水", "攻击强化", "防御强化" };
             return names[Random.Range(0, names.Length)];
+        }
+
+        private int GetConsumablePrice(ConsumableEffectType effectType)
+        {
+            switch (effectType)
+            {
+                case ConsumableEffectType.Bomb: return 999;
+                case ConsumableEffectType.FreezeTrap: return 63;
+                case ConsumableEffectType.HealPotion: return 85;
+                case ConsumableEffectType.AttackBuff: return 55;
+                case ConsumableEffectType.DefenseBuff: return 30;
+                default: return 50;
+            }
         }
 
         private ConsumableEffectType GetConsumableEffectType(string name)
@@ -359,6 +520,22 @@ namespace TribeSystem
                 case CatQuality.Gold: return "大师";
                 default: return quality.ToString();
             }
+        }
+
+        private string GetTribeIcon(TribeType tribeType, ShopConfig config)
+        {
+            var tribeIcons = config.items.cat?.tribeIcons;
+            if (tribeIcons != null)
+            {
+                string key = ((int)tribeType).ToString();
+                if (tribeIcons.ContainsKey(key))
+                {
+                    var icons = tribeIcons[key];
+                    if (icons != null && icons.Count > 0)
+                        return icons[0];
+                }
+            }
+            return "";
         }
     }
 }

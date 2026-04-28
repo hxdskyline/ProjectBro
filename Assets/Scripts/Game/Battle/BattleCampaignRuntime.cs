@@ -13,7 +13,7 @@ public enum LevelType
 
 public class BattleCampaignRuntime
 {
-    private const string BattleLevelConfigFileName = "battle_campaign_levels.json";
+    private const string BattleLevelConfigFileName = "Tables/levels_config.json";
 
     private readonly int[][] _enemyUnitIdsByBattle;
 
@@ -52,6 +52,9 @@ public class BattleCampaignRuntime
     private readonly bool[] _hasNewTribeEventByBattle;
     private readonly int[] _catFoodRewardByBattle;
 
+    // Enemy type names (loaded from enemyTypes in config)
+    private readonly Dictionary<int, string> _enemyTypeNames = new Dictionary<int, string>();
+
     // Popup priorities
     private readonly Dictionary<string, int> _popupPriorities = new Dictionary<string, int>();
 
@@ -82,20 +85,15 @@ public class BattleCampaignRuntime
         _isCompleted = false;
     }
 
-    // --- Legacy methods (backward compatible) ---
-
     public int GetEnemyCountForBattle(int battleNumber)
     {
         int[] ids = GetEnemyUnitIdsForBattle(battleNumber);
         return ids != null && ids.Length > 0 ? ids.Length : 1;
     }
 
-    /// <summary>
-    /// 获取敌方单位ID（兼容旧接口，默认返回 single 或 fallback）
-    /// </summary>
     public int[] GetEnemyUnitIdsForBattle(int battleNumber)
     {
-        // Try new format first: prefer single, then swarm
+        // Try single first, then swarm
         var ids = GetEnemyUnitIds(battleNumber, EnemyFormationType.Single);
         if (ids != null && ids.Length > 0)
             return ids;
@@ -104,12 +102,14 @@ public class BattleCampaignRuntime
         if (ids != null && ids.Length > 0)
             return ids;
 
-        // Fallback to legacy
-        if (_enemyUnitIdsByBattle == null || _enemyUnitIdsByBattle.Length == 0)
-            return null;
+        return null;
+    }
 
-        int index = Mathf.Clamp(battleNumber - 1, 0, _enemyUnitIdsByBattle.Length - 1);
-        return _enemyUnitIdsByBattle[index];
+    public string GetEnemyName(int enemyUnitId)
+    {
+        if (_enemyTypeNames.TryGetValue(enemyUnitId, out string name))
+            return name;
+        return $"敌方兵种 {enemyUnitId}";
     }
 
     public int GetNextBattleNumber(int currentBattleNumber)
@@ -133,13 +133,11 @@ public class BattleCampaignRuntime
         _currentBattleIndex++;
     }
 
-    // --- Legacy cat food reward (returns normal difficulty value) ---
     public int GetCatFoodRewardForBattle(int battleNumber)
     {
         return GetCatFoodReward(battleNumber, DifficultyLevel.Normal);
     }
 
-    // --- Legacy enemy stats (returns normal difficulty value) ---
     public UnitStaticAttributes GetEnemyStatsForBattle(int battleNumber)
     {
         return GetEnemyStats(battleNumber, DifficultyLevel.Normal);
@@ -338,6 +336,20 @@ public class BattleCampaignRuntime
         {
             string jsonContent = File.ReadAllText(configPath);
             JsonData rootJson = JsonMapper.ToObject(jsonContent);
+
+            // Load enemy type names
+            if (rootJson != null && rootJson.Keys.Contains("enemyTypes"))
+            {
+                JsonData enemyTypesJson = rootJson["enemyTypes"];
+                foreach (string key in enemyTypesJson.Keys)
+                {
+                    if (int.TryParse(key, out int id))
+                    {
+                        string name = ReadString(enemyTypesJson[key], "name", $"敌方兵种 {id}");
+                        _enemyTypeNames[id] = name;
+                    }
+                }
+            }
 
             // Load popup priorities
             if (rootJson != null && rootJson.Keys.Contains("popupPriorities"))
@@ -620,7 +632,9 @@ public class BattleCampaignRuntime
         stats.Attack = ReadInt(json, "attack", defaults.Attack);
         stats.Defense = ReadInt(json, "defense", defaults.Defense);
         stats.MaxHp = ReadInt(json, "hp", defaults.MaxHp);
-        stats.MoveSpeed = ReadFloat(json, "moveSpeed", defaults.MoveSpeed);
+        // JSON 中速度值为整数，直接读取
+        stats.MoveSpeed = ReadInt(json, "moveSpeed", defaults.MoveSpeed);
+        stats.AttackSpeed = ReadInt(json, "attackSpeed", defaults.AttackSpeed);
         stats.AttackRange = ReadFloat(json, "attackRange", defaults.AttackRange);
 
         return stats;

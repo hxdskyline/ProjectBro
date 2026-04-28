@@ -213,7 +213,7 @@ namespace TribeSystem.UI
                 int atk = Mathf.RoundToInt(l.baseAttack * cat.attackMultiplier);
                 int def = Mathf.RoundToInt(l.baseDefense * cat.defenseMultiplier);
                 int hp = Mathf.RoundToInt(l.baseHp * cat.hpMultiplier);
-                int spd = Mathf.RoundToInt(l.baseSpeed * cat.speedMultiplier);
+                int spd = Mathf.RoundToInt(l.baseMoveSpeed * cat.speedMultiplier * 1000);
                 statsText.text = $"攻{atk} 防{def} 血{hp} 速{spd}";
             }
             else
@@ -262,13 +262,13 @@ namespace TribeSystem.UI
 
             // 5项属性
             string[] attrNames = { "攻击", "防御", "生命", "速度", "统御" };
-            int[] baseValues = { leader.baseAttack, leader.baseDefense, leader.baseHp, leader.baseSpeed, leader.command };
+            int[] baseValues = { leader.baseAttack, leader.baseDefense, leader.baseHp, Mathf.RoundToInt(leader.baseMoveSpeed * 1000), leader.command };
             float[] buffPcts = {
                 leader.permanentBuffs?.attackPercent ?? 0f,
                 leader.permanentBuffs?.defensePercent ?? 0f,
                 leader.permanentBuffs?.hpPercent ?? 0f,
                 leader.permanentBuffs?.speedPercent ?? 0f,
-                leader.permanentBuffs?.commandPercent ?? 0f
+                0f
             };
 
             for (int i = 0; i < 5; i++)
@@ -330,17 +330,16 @@ namespace TribeSystem.UI
             int atk = leader.baseAttack + (buffs?.attackBonus ?? 0) + deltaAttack;
             int def = leader.baseDefense + (buffs?.defenseBonus ?? 0);
             int hp = leader.baseHp + (buffs?.hpBonus ?? 0) + deltaHp;
-            int spd = leader.baseSpeed + (buffs?.speedBonus ?? 0);
-            int cmd = leader.command + (buffs?.commandBonus ?? 0);
+            int cmd = leader.command;
 
             bool showAtk = highlight ? deltaAttack > 0 : deltaAttack < 0;
             bool showHp = highlight ? deltaHp > 0 : deltaHp < 0;
 
-            string[] names = { "攻击", "防御", "生命", "速度", "统御" };
-            int[] vals = { atk, def, hp, spd, cmd };
-            bool[] boosted = { showAtk, false, showHp, false, false };
+            string[] names = { "攻击", "防御", "生命", "统御" };
+            int[] vals = { atk, def, hp, cmd };
+            bool[] boosted = { showAtk, false, showHp, false };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 4; i++)
             {
                 Color textColor = boosted[i] ? new Color(0.2f, 0.9f, 0.3f) : new Color(0.984f, 0.965f, 0.855f);
                 string prefix = boosted[i] ? "▲ " : "";
@@ -512,8 +511,7 @@ namespace TribeSystem.UI
                 case StatType.Attack: return buffs.attackPercent;
                 case StatType.Defense: return buffs.defensePercent;
                 case StatType.Hp: return buffs.hpPercent;
-                case StatType.Speed: return buffs.speedPercent;
-                case StatType.Command: return buffs.commandPercent;
+                case StatType.MoveSpeed: return buffs.speedPercent;
                 default: return 0f;
             }
         }

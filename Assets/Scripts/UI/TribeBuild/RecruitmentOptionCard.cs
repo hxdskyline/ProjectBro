@@ -33,7 +33,7 @@ namespace TribeSystem.UI
             Index = index;
 
             if (_titleText != null)
-                _titleText.text = GetOptionTypeTitle(option.optionType);
+                _titleText.text = GetOptionTypeTitle(option);
             if (_descText != null)
                 _descText.text = option.description;
             if (_okButton != null)
@@ -79,14 +79,14 @@ namespace TribeSystem.UI
                 Addressables.Release(_portraitHandle);
         }
 
-        private string GetOptionTypeTitle(RecruitmentOptionType optionType)
+        private string GetOptionTypeTitle(RecruitmentOption option)
         {
-            switch (optionType)
+            switch (option.optionType)
             {
-                case RecruitmentOptionType.NewTribe: return "招募";
-                case RecruitmentOptionType.AddCats: return "繁育";
-                case RecruitmentOptionType.QualityEvolution: return "品质";
-                case RecruitmentOptionType.LeaderBoost: return "属性";
+                case ChoiceCategory.Reinforcement: return "招募";
+                case ChoiceCategory.AddCats: return "繁育";
+                case ChoiceCategory.QualityEvolution: return "品质";
+                case ChoiceCategory.Buff: return "属性";
                 default: return "招募选项";
             }
         }

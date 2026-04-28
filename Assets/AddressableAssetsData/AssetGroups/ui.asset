@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 08b56cb525fde0742a76ce1237fb16d5
+  m_GUID: ff82415fc853a2e4680748f063b436c3
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
@@ -23,12 +23,22 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 03a58a26e74953148bd90842c36c9583
-    m_Address: ui/sprite/buildcard/common_btn_huanganniu2
+    m_Address: ui/sprite/common/common_btn_huanganniu2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 06801bf4404ef8f409850a5ac87114ed
     m_Address: ui/sprite/buildcard/zhujiemian_img_xialaxuanzhong
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 08ffc96fadba41143a56c6171d95f06d
+    m_Address: ui/sprite/itemicon/7
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0b6f05797d402b54e88586b1ea46a477
+    m_Address: ui/tribebuild/addcat/buffentry
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -39,6 +49,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0ec661d05ff4a76449266709a770e31d
     m_Address: ui/tribebuild/initialtribeselectionpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1320e894e2fc6604d8815e6b84f34a53
+    m_Address: ui/sprite/itemicon/1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -58,12 +73,22 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3178ae8a0ae7c8440a00ed88df151a08
-    m_Address: ui/sprite/buildcard/common_btn_honganniu2
+    m_Address: ui/sprite/common/common_btn_honganniu2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 32a65e48002aaa849b4be0e727be2723
+    m_Address: ui/tribebuild/backpack/backpackitem
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 33891cc251876704d8502fcba308152e
     m_Address: ui/sprite/addcat/zhaomu_img_biaotou
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 35a195ffe147fe041b72a270660f6e76
+    m_Address: ui/tribebuild/initialtribeeventoptioncard
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -73,7 +98,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 36d55bbd7dd148b47a136c28a9a9e69a
-    m_Address: ui/tribebuild/shoppanel
+    m_Address: ui/tribebuild/shop/shoppanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -88,12 +113,12 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3f56e1df1edd24442a0fa575c52a2552
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_xue
+    m_Address: ui/sprite/common/zhujiemian_icon_xue
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4036222cc40635d43b4f1ca72c16361c
-    m_Address: ui/sprite/buildcard/common_btn_houtui
+    m_Address: ui/sprite/common/common_btn_houtui
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -102,8 +127,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 42f33049ab4487b4881924fd73857c90
+    m_Address: ui/sprite/itemicon/9
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 450173470ba00df478975b77c3306ee2
     m_Address: ui/sprite/addcat/common_btn_huanganniu
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 459d4374a64af73408c50c0a82356d0b
+    m_Address: ui/tribebuild/stattooltip
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -119,6 +154,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 48038e613d658c0489034b866e818fe5
     m_Address: ui/sprite/shop/shangren_btn_tuichu
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4a11b8c1c53b7e049a0e057ce1e606d9
+    m_Address: ui/sprite/itemicon/10
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -142,13 +182,33 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 531152540e073694597b96256554f0e8
+    m_Address: ui/sprite/itemicon/xianluo2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5326f61806536ab4da42e8de1ca125f9
+    m_Address: ui/sprite/itemicon/lihua2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 549039affd13c724f89b63d995081d47
     m_Address: ui/sprite/addcat/common_img_ziyuanshudi
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54b753f3028e21d40995005019929061
+    m_Address: ui/sprite/itemicon/5
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 553a135b778de7a4db83378f45c42a93
     m_Address: ui/tribebuild/newtribeeventoptioncard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 57feff7e9f0039d4eba33a45954174d0
+    m_Address: ui/sprite/itemicon/xianluo1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -159,6 +219,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5c4f459823707ec4a8a93f06bf764712
     m_Address: "ui/sprite/buildcard/\u6807\u6CE8_z-\u4E3B\u754C\u9762"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f3e75dad500ffe48ae4d276df48a414
+    m_Address: ui/sprite/itemicon/nainiu2
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -177,13 +242,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 712597a8a53285346858a84dfba13c4c
+    m_Address: ui/sprite/itemicon/laoshu2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 712b90f94d2199b40b65ed9bcf6aedc6
     m_Address: ui/sprite/shop/shangren_img_daojvdi1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 74175b2fce6f7c54598bed14d1f4f2a6
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_ming
+    m_Address: ui/sprite/common/zhujiemian_icon_ming
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -198,12 +268,17 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7f3c279e50f78ce42883d1eafa3c48af
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_tong
+    m_Address: ui/sprite/common/zhujiemian_icon_tong
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 805a67ddf1563d74bb4c3d06fb3a7bae
     m_Address: ui/tribebuild/tribecard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 87d2a905a090f9f4c82447e692677624
+    m_Address: ui/sprite/itemicon/3
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -213,7 +288,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8b5c94bbc1ac58a4ea1c78e5e0f20368
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_fei
+    m_Address: ui/sprite/common/zhujiemian_icon_fei
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -223,7 +298,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8e305737b25310f4185885a3b2973d40
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_su
+    m_Address: ui/sprite/common/zhujiemian_icon_su
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -238,7 +313,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 961070c7678767b4d934f4d0c0aad974
-    m_Address: ui/sprite/buildcard/common_btn_yiwang
+    m_Address: ui/sprite/common/common_btn_yiwang
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -257,18 +332,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9d2fb2d2a3cd1fd4c8e800ee82482173
+    m_Address: ui/tribebuild/backpack/backpackpanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
     m_Address: ui/tribebuild/ritualtiercard
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a255356c3b8ba89409fca0178eebfd82
-    m_Address: ui/sprite/buildcard/common_img_jindutiaodi3g
+    m_Address: ui/sprite/common/common_img_jindutiaodi3g
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a30b09d2425c28242985c819c04df324
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_gong
+    m_Address: ui/sprite/common/zhujiemian_icon_gong
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -278,7 +358,12 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a41f905d39f19ce449fd2388ea709d0d
-    m_Address: ui/sprite/buildcard/common_btn_honganniu
+    m_Address: ui/sprite/common/common_btn_honganniu
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a572997d13ca48e4dbef5ce24b92360d
+    m_Address: ui/sprite/itemicon/6
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -323,7 +408,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b8922860b01405d43979f29151e3a300
-    m_Address: ui/sprite/buildcard/zhujiemian_icon_fang
+    m_Address: ui/sprite/common/zhujiemian_icon_fang
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -337,8 +422,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb3d63eb3002ff94d9e8b672e0707b60
+    m_Address: ui/sprite/itemicon/2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bb4d5dce7a8590f4abeb6281e19b67a3
+    m_Address: ui/sprite/itemicon/daju2
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c39d1030f9386fb4f8097f6caad0143f
+    m_Address: ui/sprite/itemicon/laoshu1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8
-    m_Address: ui/tribebuild/shopitemcard
+    m_Address: ui/tribebuild/shop/shopitemcard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c621841f0eb3acb4e8d0f462ab028928
+    m_Address: ui/sprite/itemicon/nainiu1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -354,6 +459,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca6d269c149c84c4baa27f63b37720e0
     m_Address: ui/sprite/buildcard/zhujiemian_bg_beijing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d4497b98d7110db489c27e190e8ca35f
+    m_Address: ui/sprite/itemicon/daju1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -383,12 +493,17 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dd405f662b2c9a74db76ed242e87fa73
-    m_Address: ui/sprite/buildcard/common_img_jindutiao
+    m_Address: ui/sprite/common/common_img_jindutiao
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: de71c652eef3ed64caceaba5d1e35128
     m_Address: ui/sprite/addcat/common_icon_xiaoyuganhuobi
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1c441c1caed920449c1bc56dd80cfac
+    m_Address: ui/sprite/itemicon/4
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -414,6 +529,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e800269ee798b164895818d9d00ea771
     m_Address: ui/texture/buildbg
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e87b13021f74d1f43b64d152d23f8c4a
+    m_Address: ui/sprite/itemicon/8
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: efe68baf7675b194b8d60b772f7cdbef
+    m_Address: ui/sprite/itemicon/lihua1
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

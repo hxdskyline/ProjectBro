@@ -118,6 +118,10 @@ public class FighterHUD : MonoBehaviour
             elapsed += Time.deltaTime;
             float p = elapsed / duration;
             txtGo.transform.localPosition = Vector3.Lerp(start, end, p);
+            // 抵消父级翻转，防止文字被镜像
+            float parentFlipX = transform.localScale.x;
+            float counterX = Mathf.Abs(parentFlipX) > 0.001f ? 1f / parentFlipX : 1f;
+            txtGo.transform.localScale = new Vector3(counterX, 1f, 1f);
             tmp.color = new Color(tmp.color.r, tmp.color.g, tmp.color.b, 1f - p);
             if (Camera.main != null) txtGo.transform.rotation = Camera.main.transform.rotation;
             yield return null;

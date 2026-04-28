@@ -960,13 +960,12 @@ public class BattlePreparePanel : UIPanel
 
     private string ResolveEnemyName(int enemyUnitId)
     {
-        switch (enemyUnitId)
-        {
-            case 1: return "敌方侦察猫";
-            case 2: return "敌方突击猫";
-            case 3: return "敌方精英猫";
-            default: return $"敌方兵种 {enemyUnitId}";
-        }
+        if (GameManager.Instance == null)
+            return $"敌方兵种 {enemyUnitId}";
+        var campaign = GameManager.Instance.BattleCampaignRuntime;
+        if (campaign != null)
+            return campaign.GetEnemyName(enemyUnitId);
+        return $"敌方兵种 {enemyUnitId}";
     }
 
     private void OnDestroy()

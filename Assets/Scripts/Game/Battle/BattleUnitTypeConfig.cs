@@ -6,15 +6,17 @@ public struct UnitStaticAttributes
     [Min(1)] public int MaxHp;
     [Min(1)] public int Attack;
     [Min(0)] public int Defense;
-    [Min(0.1f)] public float MoveSpeed;
+    [Min(0)] public int MoveSpeed;     // 整数存储，实际值 = MoveSpeed / 1000f
+    [Min(0)] public int AttackSpeed;   // 整数存储，实际值 = AttackSpeed / 1000f，表示攻击冷却时间(秒)，0=从MoveSpeed推导
     [Min(0.1f)] public float AttackRange;
 
     public static UnitStaticAttributes Default => new UnitStaticAttributes
     {
         MaxHp = 6,
         Attack = 1,
-        Defense = 3,
-        MoveSpeed = 2.2f,
+        Defense = 0,
+        MoveSpeed = 2200,
+        AttackSpeed = 0,
         AttackRange = 1.0f
     };
 }
@@ -62,9 +64,9 @@ public class UnitRuntimeAttributes
     public float SkillMultiplier; // 1.0 = normal attack, 0~10 for skills
     public int TrueDamage;        // ignores all defense
 
-    // 速度派生属性
-    [Min(0.001f)] public float CorrectedMoveSpeed; // MS = CS / 1000
-    [Min(0.001f)] public float CorrectedAttackSpeed; // AS = CS / 2000
+    // 速度派生属性（整数域计算，最终 /1000 转回 float）
+    public float CorrectedMoveSpeed; // 实际移速 = CorrectedMoveSpeed / 1000
+    public float CorrectedAttackSpeed; // 实际攻击冷却时间(秒)，直接使用
 
     private UnitStaticAttributes _base;
 
@@ -79,7 +81,7 @@ public class UnitRuntimeAttributes
         MoveSpeed = 0.1f;
         AttackRange = 0.1f;
         CorrectedMoveSpeed = 0.001f;
-        CorrectedAttackSpeed = 0.0005f;
+        CorrectedAttackSpeed = 1.0f;
         Recalculate();
         CurrentHp = MaxHp;
     }
@@ -119,7 +121,7 @@ public class UnitRuntimeAttributes
     /// <summary>
     /// Recalculate final stats from base + modifiers.
     /// Formula: final = base * (1 + ΣPBUFF - ΣPDEBUFF) + ΣABUFF - ΣADEBUFF
-    /// Speed conversion: MS = CS/1000, AS = CS/2000
+    /// Speed conversion: MS = CS/1000, AS(cooldown) = base/1000
     /// </summary>
     public void Recalculate()
     {
@@ -145,17 +147,20 @@ public class UnitRuntimeAttributes
             CurrentHp = Mathf.Clamp(CurrentHp, 0, MaxHp);
         }
 
-        // 修正速度 (CS)
+        // 修正速度 (CS) - 在整数域计算
         float spdPercentMod = (1f + SpeedPercentBuff - SpeedPercentDebuff);
         int spdFlatMod = SpeedFlatBuff - SpeedFlatDebuff;
-        float correctedSpeed = _base.MoveSpeed * 1000f * spdPercentMod + spdFlatMod;
+        float correctedSpeed = _base.MoveSpeed * spdPercentMod + spdFlatMod;
         correctedSpeed = Mathf.Max(1f, correctedSpeed);
 
-        // 速度派生: MS = CS/1000, AS = CS/2000
+        // 速度派生: 实际值 = CS / 1000
         CorrectedMoveSpeed = Mathf.Max(0.001f, correctedSpeed / 1000f);
-        CorrectedAttackSpeed = Mathf.Max(0.0005f, correctedSpeed / 2000f);
+        // 攻速冷却: 优先使用静态配置的 AttackSpeed(冷却时间)，否则从移速推导
+        if (_base.AttackSpeed > 0)
+            CorrectedAttackSpeed = Mathf.Max(0.1f, _base.AttackSpeed / 1000f);
+        else
+            CorrectedAttackSpeed = Mathf.Max(0.1f, 2000f / correctedSpeed);
 
-        // 兼容旧字段
         MoveSpeed = CorrectedMoveSpeed;
         AttackRange = Mathf.Max(0.1f, _base.AttackRange);
     }

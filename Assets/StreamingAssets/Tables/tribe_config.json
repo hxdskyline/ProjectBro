@@ -6,18 +6,21 @@
       "description": "致命的射手",
       "initialCatCount": 5,
       "deployCostPerCat": 10,
+      "avatarDefinitionAddress": "data/avatar/definitions/Lihua_AvatarAnimDef",
       "leaderBaseStats": {
-        "attack": 12,
-        "defense": 15,
-        "hp": 150,
-        "speed": 1100,
-        "command": 8
+        "attack": 26,
+        "defense": 4,
+        "hp": 225,
+        "command": 8,
+        "moveSpeed": 1100,
+        "attackSpeed": 1750
       },
       "catBaseStats": {
-        "attack": 7,
-        "defense": 36,
-        "hp": 140,
-        "speed": 1100,
+        "attack": 17,
+        "defense": 0,
+        "hp": 130,
+        "moveSpeed": 1100,
+        "attackSpeed": 2000,
         "command": 0
       }
     },
@@ -27,18 +30,21 @@
       "description": "巨大体型\n无情碾压对手",
       "initialCatCount": 2,
       "deployCostPerCat": 10,
+      "avatarDefinitionAddress": "data/avatar/definitions/Daju_AvatarAnimDef",
       "leaderBaseStats": {
-        "attack": 11,
-        "defense": 25,
-        "hp": 190,
-        "speed": 2500,
-        "command": 12
+        "attack": 28,
+        "defense": 2,
+        "hp": 317,
+        "command": 12,
+        "moveSpeed": 1800,
+        "attackSpeed": 2000
       },
       "catBaseStats": {
-        "attack": 6,
-        "defense": 48,
-        "hp": 180,
-        "speed": 2500,
+        "attack": 19,
+        "defense": 1,
+        "hp": 350,
+        "moveSpeed": 1800,
+        "attackSpeed": 2200,
         "command": 0
       }
     },
@@ -48,18 +54,21 @@
       "description": "增殖、分裂\n猫越多就越强",
       "initialCatCount": 4,
       "deployCostPerCat": 8,
+      "avatarDefinitionAddress": "data/avatar/definitions/Nainiu_AvatarAnimDef",
       "leaderBaseStats": {
-        "attack": 9,
-        "defense": 30,
-        "hp": 210,
-        "speed": 950,
-        "command": 11
+        "attack": 25,
+        "defense": 4,
+        "hp": 237,
+        "command": 11,
+        "moveSpeed": 2000,
+        "attackSpeed": 2000
       },
       "catBaseStats": {
-        "attack": 6,
-        "defense": 52,
-        "hp": 200,
-        "speed": 950,
+        "attack": 13,
+        "defense": 0,
+        "hp": 170,
+        "moveSpeed": 2000,
+        "attackSpeed": 2000,
         "command": 0
       }
     },
@@ -67,20 +76,23 @@
       "tribeType": 4,
       "tribeName": "暹罗猫族",
       "description": "闪现、能量盾\n神秘魔法输出",
-      "initialCatCount": 4,
+      "initialCatCount": 3,
       "deployCostPerCat": 12,
+      "avatarDefinitionAddress": "data/avatar/definitions/Xianluo_AvatarAnimDef",
       "leaderBaseStats": {
-        "attack": 13,
-        "defense": 12,
-        "hp": 140,
-        "speed": 1200,
-        "command": 9
+        "attack": 32,
+        "defense": 5,
+        "hp": 230,
+        "command": 9,
+        "moveSpeed": 9999,
+        "attackSpeed": 2000
       },
       "catBaseStats": {
-        "attack": 7,
-        "defense": 33,
-        "hp": 130,
-        "speed": 1200,
+        "attack": 12,
+        "defense": 2,
+        "hp": 210,
+        "moveSpeed": 2400,
+        "attackSpeed": 2000,
         "command": 0
       }
     }

@@ -89,7 +89,7 @@ namespace TribeSystem.UI
                 _leaderStatsText.text = $"攻击: {leader.baseAttack}\n" +
                                         $"防御: {leader.baseDefense}\n" +
                                         $"血量: {leader.baseHp}\n" +
-                                        $"速度: {leader.baseSpeed}\n" +
+                                        $"速度: {Mathf.RoundToInt(leader.baseMoveSpeed * 1000)}\n" +
                                         $"统御: {leader.command}";
             }
 

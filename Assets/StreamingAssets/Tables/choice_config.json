@@ -1,0 +1,31 @@
+{
+  "archetypes": [
+    {
+      "id": "recruit_buff_all_cats_attack_flat_3",
+      "displayName": "小猫攻击强化",
+      "descriptionTemplate": "全体小猫攻击力+{value}（光环）",
+      "source": "recruitment",
+      "category": "buff",
+      "buffScope": "AllCats",
+      "buffApplyType": "Aura",
+      "buffEffects": [
+        { "statType": "Attack", "isPercent": false, "value": 3, "gameEffectType": -1 }
+      ],
+      "weight": 10
+    },
+    {
+      "id": "recruit_buff_all_cats_attack_hp",
+      "displayName": "小猫攻击和血双强化",
+      "descriptionTemplate": "全体小猫攻击力+3 生命值+20（光环）",
+      "source": "recruitment",
+      "category": "buff",
+      "buffScope": "AllCats",
+      "buffApplyType": "Aura",
+      "buffEffects": [
+        { "statType": "Attack", "isPercent": false, "value": 3, "gameEffectType": -1 },
+        { "statType": "Hp", "isPercent": false, "value": 20, "gameEffectType": -1 }
+      ],
+      "weight": 10
+    }
+  ]
+}

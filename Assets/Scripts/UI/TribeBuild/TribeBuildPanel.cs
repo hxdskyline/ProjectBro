@@ -29,12 +29,15 @@ namespace TribeSystem.UI
         [SerializeField] private TribeCard _tribeCardPrefab;
         [SerializeField] private TribeDetailTips _tribeDetailTipsPrefab;
         [SerializeField] private Button _sellCatButton;
+        [SerializeField] private Button _backpackButton;
 
         [Header("子面板引用")]
         [SerializeField] private RecruitmentPanel _recruitmentPanel;
         [SerializeField] private RitualPanel _ritualPanel;
         [SerializeField] private ShopPanel _shopPanel;
         [SerializeField] private NewTribeEventPanel _newTribeEventPanel;
+        [SerializeField] private BackpackPanel _backpackPanelPrefab;
+        private BackpackPanel _backpackPanelInstance;
         private AccessoryCodexPanel _codexPanel;
         private RecruitmentResultPanel _recruitmentResultPanel;
 
@@ -43,6 +46,7 @@ namespace TribeSystem.UI
         [SerializeField] private GameObject _tribeAvatarRoot;
 
         private DataManager _dataManager;
+        private AuraService _auraService;
         private RecruitmentService _recruitmentService;
         private RitualService _ritualService;
         private ShopService _shopService;
@@ -84,9 +88,13 @@ namespace TribeSystem.UI
         private void Awake()
         {
             _dataManager = GameManager.Instance?.DataManager;
+            _auraService = new AuraService();
             _recruitmentService = new RecruitmentService();
             _ritualService = new RitualService();
             _shopService = new ShopService();
+            _recruitmentService.SetAuraService(_auraService);
+            _ritualService.SetAuraService(_auraService);
+            _shopService.SetAuraService(_auraService);
 
             // 初始化回合和存档管理器
             _roundManager = new RoundManager();
@@ -167,33 +175,26 @@ namespace TribeSystem.UI
         private void InitializeButtons()
         {
             // 绑定开始战斗按钮
-            if (_startBattleButton != null)
-            {
-                _startBattleButton.onClick.RemoveAllListeners();
-                _startBattleButton.onClick.AddListener(OnStartBattleButtonClicked);
-            }
+            _startBattleButton.onClick.RemoveAllListeners();
+            _startBattleButton.onClick.AddListener(OnStartBattleButtonClicked);
 
             // 绑定商店按钮
-            if (_shopButton != null)
-            {
-                _shopButton.onClick.RemoveAllListeners();
-                _shopButton.onClick.AddListener(OpenShop);
-            }
+            _shopButton.onClick.RemoveAllListeners();
+            _shopButton.onClick.AddListener(OpenShop);
 
             // 绑定返回按钮
-            if (_backButton != null)
-            {
-                _backButton.onClick.RemoveAllListeners();
-                _backButton.onClick.AddListener(OnBackButtonClicked);
-            }
+            _backButton.onClick.RemoveAllListeners();
+            _backButton.onClick.AddListener(OnBackButtonClicked);
 
             // 绑定出售小猫按钮
-            if (_sellCatButton != null)
-            {
-                _sellCatButton.onClick.RemoveAllListeners();
-                _sellCatButton.onClick.AddListener(OnSellCatButtonClicked);
-                _sellCatButton.gameObject.SetActive(false);
-            }
+            _sellCatButton.onClick.RemoveAllListeners();
+            _sellCatButton.onClick.AddListener(OnSellCatButtonClicked);
+            _sellCatButton.gameObject.SetActive(false);
+
+            // 绑定背包按钮
+            _backpackButton.onClick.RemoveAllListeners();
+            _backpackButton.onClick.AddListener(OpenBackpack);
+
         }
 
         private void OnBackButtonClicked()
@@ -280,6 +281,9 @@ namespace TribeSystem.UI
                 _newTribeEventPanel.Initialize();
                 _newTribeEventPanel.Hide();
             }
+
+            // 背包面板（运行时创建）
+            CreateBackpackPanel();
 
             // 图鉴面板（运行时创建）
             CreateCodexPanel();
@@ -445,7 +449,7 @@ namespace TribeSystem.UI
         {
             switch (option.optionType)
             {
-                case RecruitmentOptionType.AddCats:
+                case ChoiceCategory.AddCats:
                 {
                     var tribe = FindTribeById(option.targetTribeId);
                     if (tribe == null) break;
@@ -457,7 +461,7 @@ namespace TribeSystem.UI
                     ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
                     return;
                 }
-                case RecruitmentOptionType.QualityEvolution:
+                case ChoiceCategory.QualityEvolution:
                 {
                     var tribe = FindTribeById(option.targetTribeId);
                     if (tribe == null) break;
@@ -469,18 +473,26 @@ namespace TribeSystem.UI
                     ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
                     return;
                 }
-                case RecruitmentOptionType.LeaderBoost:
+                case ChoiceCategory.Buff:
                 {
                     var tribe = FindTribeById(option.targetTribeId);
                     if (tribe == null) break;
                     string tribeName = GetTribeTypeName(tribe.tribeType);
-                    _recruitmentService.ExecuteLeaderBoost(tribe, option.bonusAttack, option.bonusHp);
+                    // 优先使用 gameChoice（从 choice_config 生成）
+                    if (option.gameChoice != null)
+                    {
+                        _auraService?.RegisterChoice(option.gameChoice);
+                    }
+                    else
+                    {
+                        _recruitmentService.ExecuteLeaderBoost(tribe, option.bonusAttack, option.bonusHp);
+                    }
                     _tribes = _dataManager.GetTribes();
                     RefreshUI();
                     ShowLeaderBoostResult(tribeName, tribe.leader, option.bonusAttack, option.bonusHp, tribe.tribeType);
                     return;
                 }
-                case RecruitmentOptionType.NewTribe:
+                case ChoiceCategory.Reinforcement:
                 {
                     if (!option.targetTribeType.HasValue) break;
                     string tribeName = GetTribeTypeName(option.targetTribeType.Value);
@@ -624,7 +636,7 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 处理新部族事件
+        /// 处理新部族事件 - 强制三选一
         /// </summary>
         private void ProcessNewTribeEvent()
         {
@@ -643,24 +655,42 @@ namespace TribeSystem.UI
                 return;
             }
 
-            // 检查是否还有未拥有的部族类型
+            // 获取未拥有的部族类型
             var availableTypes = _recruitmentService.GetAvailableTribeTypes();
-
-            // 构造二选一选项
-            var options = new List<NewTribeEventOption>();
-            if (availableTypes.Count > 0)
+            if (availableTypes.Count == 0)
             {
+                ProcessNextPopupEvent();
+                return;
+            }
+
+            // 随机选3个（或全部，如果不足3个）
+            int count = Mathf.Min(3, availableTypes.Count);
+            var shuffled = new List<TribeType>(availableTypes);
+            for (int i = shuffled.Count - 1; i > 0; i--)
+            {
+                int j = UnityEngine.Random.Range(0, i + 1);
+                var temp = shuffled[i];
+                shuffled[i] = shuffled[j];
+                shuffled[j] = temp;
+            }
+
+            // 构造三选一选项
+            var options = new List<NewTribeEventOption>();
+            for (int i = 0; i < count; i++)
+            {
+                var tribeType = shuffled[i];
+                var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+                string desc = config != null && !string.IsNullOrEmpty(config.description)
+                    ? config.description
+                    : "加入你的阵营";
+
                 options.Add(new NewTribeEventOption
                 {
-                    optionType = NewTribeEventOptionType.NewRandomTribe,
-                    description = "获得一个随机新部族"
+                    optionType = NewTribeEventOptionType.NewTribe,
+                    tribeType = tribeType,
+                    description = desc
                 });
             }
-            options.Add(new NewTribeEventOption
-            {
-                optionType = NewTribeEventOptionType.CatFoodReward,
-                description = "获得1000猫粮"
-            });
 
             if (_newTribeEventPanel != null)
             {
@@ -678,19 +708,9 @@ namespace TribeSystem.UI
             {
                 switch (option.optionType)
                 {
-                    case NewTribeEventOptionType.NewRandomTribe:
-                        var availableTypes = _recruitmentService.GetAvailableTribeTypes();
-                        if (availableTypes.Count > 0)
-                        {
-                            TribeType selected = availableTypes[UnityEngine.Random.Range(0, availableTypes.Count)];
-                            _recruitmentService.ExecuteFreeNewTribeRecruitment(selected);
-                            Debug.Log($"[TribeBuildPanel] 新部族事件：免费获得 {selected} 部族");
-                        }
-                        break;
-
-                    case NewTribeEventOptionType.CatFoodReward:
-                        _dataManager.AddCatFood(1000);
-                        Debug.Log("[TribeBuildPanel] 新部族事件：获得1000猫粮");
+                    case NewTribeEventOptionType.NewTribe:
+                        _recruitmentService.ExecuteFreeNewTribeRecruitment(option.tribeType);
+                        Debug.Log($"[TribeBuildPanel] 新部族事件：获得 {option.tribeType} 部族");
                         break;
                 }
 
@@ -733,17 +753,38 @@ namespace TribeSystem.UI
             // 玩家可以自由操作：查看族群、打开商店、准备战斗
         }
 
+        private void CreateBackpackPanel()
+        {
+            if (_backpackPanelInstance != null) return;
+            if (_backpackPanelPrefab == null) return;
+
+            _backpackPanelInstance = Instantiate(_backpackPanelPrefab, transform);
+            _backpackPanelInstance.gameObject.name = "BackpackPanel";
+            _backpackPanelInstance.Hide();
+        }
+
+        /// <summary>
+        /// 打开背包面板（可由UI按钮调用）
+        /// </summary>
+        public void OpenBackpack()
+        {
+            if (_backpackPanelInstance != null)
+            {
+                _backpackPanelInstance.Show();
+            }
+        }
+
         private void CreateCodexPanel()
         {
             if (_codexPanel != null) return;
 
             GameObject go = new GameObject("AccessoryCodexPanel", typeof(RectTransform));
             go.transform.SetParent(transform, false);
-            RectTransform rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
 
             _codexPanel = go.AddComponent<AccessoryCodexPanel>();
             _codexPanel.Initialize();
@@ -830,7 +871,9 @@ namespace TribeSystem.UI
 
         private void OnShopItemBuy(ShopItem item)
         {
+            Debug.Log($"[TribeBuildPanel][Debug] OnShopItemBuy: type={item.itemType}, name={item.name}, artifactEffectType={item.artifactEffectType}");
             int result = _shopService.BuyItem(item);
+            Debug.Log($"[TribeBuildPanel][Debug] BuyItem result={result}");
             if (result == 1)
             {
                 RefreshUI();
@@ -845,7 +888,45 @@ namespace TribeSystem.UI
 
                 // 商店购买后存档
                 _saveManager?.SaveAfterShopPurchase(_roundManager.CurrentRound);
+
+                // 奇物购买提示
+                if (item.itemType == ShopItemType.Artifact)
+                {
+                    ShowPurchaseHint($"获得了奇物：{item.name}");
+                }
             }
+        }
+
+        private void ShowPurchaseHint(string message)
+        {
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var root = _forcedPopupRoot != null ? _forcedPopupRoot : transform as RectTransform;
+
+            GameObject hintGo = new GameObject("PurchaseHint", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+            hintGo.transform.SetParent(root, false);
+            RectTransform hintRect = hintGo.GetComponent<RectTransform>();
+            hintRect.anchorMin = new Vector2(0.3f, 0.4f);
+            hintRect.anchorMax = new Vector2(0.7f, 0.6f);
+            hintRect.offsetMin = Vector2.zero;
+            hintRect.offsetMax = Vector2.zero;
+            Image hintBg = hintGo.GetComponent<Image>();
+            hintBg.color = new Color(0.15f, 0.12f, 0.2f, 0.95f);
+
+            GameObject textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.transform.SetParent(hintRect, false);
+            RectTransform textRt = textGo.GetComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+            Text text = textGo.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 22;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(1f, 0.9f, 0.4f, 1f);
+            text.text = message;
+
+            Destroy(hintGo, 2f);
         }
 
         private void OnShopRefresh()
@@ -968,12 +1049,13 @@ namespace TribeSystem.UI
             }
             else
             {
-                Debug.Log("[TribeBuildPanel] 战斗失败，可以重新挑战");
+                Debug.Log("[TribeBuildPanel] 战斗失败，奖励减半，继续推进");
 
-                // 通知GameFlowController战斗失败
+                // 通知GameFlowController战斗结束
                 GameFlowController.Instance?.OnBattleEnded(victory);
 
-                // 失败不推进回合，允许重新调整阵容
+                // 失败也推进回合
+                AdvanceRound();
             }
 
             RefreshUI();
@@ -1066,7 +1148,7 @@ namespace TribeSystem.UI
                     baseAttack = config.leaderBaseStats.attack,
                     baseDefense = config.leaderBaseStats.defense,
                     baseHp = config.leaderBaseStats.hp,
-                    baseSpeed = config.leaderBaseStats.speed,
+                    baseMoveSpeed = config.leaderBaseStats.moveSpeed,
                     command = config.leaderBaseStats.command,
                     skillIds = new List<int>(),
                     permanentBuffs = new PermanentBuffs(),
@@ -1080,7 +1162,9 @@ namespace TribeSystem.UI
             // 添加初始白色小猫
             for (int i = 0; i < config.initialCatCount; i++)
             {
-                tribe.cats.Add(CatData.CreateWithQuality(CatQuality.White, type));
+                var cat = CatData.CreateWithQuality(CatQuality.White, type);
+                cat.ApplyGlobalArtifactBonus();
+                tribe.cats.Add(cat);
             }
 
             return tribe;
@@ -1137,7 +1221,7 @@ namespace TribeSystem.UI
 
         private void RefreshTribeList()
         {
-            if (_tribeListContainer == null || _tribeCardPrefab == null) return;
+            if (_tribeListContainer == null || _tribeCardPrefab == null) { Debug.Log($"[TribeBuildPanel][Debug] RefreshTribeList: container={_tribeListContainer != null}, prefab={_tribeCardPrefab != null}"); return; }
 
             // 清空现有列表
             for (int i = _tribeListContainer.childCount - 1; i >= 0; i--)
@@ -1146,6 +1230,13 @@ namespace TribeSystem.UI
             }
             _displayedCard = null;
             _currentDisplayTribeId = -1;
+
+            Debug.Log($"[TribeBuildPanel][Debug] RefreshTribeList: _tribes={_tribes != null}, count={_tribes?.Count}");
+            if (_tribes != null && _tribes.Count > 0)
+            {
+                var t = _tribes[0];
+                Debug.Log($"[TribeBuildPanel][Debug] RefreshTribeList: tribes[0]={t.tribeType}, leader={t.leader != null}, hpBonus={t.leader?.permanentBuffs?.hpBonus}");
+            }
 
             if (_tribes == null || _tribes.Count == 0) return;
 
@@ -1165,9 +1256,10 @@ namespace TribeSystem.UI
         /// </summary>
         private void ShowTribeOnCard(TribeRecord tribe)
         {
-            if (_displayedCard == null || tribe == null) return;
-            if (_currentDisplayTribeId == tribe.tribeId) return;
+            if (_displayedCard == null || tribe == null) { Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: card={_displayedCard != null}, tribe={tribe != null}"); return; }
+            if (_currentDisplayTribeId == tribe.tribeId) { Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: same tribe {_currentDisplayTribeId}, skipping"); return; }
 
+            Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: tribe={tribe.tribeType}, leader={tribe.leader != null}, hpBonus={tribe.leader?.permanentBuffs?.hpBonus}");
             _currentDisplayTribeId = tribe.tribeId;
             _displayedCard.Setup(tribe, false, null, null);
         }

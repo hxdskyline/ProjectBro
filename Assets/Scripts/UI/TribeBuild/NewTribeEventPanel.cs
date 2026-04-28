@@ -13,7 +13,7 @@ namespace TribeSystem.UI
     public class NewTribeEventPanel : MonoBehaviour
     {
         private const string PanelName = "新部族事件";
-        private const string HintForce = "二选一：请选择一项奖励";
+        private const string HintForce = "选择一个新部族加入你的阵营";
 
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;
@@ -99,10 +99,8 @@ namespace TribeSystem.UI
         {
             switch (optionType)
             {
-                case NewTribeEventOptionType.NewRandomTribe:
+                case NewTribeEventOptionType.NewTribe:
                     return new Color(0.2f, 0.4f, 0.6f, 1f);
-                case NewTribeEventOptionType.CatFoodReward:
-                    return new Color(0.6f, 0.5f, 0.2f, 1f);
                 default:
                     return new Color(0.5f, 0.5f, 0.5f, 1f);
             }

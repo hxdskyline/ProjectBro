@@ -12,6 +12,7 @@ namespace TribeSystem
     public class RitualService
     {
         private DataManager _dataManager;
+        private AuraService _auraService;
 
         // 消耗档次配置（可配置）
         private static readonly int[] CostTiers = { 0, 300, 600 };
@@ -27,6 +28,11 @@ namespace TribeSystem
         public RitualService()
         {
             _dataManager = GameManager.Instance?.DataManager;
+        }
+
+        public void SetAuraService(AuraService auraService)
+        {
+            _auraService = auraService;
         }
 
         // ─── 兼容旧 UI 的方法（RitualPanel 调用）────────────────────
@@ -271,6 +277,8 @@ namespace TribeSystem
                 if (accessoryId != null)
                 {
                     _dataManager.UnlockAccessory(accessoryId);
+                    // 同时注册为 EquipmentRecord
+                    RegisterAccessoryAsEquipment(accessoryId);
                     result.bonusDescription = $"额外获得: 饰品 [{accessoryId}]";
                     Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
                 }
@@ -468,6 +476,7 @@ namespace TribeSystem
                     break;
                 case RitualRewardType.Accessory:
                     _dataManager.UnlockAccessory($"accessory_{item.accessoryId}");
+                    RegisterAccessoryAsEquipment($"accessory_{item.accessoryId}");
                     Debug.Log($"[RitualService] Received accessory: {item.accessoryId}");
                     break;
             }
@@ -485,6 +494,7 @@ namespace TribeSystem
                 if (accessoryId != null)
                 {
                     _dataManager.UnlockAccessory(accessoryId);
+                    RegisterAccessoryAsEquipment(accessoryId);
                     Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
                 }
                 else
@@ -502,6 +512,70 @@ namespace TribeSystem
             }
         }
 
+        /// <summary>
+        /// 从 accessory_config.json 读取饰品效果并注册为 EquipmentRecord
+        /// </summary>
+        private void RegisterAccessoryAsEquipment(string accessoryId)
+        {
+            string configPath = UnityEngine.Application.streamingAssetsPath + "/Tables/accessory_config.json";
+            if (!System.IO.File.Exists(configPath)) return;
+
+            var configText = System.IO.File.ReadAllText(configPath);
+            var root = LitJson.JsonMapper.ToObject(configText);
+            var accessoriesJson = root["accessories"];
+
+            for (int i = 0; i < accessoriesJson.Count; i++)
+            {
+                var acc = accessoriesJson[i];
+                if (acc["id"].ToString() != accessoryId) continue;
+
+                string name = acc.ContainsKey("name") ? acc["name"].ToString() : accessoryId;
+                string desc = acc.ContainsKey("description") ? acc["description"].ToString() : "";
+
+                var equip = new EquipmentRecord
+                {
+                    equipmentId = $"Equip_{accessoryId}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                    configId = accessoryId,
+                    displayName = name,
+                    description = desc,
+                    buffScope = BuffApplyScope.All,
+                    buffApplyType = BuffApplyType.Aura,
+                    acquiredRound = _dataManager.GetCurrentRound(),
+                    effects = new List<BuffEffectItem>()
+                };
+
+                var effectsJson = acc["effects"];
+                for (int j = 0; j < effectsJson.Count; j++)
+                {
+                    var effObj = effectsJson[j];
+                    int typeVal = effObj["type"].IsInt ? (int)effObj["type"] : int.Parse(effObj["type"].ToString());
+                    float value = float.TryParse(effObj["value"].ToString(), out float v) ? v : 0f;
+                    var statType = MapAccessoryEffectType(typeVal);
+                    bool isPercent = typeVal <= 4; // type 0-4 是百分比
+                    equip.effects.Add(new BuffEffectItem(statType, isPercent, value, typeVal));
+                }
+
+                _auraService?.RegisterEquipment(equip);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// 将 accessory_config.json 的 type 数字映射到 StatType
+        /// </summary>
+        private StatType MapAccessoryEffectType(int type)
+        {
+            switch (type)
+            {
+                case 0: return StatType.Attack;
+                case 1: return StatType.Defense;
+                case 2: return StatType.Hp;
+                case 3: return StatType.MoveSpeed;
+                case 4: return StatType.Attack; // 全属性+X%，分别加到各属性上
+                default: return StatType.Attack;
+            }
+        }
+
         private void ApplyTemporaryStatBoost(TribeRecord tribe, StatType stat, int amount)
         {
             if (tribe.leader.temporaryBuff == null)
@@ -513,41 +587,44 @@ namespace TribeSystem
                 case StatType.Attack: buff.attackPercent += pct; break;
                 case StatType.Defense: buff.defensePercent += pct; break;
                 case StatType.Hp: buff.hpPercent += pct; break;
-                case StatType.Speed: buff.speedPercent += pct; break;
+                case StatType.MoveSpeed: break; // 祈愿不再提供速度加成
             }
             buff.duration = 3;
         }
 
         private void ApplyPermanentStatBoost(TribeRecord tribe, StatType stat, int amount)
         {
-            var b = tribe.leader.permanentBuffs;
-            switch (stat)
-            {
-                case StatType.Attack: b.attackBonus += amount; break;
-                case StatType.Defense: b.defenseBonus += amount; break;
-                case StatType.Hp: b.hpBonus += amount; break;
-                case StatType.Speed: b.speedBonus += amount; break;
-                case StatType.Command: b.commandBonus += amount; break;
-            }
+            var effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, amount) };
+            var choice = GameChoice.CreateBuff(
+                $"Ritual_StatBoost_{tribe.tribeType}_{stat}_{amount}",
+                "祈愿强化", $"祈愿：{GetStatName(stat)} +{amount}",
+                ChoiceSource.Ritual,
+                BuffApplyScope.SingleTribeLeader, BuffApplyType.CurrentUnit,
+                effects, tribe.tribeType);
+            _auraService?.RegisterChoice(choice);
         }
 
         private void ApplyPermanentStatPercentBoost(TribeRecord tribe, StatType stat, float pct)
         {
-            var b = tribe.leader.permanentBuffs;
-            switch (stat)
-            {
-                case StatType.Attack: b.attackPercent += pct; break;
-                case StatType.Defense: b.defensePercent += pct; break;
-                case StatType.Hp: b.hpPercent += pct; break;
-                case StatType.Speed: b.speedPercent += pct; break;
-                case StatType.Command: b.commandPercent += pct; break;
-            }
+            var effects = new List<BuffEffectItem> { new BuffEffectItem(stat, true, pct) };
+            var choice = GameChoice.CreateBuff(
+                $"Ritual_StatPct_{tribe.tribeType}_{stat}_{Mathf.RoundToInt(pct * 100)}",
+                "祈愿强化", $"祈愿：{GetStatName(stat)} +{Mathf.RoundToInt(pct * 100)}%",
+                ChoiceSource.Ritual,
+                BuffApplyScope.SingleTribeLeader, BuffApplyType.CurrentUnit,
+                effects, tribe.tribeType);
+            _auraService?.RegisterChoice(choice);
         }
 
         private void AddCatsToTribe(TribeRecord tribe, int count, CatQuality quality)
         {
             for (int i = 0; i < count; i++)
-                tribe.cats.Add(CatData.CreateWithQuality(quality, tribe.tribeType));
+            {
+                var cat = CatData.CreateWithQuality(quality, tribe.tribeType);
+                cat.ApplyGlobalArtifactBonus();
+                _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
+                tribe.cats.Add(cat);
+            }
         }
 
         private TribeRecord GetRandomActiveTribe()
@@ -578,8 +655,7 @@ namespace TribeSystem
                 case StatType.Attack: return "攻击";
                 case StatType.Defense: return "防御";
                 case StatType.Hp: return "血量";
-                case StatType.Speed: return "速度";
-                case StatType.Command: return "统御";
+                case StatType.MoveSpeed: return "移速";
                 default: return "属性";
             }
         }

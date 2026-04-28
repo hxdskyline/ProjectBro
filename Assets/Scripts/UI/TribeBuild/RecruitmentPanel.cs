@@ -278,34 +278,34 @@ namespace TribeSystem.UI
             descText.text = option.description;
         }
 
-        private Color GetOptionCardColor(RecruitmentOptionType optionType)
+        private Color GetOptionCardColor(ChoiceCategory optionType)
         {
             switch (optionType)
             {
-                case RecruitmentOptionType.NewTribe:
+                case ChoiceCategory.Reinforcement:
                     return new Color(0.2f, 0.4f, 0.6f, 1f);
-                case RecruitmentOptionType.AddCats:
+                case ChoiceCategory.AddCats:
                     return new Color(0.2f, 0.6f, 0.4f, 1f);
-                case RecruitmentOptionType.QualityEvolution:
+                case ChoiceCategory.QualityEvolution:
                     return new Color(0.5f, 0.3f, 0.6f, 1f);
-                case RecruitmentOptionType.LeaderBoost:
+                case ChoiceCategory.Buff:
                     return new Color(0.6f, 0.4f, 0.2f, 1f);
                 default:
                     return new Color(0.5f, 0.5f, 0.5f, 1f);
             }
         }
 
-        private string GetOptionTypeTitle(RecruitmentOptionType optionType)
+        private string GetOptionTypeTitle(ChoiceCategory optionType)
         {
             switch (optionType)
             {
-                case RecruitmentOptionType.NewTribe:
+                case ChoiceCategory.Reinforcement:
                     return "新增族群";
-                case RecruitmentOptionType.AddCats:
+                case ChoiceCategory.AddCats:
                     return "增加小猫";
-                case RecruitmentOptionType.QualityEvolution:
+                case ChoiceCategory.QualityEvolution:
                     return "品质进化";
-                case RecruitmentOptionType.LeaderBoost:
+                case ChoiceCategory.Buff:
                     return "族长强化";
                 default:
                     return "招募选项";

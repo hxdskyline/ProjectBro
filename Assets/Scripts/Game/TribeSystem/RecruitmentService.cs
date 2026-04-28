@@ -9,15 +9,20 @@ namespace TribeSystem
     public class RecruitmentService
     {
         private DataManager _dataManager;
+        private AuraService _auraService;
 
         public RecruitmentService()
         {
             _dataManager = GameManager.Instance?.DataManager;
         }
 
+        public void SetAuraService(AuraService auraService)
+        {
+            _auraService = auraService;
+        }
+
         /// <summary>
-        /// 生成招募选项（1个增加小猫 + 2个族长强化）
-        /// 族长强化固定为三种：+6攻击、+4攻击+50血、+80血
+        /// 生成招募选项（1个增加小猫 + 2个buff选项，从choice_config.json读取）
         /// </summary>
         public List<RecruitmentOption> GenerateOptions()
         {
@@ -46,36 +51,25 @@ namespace TribeSystem
                 options.Add(addCatsOptions[idx]);
             }
 
-            // 2. 随机选 2 个不同的族长强化选项（从3种固定奖励中选）
-            var leaderBoostOptions = new List<RecruitmentOption>();
-            foreach (var tribe in playerData.tribes)
+            // 2. 从 choice_config.json 读取 buff 原型，按权重随机选 2 个
+            var buffArchetypes = TribeConfigLoader.Instance.GetArchetypesBySource("recruitment");
+            if (buffArchetypes != null && buffArchetypes.Count > 0)
             {
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 6, 0));   // +6攻击
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 4, 50));  // +4攻击+50血
-                leaderBoostOptions.Add(CreateLeaderBoostOption(tribe, 0, 80));  // +80血
-            }
-
-            // 打乱后选2个不同类型的
-            for (int i = 0; i < leaderBoostOptions.Count; i++)
-            {
-                int swapIdx = Random.Range(i, leaderBoostOptions.Count);
-                var temp = leaderBoostOptions[i];
-                leaderBoostOptions[i] = leaderBoostOptions[swapIdx];
-                leaderBoostOptions[swapIdx] = temp;
-            }
-
-            var selectedBoosts = new List<RecruitmentOption>();
-            var seenTypes = new HashSet<string>();
-            foreach (var opt in leaderBoostOptions)
-            {
-                string typeKey = $"{opt.bonusAttack}_{opt.bonusHp}";
-                if (seenTypes.Add(typeKey))
+                // 为每个族群生成对应的 buff 选项
+                var allBuffOptions = new List<RecruitmentOption>();
+                foreach (var tribe in playerData.tribes)
                 {
-                    selectedBoosts.Add(opt);
-                    if (selectedBoosts.Count >= 2) break;
+                    foreach (var archetype in buffArchetypes)
+                    {
+                        if (archetype.category != "buff") continue;
+                        allBuffOptions.Add(CreateBuffOptionFromArchetype(tribe, archetype));
+                    }
                 }
+
+                // 按权重随机抽取（去重：同一原型只选一次）
+                var selectedBuffOptions = WeightedRandomSelect(allBuffOptions, 2);
+                options.AddRange(selectedBuffOptions);
             }
-            options.AddRange(selectedBoosts);
 
             // 3. 随机打乱这 3 个选项的顺序
             for (int i = 0; i < options.Count; i++)
@@ -87,6 +81,129 @@ namespace TribeSystem
             }
 
             return options;
+        }
+
+        /// <summary>
+        /// 从 archetype 创建招募 buff 选项
+        /// </summary>
+        private RecruitmentOption CreateBuffOptionFromArchetype(TribeRecord tribe, ChoiceArchetype archetype)
+        {
+            // 解析 scope
+            BuffApplyScope scope = ParseBuffScope(archetype.buffScope);
+            BuffApplyType applyType = archetype.buffApplyType == "Aura" ? BuffApplyType.Aura : BuffApplyType.CurrentUnit;
+
+            // 构造 GameChoice 用于后续执行
+            var buffEffects = new List<BuffEffectItem>();
+            if (archetype.buffEffects != null)
+            {
+                foreach (var eff in archetype.buffEffects)
+                {
+                    StatType stat = ParseStatType(eff.statType);
+                    buffEffects.Add(new BuffEffectItem(stat, eff.isPercent, eff.value, eff.gameEffectType));
+                }
+            }
+
+            var choice = GameChoice.CreateBuff(
+                archetype.id,
+                archetype.displayName,
+                FormatDescription(archetype.descriptionTemplate, tribe.tribeType, buffEffects),
+                ChoiceSource.Recruitment,
+                scope,
+                applyType,
+                buffEffects,
+                tribe.tribeType);
+
+            return new RecruitmentOption
+            {
+                optionType = ChoiceCategory.Buff,
+                cost = 0,
+                targetTribeType = null,
+                targetTribeId = tribe.tribeId,
+                bonusAttack = GetEffectValue(buffEffects, StatType.Attack),
+                bonusHp = GetEffectValue(buffEffects, StatType.Hp),
+                description = $"{GetTribeTypeName(tribe.tribeType)}\n{archetype.displayName}",
+                // 附加 GameChoice 供执行时使用
+                gameChoice = choice
+            };
+        }
+
+        /// <summary>
+        /// 按权重随机选取 N 个不重复选项
+        /// </summary>
+        private List<RecruitmentOption> WeightedRandomSelect(List<RecruitmentOption> options, int count)
+        {
+            var result = new List<RecruitmentOption>();
+            var remaining = new List<RecruitmentOption>(options);
+
+            // 打乱
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                int swapIdx = Random.Range(i, remaining.Count);
+                var temp = remaining[i];
+                remaining[i] = remaining[swapIdx];
+                remaining[swapIdx] = temp;
+            }
+
+            // 按 archetype id 去重，选最多 count 个
+            var seenArchetypes = new HashSet<string>();
+            foreach (var opt in remaining)
+            {
+                if (opt.gameChoice == null) continue;
+                string archetypeId = opt.gameChoice.choiceId;
+                if (seenArchetypes.Add(archetypeId))
+                {
+                    result.Add(opt);
+                    if (result.Count >= count) break;
+                }
+            }
+
+            return result;
+        }
+
+        private string FormatDescription(string template, TribeType tribeType, List<BuffEffectItem> effects)
+        {
+            if (string.IsNullOrEmpty(template)) return template;
+            string result = template.Replace("{tribe_name}", GetTribeTypeName(tribeType));
+            foreach (var eff in effects)
+            {
+                result = result.Replace("{value}", Mathf.RoundToInt(eff.value).ToString());
+            }
+            return result;
+        }
+
+        private int GetEffectValue(List<BuffEffectItem> effects, StatType stat)
+        {
+            foreach (var eff in effects)
+            {
+                if (eff.statType == stat) return Mathf.RoundToInt(eff.value);
+            }
+            return 0;
+        }
+
+        private BuffApplyScope ParseBuffScope(string scope)
+        {
+            switch (scope)
+            {
+                case "All": return BuffApplyScope.All;
+                case "AllLeaders": return BuffApplyScope.AllLeaders;
+                case "AllCats": return BuffApplyScope.AllCats;
+                case "SingleTribeLeader": return BuffApplyScope.SingleTribeLeader;
+                case "SingleTribeCat": return BuffApplyScope.SingleTribeCat;
+                default: return BuffApplyScope.All;
+            }
+        }
+
+        private StatType ParseStatType(string stat)
+        {
+            switch (stat)
+            {
+                case "Attack": return StatType.Attack;
+                case "Defense": return StatType.Defense;
+                case "Hp": return StatType.Hp;
+                case "MoveSpeed": return StatType.MoveSpeed;
+                case "AttackSpeed": return StatType.AttackSpeed;
+                default: return StatType.Attack;
+            }
         }
 
         private string GetCoreLogicDescription(RecruitmentOption opt)
@@ -102,11 +219,11 @@ namespace TribeSystem
                 if (tribe != null) tType = tribe.tribeType;
             }
 
-            if (opt.optionType == RecruitmentOptionType.AddCats)
+            if (opt.optionType == ChoiceCategory.AddCats)
             {
                 return $"{tType}_AddCats";
             }
-            if (opt.optionType == RecruitmentOptionType.LeaderBoost)
+            if (opt.optionType == ChoiceCategory.Buff)
             {
                 return $"{tType}_LeaderBoost_{opt.targetStatType}";
             }
@@ -126,11 +243,14 @@ namespace TribeSystem
                 return 0;
             }
 
-            int catsToAdd = 1;
+            int catsToAdd = config.initialCatCount;
 
             for (int i = 0; i < catsToAdd; i++)
             {
-                tribe.cats.Add(CatData.CreateWithRandomQuality(tribe.tribeType));
+                var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
+                cat.ApplyGlobalArtifactBonus();
+                _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
+                tribe.cats.Add(cat);
             }
 
             _dataManager.SavePlayerData();
@@ -144,16 +264,25 @@ namespace TribeSystem
         /// </summary>
         public bool ExecuteLeaderBoost(TribeRecord tribe, int attackBonus, int hpBonus)
         {
-            var buffs = tribe.leader.permanentBuffs;
-            buffs.attackBonus += attackBonus;
-            buffs.hpBonus += hpBonus;
+            var effects = new List<BuffEffectItem>();
+            if (attackBonus != 0)
+                effects.Add(new BuffEffectItem(StatType.Attack, false, attackBonus));
+            if (hpBonus != 0)
+                effects.Add(new BuffEffectItem(StatType.Hp, false, hpBonus));
 
-            // 招募给的简单加血加攻 buff 配置为不显示
-            if (attackBonus != 0) buffs.attackVisible = false;
-            if (hpBonus != 0) buffs.hpVisible = false;
+            var choice = GameChoice.CreateBuff(
+                $"Recruit_LeaderBoost_{tribe.tribeType}_{attackBonus}_{hpBonus}",
+                "招募强化",
+                $"族长属性提升",
+                ChoiceSource.Recruitment,
+                BuffApplyScope.SingleTribeLeader,
+                BuffApplyType.CurrentUnit,
+                effects,
+                tribe.tribeType);
 
-            _dataManager.SavePlayerData();
-            Debug.Log($"[RecruitmentService] Boosted leader in tribe {tribe.tribeType}: +{attackBonus} atk, +{hpBonus} hp (free)");
+            _auraService?.RegisterChoice(choice);
+
+            Debug.Log($"[RecruitmentService] Boosted leader in tribe {tribe.tribeType}: +{attackBonus} atk, +{hpBonus} hp");
 
             return true;
         }
@@ -180,12 +309,19 @@ namespace TribeSystem
                 isActive = true
             };
 
+            _dataManager.AddTribe(newTribe);
+
+            // 为新族长补发 aura buff
+            _auraService?.ApplyAurasToNewLeader(newTribe.leader, tribeType);
+
             for (int i = 0; i < config.initialCatCount; i++)
             {
-                newTribe.cats.Add(CatData.CreateWithQuality(CatQuality.White, tribeType));
+                var cat = CatData.CreateWithQuality(CatQuality.White, tribeType);
+                cat.ApplyGlobalArtifactBonus();
+                _auraService?.ApplyAurasToNewCat(cat, tribeType);
+                newTribe.cats.Add(cat);
             }
 
-            _dataManager.AddTribe(newTribe);
             Debug.Log($"[RecruitmentService] Added new tribe: {tribeType}");
 
             return newTribe;
@@ -265,7 +401,7 @@ namespace TribeSystem
                 baseAttack = config.leaderBaseStats.attack,
                 baseDefense = config.leaderBaseStats.defense,
                 baseHp = config.leaderBaseStats.hp,
-                baseSpeed = config.leaderBaseStats.speed,
+                baseMoveSpeed = config.leaderBaseStats.moveSpeed,
                 command = config.leaderBaseStats.command,
                 skillIds = new List<int>(),
                 permanentBuffs = buffs,
@@ -277,13 +413,15 @@ namespace TribeSystem
 
         private RecruitmentOption CreateAddCatsOption(TribeRecord tribe)
         {
+            var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+            int catCount = config != null ? config.initialCatCount : 1;
             return new RecruitmentOption
             {
-                optionType = RecruitmentOptionType.AddCats,
+                optionType = ChoiceCategory.AddCats,
                 cost = 0,
                 targetTribeType = null,
                 targetTribeId = tribe.tribeId,
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n+1只小猫"
+                description = $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只小猫"
             };
         }
 
@@ -299,7 +437,7 @@ namespace TribeSystem
 
             return new RecruitmentOption
             {
-                optionType = RecruitmentOptionType.LeaderBoost,
+                optionType = ChoiceCategory.Buff,
                 cost = 0,
                 targetTribeType = null,
                 targetTribeId = tribe.tribeId,
@@ -332,8 +470,7 @@ namespace TribeSystem
                 case StatType.Attack: return "攻击";
                 case StatType.Defense: return "防御";
                 case StatType.Hp: return "血量";
-                case StatType.Speed: return "速度";
-                case StatType.Command: return "统帅";
+                case StatType.MoveSpeed: return "移速";
                 default: return stat.ToString();
             }
         }

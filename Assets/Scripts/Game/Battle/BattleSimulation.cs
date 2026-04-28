@@ -337,9 +337,9 @@ public class BattleSimulation
 
         if (self.AttackCooldownTimer <= 0f)
         {
-            // 攻击速度: AS = CS/2000, 攻击间隔 = 1/AS
-            float attackSpeed = self.RuntimeAttributes?.CorrectedAttackSpeed ?? 1f;
-            self.AttackCooldownTimer = 1f / Mathf.Max(0.001f, attackSpeed);
+            // 攻击冷却: 直接使用 CorrectedAttackSpeed 作为冷却时间(秒)
+            float attackCooldown = self.RuntimeAttributes?.CorrectedAttackSpeed ?? 1f;
+            self.AttackCooldownTimer = Mathf.Max(0.1f, attackCooldown);
             self.Avatar?.PlayAttackAndReturnIdle();
 
             // 狸花（远程）：发射子弹，不走 PendingHit

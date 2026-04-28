@@ -201,7 +201,7 @@ GameObject:
   - component: {fileID: 1889917548986912583}
   - component: {fileID: 4775862104591649733}
   m_Layer: 0
-  m_Name: ShopPanel
+  m_Name: ShopButtonPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -451,13 +451,14 @@ MonoBehaviour:
   _shopEntranceObj: {fileID: 2889586775723569278}
   _tribeCardPrefab: {fileID: 9173514629417532719, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
   _tribeDetailTipsPrefab: {fileID: 8323053977849122858, guid: 93dd7b94f8b9ebc4b935dec0d3dc18f2, type: 3}
-  _catListContainer: {fileID: 0}
-  _buffEntryPrefab: {fileID: 0}
   _sellCatButton: {fileID: 5000000000000000005}
+  _backpackButton: {fileID: 6611704975733365995}
+  _tujianButton: {fileID: 0}
   _recruitmentPanel: {fileID: 5846606182133769223, guid: 3d550a5e6840fd74eadd04e286e72bb4, type: 3}
   _ritualPanel: {fileID: 7264423470781314239, guid: aead1aac3a3bad74ebc9732087475583, type: 3}
   _shopPanel: {fileID: 8157977110538632174, guid: 36d55bbd7dd148b47a136c28a9a9e69a, type: 3}
   _newTribeEventPanel: {fileID: 1140000000000000001, guid: b7c2e4f1a9d34567890abcdef1234567, type: 3}
+  _backpackPanelPrefab: {fileID: 2200634960819361322, guid: 9d2fb2d2a3cd1fd4c8e800ee82482173, type: 3}
   _forcedPopupRoot: {fileID: 1191611910865048527}
   _tribeAvatarRoot: {fileID: 2830926626587801769}
 --- !u!222 &3462646258224413836
@@ -1241,7 +1242,7 @@ GameObject:
   - component: {fileID: 1565454863667638358}
   - component: {fileID: 6611704975733365995}
   m_Layer: 0
-  m_Name: TujianButton
+  m_Name: BackpackButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1774,7 +1775,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5947\u7269\u56FE\u9274"
+  m_Text: "\u80CC\u5305"
 --- !u!1001 &430142481945031907
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1897,19 +1898,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4158270963988479712, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4158270963988479712, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4158270963988479712, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 164
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4158270963988479712, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -246
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5040939933307200679, guid: 805a67ddf1563d74bb4c3d06fb3a7bae, type: 3}
       propertyPath: m_SizeDelta.y

@@ -394,6 +394,8 @@ public class GameFlowController : MonoBehaviour
             // 重新加载玩家数据（会创建新的玩家数据）
             _dataManager.LoadPlayerData();
             _dataManager.SetCurrentRound(1);
+            // 清空本局饰品
+            _dataManager.ClearRunAccessories();
         }
 
         // 重新进行初始族群选择

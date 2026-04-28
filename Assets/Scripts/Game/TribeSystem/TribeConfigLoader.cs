@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using LitJson;
 
 namespace TribeSystem
 {
@@ -31,6 +32,7 @@ namespace TribeSystem
         private RitualConfig _ritualConfig;
         private ShopConfig _shopConfig;
         private List<CatStaticStats> _catStaticStats;
+        private ChoiceConfigWrapper _choiceConfig;
 
         // 配置文件路径 (StreamingAssets)
         private const string TRIBE_CONFIG_PATH = "Tables/tribe_config.json";
@@ -39,6 +41,7 @@ namespace TribeSystem
         private const string RITUAL_CONFIG_PATH = "Tables/ritual_config.json";
         private const string SHOP_CONFIG_PATH = "Tables/shop_config.json";
         private const string CAT_STATS_TABLE_PATH = "Tables/cat_stats_table.json";
+        private const string CHOICE_CONFIG_PATH = "Tables/choice_config.json";
 
         private string GetStreamingAssetsPath(string relativePath)
         {
@@ -72,6 +75,7 @@ namespace TribeSystem
             _ritualConfig = LoadRitualConfig();
             _shopConfig = LoadShopConfig();
             _catStaticStats = LoadCatStaticStats();
+            _choiceConfig = LoadChoiceConfig();
 
             _isLoaded = true;
 
@@ -150,6 +154,35 @@ namespace TribeSystem
             return _shopConfig;
         }
 
+        /// <summary>
+        /// 获取所有 choice 原型
+        /// </summary>
+        public List<ChoiceArchetype> GetAllChoiceArchetypes()
+        {
+            EnsureLoaded();
+            return _choiceConfig?.archetypes;
+        }
+
+        /// <summary>
+        /// 按来源获取 choice 原型
+        /// </summary>
+        public List<ChoiceArchetype> GetArchetypesBySource(string source)
+        {
+            EnsureLoaded();
+            if (_choiceConfig?.archetypes == null) return new List<ChoiceArchetype>();
+            return _choiceConfig.archetypes.FindAll(a => a.source == source);
+        }
+
+        /// <summary>
+        /// 按 ID 获取 choice 原型
+        /// </summary>
+        public ChoiceArchetype GetArchetypeById(string id)
+        {
+            EnsureLoaded();
+            if (_choiceConfig?.archetypes == null) return null;
+            return _choiceConfig.archetypes.Find(a => a.id == id);
+        }
+
         private void EnsureLoaded()
         {
             if (!_isLoaded)
@@ -172,7 +205,18 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<TribeConfigWrapper>(jsonText);
+                var json = JsonMapper.ToObject<TribeConfigWrapper>(jsonText);
+                // JSON 中速度值为整数（*1000），转换回 float
+                foreach (var tribe in json.tribes)
+                {
+                    tribe.leaderBaseStats.moveSpeed /= 1000f;
+                    tribe.leaderBaseStats.attackSpeed /= 1000f;
+                    if (tribe.catBaseStats != null)
+                    {
+                        tribe.catBaseStats.moveSpeed /= 1000f;
+                        tribe.catBaseStats.attackSpeed /= 1000f;
+                    }
+                }
                 Debug.Log($"[TribeConfigLoader] Loaded {json.tribes.Count} tribe configs");
                 return json.tribes;
             }
@@ -195,7 +239,7 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<QualityConfigWrapper>(jsonText);
+                var json = JsonMapper.ToObject<QualityConfigWrapper>(jsonText);
                 Debug.Log($"[TribeConfigLoader] Loaded {json.qualities.Count} quality configs");
                 return json.qualities;
             }
@@ -218,7 +262,7 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<RecruitmentConfigWrapper>(jsonText);
+                var json = JsonMapper.ToObject<RecruitmentConfigWrapper>(jsonText);
                 Debug.Log("[TribeConfigLoader] Loaded recruitment config");
                 return json.options;
             }
@@ -241,7 +285,7 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<RitualConfigWrapper>(jsonText);
+                var json = JsonMapper.ToObject<RitualConfigWrapper>(jsonText);
                 Debug.Log($"[TribeConfigLoader] Loaded ritual config with {json.tiers.Count} tiers");
                 return new RitualConfig { tiers = json.tiers };
             }
@@ -264,17 +308,9 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<ShopConfigWrapper>(jsonText);
+                var json = JsonMapper.ToObject<ShopConfig>(jsonText);
                 Debug.Log("[TribeConfigLoader] Loaded shop config");
-                return new ShopConfig
-                {
-                    baseRefreshCost = json.baseRefreshCost,
-                    refreshIncrement = json.refreshIncrement,
-                    slotCount = json.slotCount,
-                    shopInterval = json.shopInterval,
-                    startRound = json.startRound,
-                    items = json.items
-                };
+                return json;
             }
             catch (System.Exception e)
             {
@@ -295,7 +331,13 @@ namespace TribeSystem
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonUtility.FromJson<CatStaticStatsWrapper>(jsonText);
+                var json = JsonMapper.ToObject<CatStaticStatsWrapper>(jsonText);
+                // JSON 中速度值为整数（*1000），转换回 float
+                foreach (var cat in json.catStats)
+                {
+                    cat.moveSpeed /= 1000f;
+                    cat.attackSpeed /= 1000f;
+                }
                 Debug.Log($"[TribeConfigLoader] Loaded {json.catStats.Count} cat static stats entries");
                 return json.catStats;
             }
@@ -303,6 +345,29 @@ namespace TribeSystem
             {
                 Debug.LogError($"[TribeConfigLoader] Error parsing cat stats table: {e.Message}");
                 return new List<CatStaticStats>();
+            }
+        }
+
+        private ChoiceConfigWrapper LoadChoiceConfig()
+        {
+            string filePath = GetStreamingAssetsPath(CHOICE_CONFIG_PATH);
+            if (!File.Exists(filePath))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] choice_config.json not found at {filePath}");
+                return new ChoiceConfigWrapper { archetypes = new List<ChoiceArchetype>() };
+            }
+
+            try
+            {
+                string jsonText = File.ReadAllText(filePath);
+                var json = JsonMapper.ToObject<ChoiceConfigWrapper>(jsonText);
+                Debug.Log($"[TribeConfigLoader] Loaded {json.archetypes?.Count ?? 0} choice archetypes");
+                return json;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[TribeConfigLoader] Error parsing choice config: {e.Message}");
+                return new ChoiceConfigWrapper { archetypes = new List<ChoiceArchetype>() };
             }
         }
 
@@ -321,15 +386,7 @@ namespace TribeSystem
                     tribeType = type,
                     tribeName = type.ToString(),
                     initialCatCount = 3,
-                    leaderBaseStats = new LeaderBaseStats(),
-                    catBaseStats = new LeaderBaseStats
-                    {
-                        attack = 70,
-                        defense = 55,
-                        hp = 600,
-                        speed = 700,
-                        command = 0
-                    }
+                    leaderBaseStats = new LeaderBaseStats()
                 });
             }
             return configs;
@@ -527,12 +584,15 @@ namespace TribeSystem
         public ArtifactPriceConfig artifact;
         public ConsumablePriceConfig consumable;
         public CatPriceConfig cat;
+        public Dictionary<string, int> artifactEffects; // 奇物效果值，如 {"LeaderHpFlat": 500, "CatAttackFlat": 20}
     }
 
     [System.Serializable]
     public class ArtifactPriceConfig
     {
         public int basePrice;
+        public string icon; // 兼容旧配置
+        public Dictionary<string, string> icons; // 按效果类型分图标
     }
 
     [System.Serializable]
@@ -540,6 +600,7 @@ namespace TribeSystem
     {
         public int basePriceMin;
         public int basePriceMax;
+        public Dictionary<string, string> icons;
     }
 
     [System.Serializable]
@@ -549,6 +610,7 @@ namespace TribeSystem
         public Dictionary<string, float> qualityBonusMultipliers;
         public float priceVariation;
         public float sellRatio = 0.5f;
+        public Dictionary<string, List<string>> tribeIcons;
     }
 
     #endregion

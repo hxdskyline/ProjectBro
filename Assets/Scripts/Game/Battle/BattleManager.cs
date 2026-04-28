@@ -40,6 +40,12 @@ public class BattleManager : MonoBehaviour
     private UnitStaticAttributes? _enemyStaticAttributes;
     private TerrainType _currentTerrain = TerrainType.Plain;
     private WeatherType _currentWeather = WeatherType.Sunny;
+    private BattleFighter _cowLeaderFighter;
+    private int _cowLeaderLastCatCount;
+    private int _cowAttackPerCat;
+    private BattleFighter _artifactLeaderFighter;
+    private int _artifactAtkPerDeadCat;
+    private int _artifactLeaderLastDeadCount;
 
     public System.Action<bool> BattleEnded;
 
@@ -237,6 +243,11 @@ public class BattleManager : MonoBehaviour
 
         while (_isInBattle)
         {
+            // 动态更新奶牛族长的猫群之力 buff
+            UpdateCowLeaderBuff();
+            // 动态更新奇物：每死一只小猫族长+攻击
+            UpdateArtifactLeaderBuff();
+
             if (_simulation.Tick(Time.deltaTime, out bool playerVictory))
             {
                 EndBattle(playerVictory);
@@ -260,6 +271,12 @@ public class BattleManager : MonoBehaviour
         _simulation = null;
         _playerFighters = null;
         _enemyFighters = null;
+        _cowLeaderFighter = null;
+        _cowLeaderLastCatCount = 0;
+        _cowAttackPerCat = 0;
+        _artifactLeaderFighter = null;
+        _artifactAtkPerDeadCat = 0;
+        _artifactLeaderLastDeadCount = 0;
         ClearOldAvatars();
     }
 
@@ -296,7 +313,7 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 将已解锁饰品的属性加成应用到所有玩家单位
+    /// 将 EquipmentRecord 中的饰品属性加成应用到所有玩家单位
     /// </summary>
     private void ApplyAccessoryBuffs()
     {
@@ -306,72 +323,84 @@ public class BattleManager : MonoBehaviour
         DataManager dataManager = GameManager.Instance?.DataManager;
         if (dataManager == null) return;
 
-        var unlockedAccessories = dataManager.GetUnlockedAccessories();
-        if (unlockedAccessories == null || unlockedAccessories.Count == 0)
+        var equipments = dataManager.PlayerData?.runEquipments;
+        if (equipments == null || equipments.Count == 0)
             return;
 
-        // 加载饰品配置
-        string configPath = System.IO.Path.Combine(Application.streamingAssetsPath, "accessory_config.json");
-        if (!System.IO.File.Exists(configPath))
-            return;
+        // 汇总所有装备的效果
+        float atkBonus = 0f, defBonus = 0f, hpBonus = 0f, spdBonus = 0f;
+        int leaderSpdFlatBonus = 0;
 
-        try
+        foreach (var equip in equipments)
         {
-            string json = System.IO.File.ReadAllText(configPath);
-            LitJson.JsonData root = LitJson.JsonMapper.ToObject(json);
-            LitJson.JsonData accessoriesJson = root["accessories"];
-
-            // 汇总所有已解锁饰品的效果
-            float atkBonus = 0f, defBonus = 0f, hpBonus = 0f, spdBonus = 0f;
-
-            for (int i = 0; i < accessoriesJson.Count; i++)
+            if (equip.effects == null) continue;
+            foreach (var eff in equip.effects)
             {
-                LitJson.JsonData acc = accessoriesJson[i];
-                string accId = acc["id"].ToString();
-                if (!unlockedAccessories.Contains(accId))
-                    continue;
-
-                string effectType = acc["effectType"].ToString();
-                float effectValue = float.TryParse(acc["effectValue"].ToString(), out float v) ? v : 0f;
-
-                switch (effectType)
+                // 使用 gameEffectType 区分特殊效果
+                if (eff.gameEffectType >= 0)
                 {
-                    case "AttackPercent":  atkBonus += effectValue; break;
-                    case "DefensePercent": defBonus += effectValue; break;
-                    case "HpPercent":      hpBonus  += effectValue; break;
-                    case "SpeedPercent":   spdBonus += effectValue; break;
-                    case "AllPercent":
-                        atkBonus += effectValue;
-                        defBonus += effectValue;
-                        hpBonus  += effectValue;
-                        spdBonus += effectValue;
-                        break;
+                    switch ((TribeSystem.GameEffect)eff.gameEffectType)
+                    {
+                        case TribeSystem.GameEffect.AttackPercent:  atkBonus += eff.value; break;
+                        case TribeSystem.GameEffect.DefensePercent: defBonus += eff.value; break;
+                        case TribeSystem.GameEffect.HpPercent:      hpBonus += eff.value; break;
+                        case TribeSystem.GameEffect.SpeedPercent:   spdBonus += eff.value; break;
+                        case TribeSystem.GameEffect.LeaderSpeedFlat: leaderSpdFlatBonus += Mathf.RoundToInt(eff.value); break;
+                        case TribeSystem.GameEffect.LeaderAttackPerDeadCat: _artifactAtkPerDeadCat += Mathf.RoundToInt(eff.value); break;
+                        case TribeSystem.GameEffect.AllPercent:
+                            atkBonus += eff.value;
+                            defBonus += eff.value;
+                            hpBonus += eff.value;
+                            spdBonus += eff.value;
+                            break;
+                    }
+                }
+                else
+                {
+                    // 兼容没有 gameEffectType 的旧数据，按 StatType 映射
+                    if (eff.isPercent)
+                    {
+                        switch (eff.statType)
+                        {
+                            case TribeSystem.StatType.Attack:  atkBonus += eff.value; break;
+                            case TribeSystem.StatType.Defense: defBonus += eff.value; break;
+                            case TribeSystem.StatType.Hp:      hpBonus += eff.value; break;
+                            case TribeSystem.StatType.MoveSpeed: spdBonus += eff.value; break;
+                        }
+                    }
                 }
             }
-
-            // 应用到所有玩家单位
-            for (int i = 0; i < _playerFighters.Length; i++)
-            {
-                BattleFighter fighter = _playerFighters[i];
-                if (fighter == null || fighter.RuntimeAttributes == null)
-                    continue;
-
-                UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
-                attrs.AttackPercentBuff  += atkBonus;
-                attrs.DefensePercentBuff += defBonus;
-                attrs.HpPercentBuff      += hpBonus;
-                attrs.SpeedPercentBuff   += spdBonus;
-                attrs.Recalculate();
-            }
-
-            if (atkBonus != 0 || defBonus != 0 || hpBonus != 0 || spdBonus != 0)
-            {
-                Debug.Log($"[BattleManager] Applied accessory BUFFs: ATK+{atkBonus:P0} DEF+{defBonus:P0} HP+{hpBonus:P0} SPD+{spdBonus:P0}");
-            }
         }
-        catch (System.Exception e)
+
+        // 应用到所有玩家单位
+        for (int i = 0; i < _playerFighters.Length; i++)
         {
-            Debug.LogWarning($"[BattleManager] Failed to apply accessory buffs: {e.Message}");
+            BattleFighter fighter = _playerFighters[i];
+            if (fighter == null || fighter.RuntimeAttributes == null)
+                continue;
+
+            UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
+            attrs.AttackPercentBuff  += atkBonus;
+            attrs.DefensePercentBuff += defBonus;
+            attrs.HpPercentBuff      += hpBonus;
+            attrs.SpeedPercentBuff   += spdBonus;
+
+            // 族长速度固定值加成（有天生buff的是族长）
+            if (fighter.InnateBuffs != null && fighter.InnateBuffs.Count > 0)
+            {
+                if (leaderSpdFlatBonus != 0)
+                    attrs.SpeedFlatBuff += leaderSpdFlatBonus;
+                // 记录族长引用（用于奇物动态加成）
+                if (_artifactAtkPerDeadCat > 0 && _artifactLeaderFighter == null)
+                    _artifactLeaderFighter = fighter;
+            }
+
+            attrs.Recalculate();
+        }
+
+        if (atkBonus != 0 || defBonus != 0 || hpBonus != 0 || spdBonus != 0 || leaderSpdFlatBonus != 0)
+        {
+            Debug.Log($"[BattleManager] Applied accessory BUFFs from runEquipments: ATK+{atkBonus:P0} DEF+{defBonus:P0} HP+{hpBonus:P0} SPD+{spdBonus:P0} LeaderSpd+{leaderSpdFlatBonus}");
         }
     }
 
@@ -382,21 +411,6 @@ public class BattleManager : MonoBehaviour
     {
         if (_playerFighters == null || _playerFighters.Length == 0)
             return;
-
-        // 先统计各族小猫数量（用于奶牛 buff）
-        var catCounts = new System.Collections.Generic.Dictionary<TribeSystem.TribeType, int>();
-        for (int i = 0; i < _playerFighters.Length; i++)
-        {
-            var f = _playerFighters[i];
-            if (f == null || f.InnateBuffs == null) continue;
-            // 有天生 buff 的是族长，没有的是小猫
-            if (f.InnateBuffs.Count == 0)
-            {
-                if (!catCounts.ContainsKey(f.TribeType))
-                    catCounts[f.TribeType] = 0;
-                catCounts[f.TribeType]++;
-            }
-        }
 
         for (int i = 0; i < _playerFighters.Length; i++)
         {
@@ -409,41 +423,107 @@ public class BattleManager : MonoBehaviour
 
             foreach (var buff in fighter.InnateBuffs)
             {
-                switch (buff.buffId)
+                switch (buff.effectType)
                 {
-                    case "innate_damage_reduce":
-                        // 大橘：受到的所有伤害-1
-                        attrs.DamageReceiveFlatBuff -= 1;
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 厚甲（伤害-1）");
+                    case TribeSystem.InnateEffectType.DamageReduce:
+                        // 受到伤害 -value
+                        attrs.DamageReceiveFlatBuff -= Mathf.RoundToInt(buff.effectValue);
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（伤害-{Mathf.RoundToInt(buff.effectValue)}）");
                         break;
 
-                    case "innate_cat_attack":
-                        // 奶牛：每有一只本族小猫，+3攻击力
-                        int catCount = catCounts.ContainsKey(fighter.TribeType) ? catCounts[fighter.TribeType] : 0;
-                        int bonus = catCount * 3;
-                        if (bonus > 0)
-                        {
-                            attrs.AttackFlatBuff += bonus;
-                            attrs.Recalculate();
-                            Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 猫群之力（{catCount}只小猫，+{bonus}攻击）");
-                        }
+                    case TribeSystem.InnateEffectType.AttackPerDefeatedCat:
+                        // 每有一只被击败的本族小猫，+value 攻击力（动态更新）
+                        _cowLeaderFighter = fighter;
+                        _cowAttackPerCat = Mathf.RoundToInt(buff.effectValue);
+                        _cowLeaderLastCatCount = -1; // 强制首次更新
                         break;
 
-                    case "innate_double_hit":
-                        // 狸花：攻击时造成两次伤害
+                    case TribeSystem.InnateEffectType.DoubleHit:
+                        // value% 概率造成双倍伤害
                         fighter.HasDoubleHit = true;
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 连击（双倍伤害）");
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（{buff.effectValue * 100}%双倍伤害）");
                         break;
 
-                    case "innate_teleport":
-                        // 暹罗：传送（速度+99999）
-                        attrs.SpeedFlatBuff += 99999;
+                    case TribeSystem.InnateEffectType.SpeedFlat:
+                        // 速度 +value
+                        attrs.SpeedFlatBuff += Mathf.RoundToInt(buff.effectValue);
                         attrs.Recalculate();
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: 传送（速度+99999）");
+                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（速度+{Mathf.RoundToInt(buff.effectValue)}）");
                         break;
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// 动态更新奶牛族长的薄葬 buff（根据被击败的小猫数量）
+    /// </summary>
+    private void UpdateCowLeaderBuff()
+    {
+        if (_cowLeaderFighter == null || _cowLeaderFighter.IsDead || _cowLeaderFighter.IsRemoved)
+            return;
+
+        // 统计本族被击败的小猫数量（IsDead 或 IsRemoved）
+        int defeatedCatCount = 0;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || f == _cowLeaderFighter) continue;
+            if (f.TribeType != _cowLeaderFighter.TribeType) continue;
+            if (f.InnateBuffs != null && f.InnateBuffs.Count > 0) continue; // 跳过族长
+            if (f.IsDead || f.IsRemoved) defeatedCatCount++;
+        }
+
+        // 数量没变化则跳过
+        if (defeatedCatCount == _cowLeaderLastCatCount)
+            return;
+
+        // 回退旧的 buff，应用新的
+        UnitRuntimeAttributes attrs = _cowLeaderFighter.RuntimeAttributes;
+        if (attrs == null) return;
+
+        attrs.AttackFlatBuff -= _cowLeaderLastCatCount * _cowAttackPerCat;
+        _cowLeaderLastCatCount = defeatedCatCount;
+        attrs.AttackFlatBuff += defeatedCatCount * _cowAttackPerCat;
+        attrs.Recalculate();
+
+        Debug.Log($"[BattleManager] {_cowLeaderFighter.Name} 薄葬更新: {defeatedCatCount}只小猫被击败，+{defeatedCatCount * _cowAttackPerCat}攻击");
+    }
+
+    /// <summary>
+    /// 动态更新奇物效果：每有一只死去的小猫，族长增加攻击力
+    /// </summary>
+    private void UpdateArtifactLeaderBuff()
+    {
+        if (_artifactLeaderFighter == null || _artifactAtkPerDeadCat <= 0)
+            return;
+        if (_artifactLeaderFighter.IsDead || _artifactLeaderFighter.IsRemoved)
+            return;
+
+        // 统计已死亡的小猫数量
+        int deadCatCount = 0;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            var f = _playerFighters[i];
+            if (f == null || f == _artifactLeaderFighter) continue;
+            if (f.InnateBuffs != null && f.InnateBuffs.Count > 0) continue; // 跳过族长
+            if (f.IsDead || f.IsDying || f.IsRemoved) deadCatCount++;
+        }
+
+        // 数量没变化则跳过
+        if (deadCatCount == _artifactLeaderLastDeadCount)
+            return;
+
+        // 回退旧的 buff，应用新的
+        UnitRuntimeAttributes attrs = _artifactLeaderFighter.RuntimeAttributes;
+        if (attrs == null) return;
+
+        attrs.AttackFlatBuff -= _artifactLeaderLastDeadCount * _artifactAtkPerDeadCat;
+        _artifactLeaderLastDeadCount = deadCatCount;
+        attrs.AttackFlatBuff += deadCatCount * _artifactAtkPerDeadCat;
+        attrs.Recalculate();
+
+        Debug.Log($"[BattleManager] {_artifactLeaderFighter.Name} 奇物(亡猫之力)更新: {deadCatCount}只小猫死亡，+{deadCatCount * _artifactAtkPerDeadCat}攻击");
     }
 
     /// <summary>
@@ -505,13 +585,13 @@ public class BattleManager : MonoBehaviour
         if (_playerFighters.Length > 0 && _playerFighters[0] != null)
         {
             var s = _playerFighters[0].StaticAttributes;
-            firstPlayerStats = $" | Leader: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed:F1}";
+            firstPlayerStats = $" | Leader: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed}";
         }
         string firstEnemyStats = "";
         if (_enemyFighters.Length > 0 && _enemyFighters[0] != null)
         {
             var s = _enemyFighters[0].StaticAttributes;
-            firstEnemyStats = $" | Enemy: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed:F1}";
+            firstEnemyStats = $" | Enemy: ATK={s.Attack} DEF={s.Defense} HP={s.MaxHp} SPD={s.MoveSpeed}";
         }
 
         Debug.Log($"[BattleSummary] {(victory ? "WIN" : "LOSE")} | " +

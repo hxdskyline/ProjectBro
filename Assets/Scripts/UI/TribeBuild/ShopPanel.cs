@@ -39,6 +39,16 @@ namespace TribeSystem.UI
         private Action _onClose;
         private Action<TribeRecord, CatData> _onCatSell;
 
+        // ItemInfo 面板
+        [Header("ItemInfo 面板")]
+        [SerializeField] private Image _infoIconImage;
+        [SerializeField] private Text _infoNameText;
+        [SerializeField] private Text _infoTypeText;
+        [SerializeField] private Text _infoDescText;
+        [SerializeField] private Button _buyButton;
+        private ShopItem _selectedItem;
+        private List<ShopItemCard> _itemCards = new List<ShopItemCard>();
+
         // 出售模式
         private bool _isSellMode = false;
         private Button _sellButton;
@@ -119,7 +129,7 @@ namespace TribeSystem.UI
             var dataManager = GameManager.Instance?.DataManager;
             if (dataManager != null && _catFoodText != null)
             {
-                _catFoodText.text = $"猫粮: {dataManager.GetCatFood()}";
+                _catFoodText.text = $"剩余猫粮: {dataManager.GetCatFood()}";
             }
         }
 
@@ -128,7 +138,10 @@ namespace TribeSystem.UI
             if (_titleText != null && _catFoodText != null && _itemsContainer != null &&
                 _refreshButton != null && _refreshCostText != null && _closeButton != null)
             {
-                return;
+                // ItemInfo 组件也一并绑定
+                if (_infoNameText != null && _infoTypeText != null && _infoDescText != null &&
+                    _buyButton != null)
+                    return;
             }
 
             _titleText = transform.Find("Title")?.GetComponent<Text>();
@@ -137,6 +150,13 @@ namespace TribeSystem.UI
             _refreshButton = transform.Find("RefreshButton")?.GetComponent<Button>();
             _refreshCostText = _refreshButton?.transform.Find("CostText")?.GetComponent<Text>();
             _closeButton = transform.Find("CloseButton")?.GetComponent<Button>();
+
+            // ItemInfo 面板 — 通过序列化字段绑定，无需 transform.Find
+            if (_buyButton != null)
+            {
+                _buyButton.onClick.RemoveAllListeners();
+                _buyButton.onClick.AddListener(OnBuyButtonClicked);
+            }
 
             if (_itemsContainer == null)
             {
@@ -353,6 +373,8 @@ namespace TribeSystem.UI
         {
             if (_itemsContainer == null || items == null) return;
 
+            _itemCards.Clear();
+
             foreach (var item in items)
             {
                 GameObject itemGo;
@@ -363,9 +385,6 @@ namespace TribeSystem.UI
                     itemGo = Instantiate(_shopItemCardPrefab, _itemsContainer);
                     cardComponent = itemGo.GetComponent<ShopItemCard>();
                     if (cardComponent != null) cardComponent.Setup(item);
-
-                    Image cardImg = itemGo.GetComponent<Image>();
-                    if (cardImg != null) cardImg.color = GetShopItemColor(item.itemType);
 
                     Button cardBtn = itemGo.GetComponent<Button>();
                     if (cardBtn != null) cardBtn.onClick.AddListener(() => OnItemClicked(item));
@@ -379,9 +398,6 @@ namespace TribeSystem.UI
                     RectTransform itemRect = itemGo.GetComponent<RectTransform>();
                     itemRect.sizeDelta = new Vector2(140f, 170f);
 
-                    Image itemImg = itemGo.GetComponent<Image>();
-                    itemImg.color = GetShopItemColor(item.itemType);
-
                     Button itemBtn = itemGo.GetComponent<Button>();
                     itemBtn.onClick.AddListener(() => OnItemClicked(item));
 
@@ -389,9 +405,17 @@ namespace TribeSystem.UI
 
                     cardComponent = itemGo.AddComponent<ShopItemCard>();
                     cardComponent.Item = item;
-                    cardComponent.BackgroundImage = itemImg;
+                    cardComponent.BackgroundImage = itemGo.GetComponent<Image>();
                 }
+
+                _itemCards.Add(cardComponent);
             }
+
+            // 默认选中第一个
+            if (items.Count > 0)
+                SelectItem(items[0]);
+            else
+                SelectItem(null);
         }
 
         private void CreateShopItemContent(RectTransform itemRect, ShopItem item)
@@ -494,7 +518,52 @@ namespace TribeSystem.UI
 
         private void OnItemClicked(ShopItem item)
         {
-            _onItemBuy?.Invoke(item);
+            SelectItem(item);
+        }
+
+        private void SelectItem(ShopItem item)
+        {
+            if (_selectedItem == item) return;
+
+            _selectedItem = item;
+
+            // 更新所有卡片的选中状态
+            foreach (var card in _itemCards)
+            {
+                if (card != null)
+                    card.SetSelected(card.Item == item);
+            }
+
+            // 刷新 ItemInfo 面板
+            if (_infoNameText != null)
+                _infoNameText.text = item != null ? item.name : "";
+
+            if (_infoTypeText != null)
+                _infoTypeText.text = item != null ? GetShopItemTypeName(item.itemType) : "";
+
+            if (_infoDescText != null)
+                _infoDescText.text = item != null ? item.description : "";
+
+            if (_infoIconImage != null)
+            {
+                if (item != null && !string.IsNullOrEmpty(item.iconAddress))
+                    _infoIconImage.sprite = GameManager.Instance.ResourceManager.LoadSprite(item.iconAddress);
+                else
+                    _infoIconImage.sprite = null;
+            }
+
+            if (_buyButton != null)
+                _buyButton.gameObject.SetActive(item != null);
+        }
+
+        private void OnBuyButtonClicked()
+        {
+            if (_selectedItem != null)
+            {
+                var itemToBuy = _selectedItem;
+                _selectedItem = null;
+                _onItemBuy?.Invoke(itemToBuy);
+            }
         }
 
         private void UpdateRefreshButton()
@@ -735,6 +804,8 @@ namespace TribeSystem.UI
             {
                 Destroy(_itemsContainer.GetChild(i).gameObject);
             }
+            _itemCards.Clear();
+            _selectedItem = null;
         }
 
         /// <summary>

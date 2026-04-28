@@ -52,18 +52,6 @@ public class BattlePanel : UIPanel
     private readonly Dictionary<TribeType, AvatarAnimationDefinition> _tribeAvatarCache
         = new Dictionary<TribeType, AvatarAnimationDefinition>();
 
-    // card_build_cards.json 中品种名 → 族群类型映射
-    private static readonly Dictionary<string, TribeType> s_nameToTribeType = new Dictionary<string, TribeType>
-    {
-        { "狸花", TribeType.Tabby   },
-        { "大橘", TribeType.Orange  },
-        { "奶牛", TribeType.Cow     },
-        { "暹罗", TribeType.Siamese },
-    };
-
-    // 品种 → card_build_cards.json 中的 avatarDefinitionAddress
-    private static Dictionary<TribeType, string> _cardBuildAvatarAddresses;
-
     private AvatarAnimationDefinition GetTribeAvatarDefinition(TribeType tribeType)
     {
         if (_tribeAvatarCache.TryGetValue(tribeType, out var cached))
@@ -78,20 +66,20 @@ public class BattlePanel : UIPanel
             return def;
         }
 
-        // 从 card_build_cards.json 配置的地址加载
-        EnsureCardBuildAvatarAddresses();
-        if (_cardBuildAvatarAddresses != null && _cardBuildAvatarAddresses.TryGetValue(tribeType, out string address))
+        // 从 tribe_config.json 配置的地址加载
+        TribeConfig tribeConfig = TribeSystem.TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+        if (tribeConfig != null && !string.IsNullOrEmpty(tribeConfig.avatarDefinitionAddress))
         {
-            var loaded = GameManager.Instance.ResourceManager.LoadResource<AvatarAnimationDefinition>(address);
+            var loaded = GameManager.Instance.ResourceManager.LoadResource<AvatarAnimationDefinition>(tribeConfig.avatarDefinitionAddress);
             if (loaded != null)
             {
                 _tribeAvatarCache[tribeType] = loaded;
-                Debug.Log($"[BattlePanel] Avatar {tribeType}: JSON配置 {address} → {loaded.AvatarId}");
+                Debug.Log($"[BattlePanel] Avatar {tribeType}: tribe_config {tribeConfig.avatarDefinitionAddress} → {loaded.AvatarId}");
                 return loaded;
             }
             else
             {
-                Debug.LogWarning($"[BattlePanel] Avatar {tribeType}: JSON配置地址加载失败 {address}");
+                Debug.LogWarning($"[BattlePanel] Avatar {tribeType}: tribe_config 地址加载失败 {tribeConfig.avatarDefinitionAddress}");
             }
         }
 
@@ -119,45 +107,6 @@ public class BattlePanel : UIPanel
             case TribeType.Cow:     return _nainiuAvatarDef;
             case TribeType.Siamese: return _xianluoAvatarDef;
             default: return null;
-        }
-    }
-
-    private static void EnsureCardBuildAvatarAddresses()
-    {
-        if (_cardBuildAvatarAddresses != null) return;
-        _cardBuildAvatarAddresses = new Dictionary<TribeType, string>();
-
-        string path = System.IO.Path.Combine(Application.streamingAssetsPath, "card_build_cards.json");
-        if (!System.IO.File.Exists(path))
-        {
-            Debug.LogWarning($"[BattlePanel] card_build_cards.json 不存在: {path}");
-            return;
-        }
-
-        try
-        {
-            string json = System.IO.File.ReadAllText(path);
-            var jsonData = LitJson.JsonMapper.ToObject(json);
-            if (jsonData == null || !jsonData.IsArray) return;
-
-            foreach (LitJson.JsonData card in jsonData)
-            {
-                string name = card.ContainsKey("name") ? card["name"].ToString() : null;
-                string address = card.ContainsKey("avatarDefinitionAddress") ? card["avatarDefinitionAddress"].ToString() : null;
-                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(address)) continue;
-
-                // 取品种名（"-" 前的部分）
-                string breedName = name.Contains("-") ? name.Split('-')[0] : name;
-                if (s_nameToTribeType.TryGetValue(breedName, out TribeType tribeType))
-                {
-                    _cardBuildAvatarAddresses[tribeType] = address;
-                    Debug.Log($"[BattlePanel] card_build: {breedName} → {tribeType} → {address}");
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[BattlePanel] 读取 card_build_cards.json 失败: {e.Message}");
         }
     }
 
@@ -317,7 +266,6 @@ public class BattlePanel : UIPanel
 
         // 计算族长最终属性（含永久buff、临时buff、心情加成）
         LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId);
-        float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(leaderStats.speed);
 
         // 狸花射程4倍
         float attackRange = tribe.tribeType == TribeType.Tabby ? 6.0f : 1.5f;
@@ -327,7 +275,7 @@ public class BattlePanel : UIPanel
             MaxHp = Mathf.Max(1, Mathf.RoundToInt(leaderStats.hp)),
             Attack = Mathf.Max(1, Mathf.RoundToInt(leaderStats.attack)),
             Defense = Mathf.Max(0, Mathf.RoundToInt(leaderStats.defense)),
-            MoveSpeed = Mathf.Max(0.1f, baseSpeed),
+            MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(leaderStats.moveSpeed * 1000)),
             AttackRange = Mathf.Max(0.1f, attackRange)
         };
 
@@ -360,27 +308,7 @@ public class BattlePanel : UIPanel
         if (tribe.leader == null)
             return false;
 
-        var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-        if (tribeConfig?.catBaseStats == null)
-        {
-            Debug.LogError($"[BattlePanel] 无法获取 {tribe.tribeType} 的小猫基础属性配置");
-            return false;
-        }
-
-        LeaderStats catBaseStatsAsLeader = new LeaderStats(
-            tribeConfig.catBaseStats.attack,
-            tribeConfig.catBaseStats.defense,
-            tribeConfig.catBaseStats.hp,
-            tribeConfig.catBaseStats.speed,
-            0
-        );
-
-        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, catBaseStatsAsLeader, tribe.leader?.permanentBuffs);
-
-        int catCount = tribe.cats?.Count ?? 0;
-        int command = tribe.leader.command;
-        int penalizedSpeed = TribeStatsCalculator.ApplyCommandPenaltyToSpeed(catStats.speed, catCount, command);
-        float baseSpeed = TribeStatsCalculator.CalculateMovementSpeed(penalizedSpeed);
+        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat);
 
         // 狸花小猫射程4倍
         float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
@@ -390,7 +318,8 @@ public class BattlePanel : UIPanel
             MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
             Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
             Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
-            MoveSpeed = Mathf.Max(0.1f, baseSpeed),
+            MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.moveSpeed * 1000)),
+            AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.attackSpeed * 1000)),
             AttackRange = Mathf.Max(0.1f, catAttackRange)
         };
 

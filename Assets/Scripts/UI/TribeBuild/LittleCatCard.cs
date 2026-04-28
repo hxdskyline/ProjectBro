@@ -36,7 +36,7 @@ namespace TribeSystem.UI
                     int atk = Mathf.RoundToInt(leader.baseAttack * cat.attackMultiplier);
                     int def = Mathf.RoundToInt(leader.baseDefense * cat.defenseMultiplier);
                     int hp  = Mathf.RoundToInt(leader.baseHp * cat.hpMultiplier);
-                    int spd = Mathf.RoundToInt(leader.baseSpeed * cat.speedMultiplier);
+                    int spd = Mathf.RoundToInt(leader.baseMoveSpeed * cat.speedMultiplier * 1000);
                     _statsText.text = $"攻{atk} 防{def}\n血{hp} 速{spd}";
                 }
                 else

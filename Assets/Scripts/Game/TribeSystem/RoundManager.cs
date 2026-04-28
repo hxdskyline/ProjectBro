@@ -16,7 +16,7 @@ namespace TribeSystem
 
     /// <summary>
     /// 回合管理器 - 管理游戏关卡循环
-    /// 各关卡的事件（招募/祭祀/商店）由 battle_campaign_levels.json 配置，
+    /// 各关卡的事件（招募/祭祀/商店）由 levels_config.json 配置，
     /// 通过 BattleCampaignRuntime 查询，不在代码中硬编码。
     /// </summary>
     public class RoundManager

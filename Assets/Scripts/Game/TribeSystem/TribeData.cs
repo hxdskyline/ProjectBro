@@ -4,79 +4,9 @@ using UnityEngine;
 
 namespace TribeSystem
 {
-    /// <summary>
-    /// 地形类型
-    /// </summary>
-    public enum TerrainType
-    {
-        Plain = 0,   // 平地
-        Brush = 1    // 灌木
-    }
-
-    /// <summary>
-    /// 天气类型
-    /// </summary>
-    public enum WeatherType
-    {
-        Sunny = 0,   // 晴天
-        Rainy = 1,   // 雨天
-        Night = 2,   // 夜晚
-        Windy = 3    // 大风
-    }
-
-    /// <summary>
-    /// 难度等级
-    /// </summary>
-    public enum DifficultyLevel
-    {
-        Normal = 0,      // 普通
-        Hard = 1,        // 困难
-        Bloodbath = 2    // 血战
-    }
-
-    /// <summary>
-    /// 敌人类别
-    /// </summary>
-    public enum EnemyFormationType
-    {
-        Single = 0,  // 强力单体怪
-        Swarm = 1    // 大量小怪
-    }
-
-    /// <summary>
-    /// 四大族群类型
-    /// </summary>
-    public enum TribeType
-    {
-        None = 0,       // 无（敌人等非族长单位）
-        Tabby = 1,      // 狸花猫族 - 攻击型
-        Orange = 2,     // 大橘猫族 - 坦克型
-        Cow = 3,        // 奶牛猫族 - 防御型
-        Siamese = 4,    // 暹罗猫族 - 敏捷型
-    }
-
-    /// <summary>
-    /// 小猫品质等级
-    /// </summary>
-    public enum CatQuality
-    {
-        White = 0,      // 菜鸟 - 10%~20%
-        Blue = 1,       // 老手 - 20%~30%
-        Purple = 2,     // 精英 - 30%~40%
-        Gold = 3        // 大师 - 40%~50%
-    }
-
-    /// <summary>
-    /// 属性类型
-    /// </summary>
-    public enum StatType
-    {
-        Attack,
-        Defense,
-        Hp,
-        Speed,
-        Command
-    }
+    // ═══════════════════════════════════════════════════════════
+    //  玩家状态 — 族群实例、族长、小猫
+    // ═══════════════════════════════════════════════════════════
 
     /// <summary>
     /// 族群记录
@@ -129,7 +59,7 @@ namespace TribeSystem
         public int baseAttack;
         public int baseDefense;
         public int baseHp;
-        public int baseSpeed;
+        public float baseMoveSpeed;
         public int command;
         public List<int> skillIds;
         public PermanentBuffs permanentBuffs;
@@ -143,7 +73,7 @@ namespace TribeSystem
             baseAttack = 100;
             baseDefense = 80;
             baseHp = 1000;
-            baseSpeed = 1000;
+            baseMoveSpeed = 1.0f;
             command = 10;
             skillIds = new List<int>();
             permanentBuffs = new PermanentBuffs();
@@ -161,33 +91,76 @@ namespace TribeSystem
         public long catId;
         public CatQuality quality;
         public TribeType tribeType;
-        // 旧字段保留兼容旧存档，新小猫不再使用
         public float attackMultiplier;
         public float defenseMultiplier;
         public float hpMultiplier;
         public float speedMultiplier;
-        // 静态属性（新系统，从 cat_stats_table.json 读取）
         public int staticAttack;
         public int staticDefense;
         public int staticHp;
-        public int staticSpeed;
+        public float staticMoveSpeed;
+        public float staticAttackSpeed;
+        // 小猫自身的 buff 列表
+        public List<BuffEntry> buffEntries;
 
         public CatData()
         {
             catId = -1;
             quality = CatQuality.White;
-            attackMultiplier = 0.35f;
-            defenseMultiplier = 0.35f;
-            hpMultiplier = 0.35f;
+            attackMultiplier = 1.0f;
+            defenseMultiplier = 1.0f;
+            hpMultiplier = 1.0f;
             speedMultiplier = 1.0f;
             staticAttack = 0;
             staticDefense = 0;
             staticHp = 0;
-            staticSpeed = 0;
+            staticMoveSpeed = 1.0f;
+            staticAttackSpeed = 0.5f;
+            buffEntries = new List<BuffEntry>();
         }
 
         /// <summary>
-        /// 创建指定品质的小猫（从 cat_stats_table.json 读取静态属性）
+        /// 添加一条 buff 记录
+        /// </summary>
+        public void AddBuffEntry(BuffSource source, string choiceId, StatType stat, bool isPercent, float value, string displayName)
+        {
+            if (buffEntries == null) buffEntries = new List<BuffEntry>();
+            buffEntries.Add(new BuffEntry
+            {
+                source = source,
+                scope = BuffScope.Cat,
+                choiceId = choiceId,
+                statType = stat,
+                isPercent = isPercent,
+                value = value,
+                displayName = displayName
+            });
+        }
+
+        /// <summary>
+        /// 查询某属性的所有 buff 条目
+        /// </summary>
+        public List<BuffEntry> GetBuffEntriesForStat(StatType stat)
+        {
+            if (buffEntries == null) return new List<BuffEntry>();
+            return buffEntries.FindAll(e => e.statType == stat);
+        }
+
+        /// <summary>
+        /// 应用全局奇物加成到新创建的小猫
+        /// </summary>
+        public void ApplyGlobalArtifactBonus()
+        {
+            if (GameManager.Instance?.DataManager?.PlayerData == null) return;
+            int globalBonus = GameManager.Instance.DataManager.PlayerData.globalCatAttackFlatBonus;
+            if (globalBonus > 0)
+            {
+                AddBuffEntry(BuffSource.Artifact, "Artifact_CatAttackFlat_Global", StatType.Attack, false, globalBonus, "奇物：苍蝇拍");
+            }
+        }
+
+        /// <summary>
+        /// 创建指定品质的小猫（从 tribe_config.json 的 catBaseStats 读取静态属性）
         /// </summary>
         public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType)
         {
@@ -198,14 +171,15 @@ namespace TribeSystem
                 tribeType = tribeType
             };
 
-            // 从配置表读取静态属性
-            var stats = TribeConfigLoader.Instance?.GetCatStaticStats(tribeType, quality);
-            if (stats != null)
+            // 从 tribe_config.json 读取小猫基础属性
+            var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            if (tribeConfig?.catBaseStats != null)
             {
-                cat.staticAttack = stats.attack;
-                cat.staticDefense = stats.defense;
-                cat.staticHp = stats.hp;
-                cat.staticSpeed = stats.speed;
+                cat.staticAttack = tribeConfig.catBaseStats.attack;
+                cat.staticDefense = tribeConfig.catBaseStats.defense;
+                cat.staticHp = tribeConfig.catBaseStats.hp;
+                cat.staticMoveSpeed = tribeConfig.catBaseStats.moveSpeed;
+                cat.staticAttackSpeed = tribeConfig.catBaseStats.attackSpeed;
             }
 
             return cat;
@@ -243,7 +217,7 @@ namespace TribeSystem
                         staticAttack = stats.attack;
                         staticDefense = stats.defense;
                         staticHp = stats.hp;
-                        staticSpeed = stats.speed;
+                        staticMoveSpeed = stats.moveSpeed;
                     }
                     return true;
                 }
@@ -252,223 +226,255 @@ namespace TribeSystem
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  卡牌运行时 — CardEntry、BuffList、Buff
+    // ═══════════════════════════════════════════════════════════
+
     /// <summary>
-    /// 小猫静态属性（从 cat_stats_table.json 读取）
+    /// 卡牌条目 — 手牌中一张可被 buff/nerf 的卡的运行时实例
+    /// 拥有自己的 BuffList，所有属性修改通过 buff 叠加实现
     /// </summary>
     [Serializable]
-    public class CatStaticStats
+    public class CardEntry
     {
-        public int tribeType;
-        public int quality;
+        /// <summary>运行时全局唯一 ID（时间戳生成）</summary>
+        public long instanceId;
+
+        /// <summary>引用 Card.dataId（指向静态模板）</summary>
+        public string dataId;
+
+        /// <summary>拥有的 buff 列表</summary>
+        public BuffList buffList;
+
+        public CardEntry()
+        {
+            instanceId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            dataId = "";
+            buffList = new BuffList();
+        }
+
+        /// <summary>
+        /// 计算最终属性：基础值 + 所有 buff 的 effects 叠加
+        /// 基础值由外部传入（来自 Card 或 LeaderData/CatData）
+        /// </summary>
+        public int GetFinalStat(StatType statType, int baseValue)
+        {
+            float percentSum = 0f;
+            int flatSum = 0;
+
+            foreach (var buff in buffList.buffs)
+            {
+                foreach (var eff in buff.effects)
+                {
+                    if (eff.type == GameEffect.AllPercent)
+                    {
+                        percentSum += eff.value;
+                    }
+                    else
+                    {
+                        bool matches = (statType == StatType.Attack && (eff.type == GameEffect.AttackPercent || eff.type == GameEffect.AttackFlat))
+                                     || (statType == StatType.Defense && (eff.type == GameEffect.DefensePercent || eff.type == GameEffect.DefenseFlat))
+                                     || (statType == StatType.Hp && (eff.type == GameEffect.HpPercent || eff.type == GameEffect.HpFlat))
+                                     || (statType == StatType.MoveSpeed && (eff.type == GameEffect.SpeedPercent || eff.type == GameEffect.SpeedFlat));
+
+                        if (!matches) continue;
+
+                        if (eff.type == GameEffect.AttackPercent || eff.type == GameEffect.DefensePercent
+                            || eff.type == GameEffect.HpPercent || eff.type == GameEffect.SpeedPercent)
+                            percentSum += eff.value;
+                        else
+                            flatSum += Mathf.RoundToInt(eff.value);
+                    }
+                }
+            }
+
+            return Mathf.Max(1, Mathf.RoundToInt(baseValue * (1f + percentSum) + flatSum));
+        }
+
+        /// <summary>添加 buff</summary>
+        public void AddBuff(Buff buff)
+        {
+            buff.target = this;
+            buffList.Add(buff);
+        }
+
+        /// <summary>移除指定 buff</summary>
+        public void RemoveBuff(long buffId)
+        {
+            buffList.Remove(buffId);
+        }
+
+        /// <summary>扣所有临时 buff 回合</summary>
+        public void TickBuffs()
+        {
+            buffList.TickAll();
+        }
+    }
+
+    /// <summary>
+    /// Buff 列表容器 — CardEntry 拥有的 buff 集合
+    /// </summary>
+    [Serializable]
+    public class BuffList
+    {
+        public List<Buff> buffs;
+
+        public BuffList()
+        {
+            buffs = new List<Buff>();
+        }
+
+        /// <summary>添加 buff</summary>
+        public void Add(Buff buff)
+        {
+            buffs.Add(buff);
+        }
+
+        /// <summary>按 ID 移除</summary>
+        public bool Remove(long buffId)
+        {
+            for (int i = buffs.Count - 1; i >= 0; i--)
+            {
+                if (buffs[i].buffId == buffId)
+                {
+                    buffs.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>按类型移除</summary>
+        public void RemoveByType(BuffType type)
+        {
+            for (int i = buffs.Count - 1; i >= 0; i--)
+            {
+                if (buffs[i].buffType == type)
+                    buffs.RemoveAt(i);
+            }
+        }
+
+        /// <summary>按类型筛选</summary>
+        public List<Buff> GetByType(BuffType type)
+        {
+            var result = new List<Buff>();
+            for (int i = 0; i < buffs.Count; i++)
+            {
+                if (buffs[i].buffType == type)
+                    result.Add(buffs[i]);
+            }
+            return result;
+        }
+
+        /// <summary>扣所有临时 buff 回合，移除过期的</summary>
+        public void TickAll()
+        {
+            for (int i = buffs.Count - 1; i >= 0; i--)
+            {
+                if (!buffs[i].isPermanent)
+                {
+                    buffs[i].remainingTurns--;
+                    if (buffs[i].remainingTurns <= 0)
+                        buffs.RemoveAt(i);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Buff — 一个 buff 实例，可包含多个效果
+    /// </summary>
+    [Serializable]
+    public class Buff
+    {
+        /// <summary>全局唯一 buff ID</summary>
+        public long buffId;
+
+        /// <summary>buff 类型（用于按类型筛选）</summary>
+        public BuffType buffType;
+
+        /// <summary>引用目标卡牌</summary>
+        [NonSerialized] public CardEntry target;
+
+        /// <summary>来源描述（如 "祈祷：战舞"）</summary>
+        public string source;
+
+        /// <summary>是否显示在 buff 栏</summary>
+        public bool isVisible;
+
+        /// <summary>true=永久, false=临时</summary>
+        public bool isPermanent;
+
+        /// <summary>剩余回合（-1=永久）</summary>
+        public int remainingTurns;
+
+        /// <summary>效果列表（一个 buff 可同时加攻击+生命）</summary>
+        public List<GameEffectEntry> effects;
+
+        public Buff()
+        {
+            buffId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            buffType = BuffType.Recruitment;
+            target = null;
+            source = "";
+            isVisible = false;
+            isPermanent = true;
+            remainingTurns = -1;
+            effects = new List<GameEffectEntry>();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  计算结果快照（只读）
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 计算后的族长属性
+    /// </summary>
+    public struct LeaderStats
+    {
         public int attack;
         public int defense;
         public int hp;
-        public int speed;
-    }
+        public float moveSpeed;
+        public float attackSpeed;
+        public int command;
 
-    /// <summary>
-    /// Buff 类别
-    /// </summary>
-    public enum BuffCategory
-    {
-        StatModifier,   // 纯属性修改，visible=false
-        Special         // 特殊逻辑buff，visible=true
-    }
-
-    /// <summary>
-    /// 通用 Buff 条目（用于 UI 显示的特殊 buff）
-    /// </summary>
-    [Serializable]
-    public class TribeBuff
-    {
-        public string buffId;
-        public string displayName;
-        public string description;
-        public BuffCategory category;
-        public bool visible;
-        public int iconColorIndex;  // 0红,1蓝,2绿,3金,4紫
-        public int duration;        // -1=永久
-
-        public TribeBuff()
+        public LeaderStats(int atk, int def, int hp, float moveSpd, float atkSpd, int cmd)
         {
-            buffId = "";
-            displayName = "";
-            description = "";
-            category = BuffCategory.Special;
-            visible = true;
-            iconColorIndex = 0;
-            duration = -1;
-        }
-
-        public bool IsPermanent => duration < 0;
-        public bool IsExpired => !IsPermanent && duration <= 0;
-    }
-
-    /// <summary>
-    /// 永久加成
-    /// </summary>
-    [Serializable]
-    public class PermanentBuffs
-    {
-        public int attackBonus;
-        public float attackPercent;
-        public int defenseBonus;
-        public float defensePercent;
-        public int hpBonus;
-        public float hpPercent;
-        public int speedBonus;
-        public float speedPercent;
-        public int commandBonus;
-        public float commandPercent;
-        public List<TribeBuff> specialBuffs;
-
-        // 显示控制：false = 在 buff 栏中隐藏该属性
-        public bool attackVisible = true;
-        public bool defenseVisible = true;
-        public bool hpVisible = true;
-        public bool speedVisible = true;
-        public bool commandVisible = true;
-
-        public PermanentBuffs()
-        {
-            attackBonus = 0;
-            attackPercent = 0f;
-            defenseBonus = 0;
-            defensePercent = 0f;
-            hpBonus = 0;
-            hpPercent = 0f;
-            speedBonus = 0;
-            speedPercent = 0f;
-            commandBonus = 0;
-            commandPercent = 0f;
-            specialBuffs = new List<TribeBuff>();
-        }
-
-        /// <summary>
-        /// 确保族长拥有天生特殊 buff（加载存档时调用）
-        /// </summary>
-        public void EnsureInnateBuffs(TribeType tribeType)
-        {
-            if (specialBuffs == null) specialBuffs = new List<TribeBuff>();
-            string innateId = GetInnateBuffId(tribeType);
-            if (string.IsNullOrEmpty(innateId)) return;
-            for (int i = 0; i < specialBuffs.Count; i++)
-            {
-                if (specialBuffs[i].buffId == innateId) return; // 已存在
-            }
-            specialBuffs.Add(CreateInnateBuff(tribeType));
-        }
-
-        private static string GetInnateBuffId(TribeType tribeType)
-        {
-            switch (tribeType)
-            {
-                case TribeType.Orange:  return "innate_damage_reduce";
-                case TribeType.Cow:     return "innate_cat_attack";
-                case TribeType.Tabby:   return "innate_double_hit";
-                case TribeType.Siamese: return "innate_teleport";
-                default: return null;
-            }
-        }
-
-        /// <summary>
-        /// 创建各族天生 buff
-        /// </summary>
-        public static TribeBuff CreateInnateBuff(TribeType tribeType)
-        {
-            switch (tribeType)
-            {
-                case TribeType.Orange:
-                    return new TribeBuff
-                    {
-                        buffId = "innate_damage_reduce",
-                        displayName = "厚甲",
-                        description = "受到的所有伤害-1",
-                        category = BuffCategory.Special,
-                        visible = true,
-                        iconColorIndex = 3, // 金
-                        duration = -1
-                    };
-                case TribeType.Cow:
-                    return new TribeBuff
-                    {
-                        buffId = "innate_cat_attack",
-                        displayName = "猫群之力",
-                        description = "每有一只本族小猫，+3攻击力",
-                        category = BuffCategory.Special,
-                        visible = true,
-                        iconColorIndex = 2, // 绿
-                        duration = -1
-                    };
-                case TribeType.Tabby:
-                    return new TribeBuff
-                    {
-                        buffId = "innate_double_hit",
-                        displayName = "致命射击",
-                        description = "15%概率造成双倍伤害",
-                        category = BuffCategory.Special,
-                        visible = true,
-                        iconColorIndex = 0, // 红
-                        duration = -1
-                    };
-                case TribeType.Siamese:
-                    return new TribeBuff
-                    {
-                        buffId = "innate_teleport",
-                        displayName = "传送",
-                        description = "瞬移代替走路",
-                        category = BuffCategory.Special,
-                        visible = true,
-                        iconColorIndex = 4, // 紫
-                        duration = -1
-                    };
-                default:
-                    return null;
-            }
-        }
-    }
-    [Serializable]
-    public class TemporaryBuff
-    {
-        public float attackPercent;
-        public float defensePercent;
-        public float hpPercent;
-        public float speedPercent;
-        public int duration; // 剩余回合数
-
-        public TemporaryBuff()
-        {
-            attackPercent = 0f;
-            defensePercent = 0f;
-            hpPercent = 0f;
-            speedPercent = 0f;
-            duration = 0;
-        }
-
-        public bool IsActive()
-        {
-            return duration > 0;
-        }
-
-        public void DecreaseDuration()
-        {
-            if (duration > 0)
-            {
-                duration--;
-            }
+            attack = atk;
+            defense = def;
+            this.hp = hp;
+            moveSpeed = moveSpd;
+            attackSpeed = atkSpd;
+            command = cmd;
         }
     }
 
     /// <summary>
-    /// 招募选项类型
+    /// 计算后的小猫属性
     /// </summary>
-    public enum RecruitmentOptionType
+    public struct CatStats
     {
-        NewTribe,           // 新增族群
-        AddCats,            // 增加小猫
-        QualityEvolution,   // 品质进化
-        LeaderBoost         // 族长强化
+        public int attack;
+        public int defense;
+        public int hp;
+        public float moveSpeed;
+        public float attackSpeed;
+
+        public CatStats(int atk, int def, int hp, float moveSpd, float atkSpd)
+        {
+            attack = atk;
+            defense = def;
+            this.hp = hp;
+            moveSpeed = moveSpd;
+            attackSpeed = atkSpd;
+        }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  招募相关
+    // ═══════════════════════════════════════════════════════════
 
     /// <summary>
     /// 招募选项
@@ -476,7 +482,7 @@ namespace TribeSystem
     [Serializable]
     public class RecruitmentOption
     {
-        public RecruitmentOptionType optionType;
+        public ChoiceCategory optionType;
         public int cost;
         public TribeType? targetTribeType; // 目标族群类型（新增族群时）
         public int targetTribeId;          // 目标族群ID（已有族群操作时）
@@ -486,9 +492,12 @@ namespace TribeSystem
         public int bonusHp;                // 固定血量加成
         public string description;
 
+        [System.NonSerialized]
+        public GameChoice gameChoice;      // 关联的 GameChoice（从 choice_config 生成时附带）
+
         public RecruitmentOption()
         {
-            optionType = RecruitmentOptionType.NewTribe;
+            optionType = ChoiceCategory.Reinforcement;
             cost = 0;
             targetTribeType = null;
             targetTribeId = -1;
@@ -496,8 +505,13 @@ namespace TribeSystem
             bonusAttack = 0;
             bonusHp = 0;
             description = "";
+            gameChoice = null;
         }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  祈祀相关
+    // ═══════════════════════════════════════════════════════════
 
     /// <summary>
     /// 祭祀奖励类型
@@ -578,6 +592,10 @@ namespace TribeSystem
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  商店相关
+    // ═══════════════════════════════════════════════════════════
+
     /// <summary>
     /// 商店物品类型
     /// </summary>
@@ -586,6 +604,15 @@ namespace TribeSystem
         Artifact,       // 奇物
         Consumable,     // 一次性道具
         Cat             // 小猫
+    }
+
+    /// <summary>
+    /// 奇物效果类型
+    /// </summary>
+    public enum ArtifactEffectType
+    {
+        LeaderHpFlat,    // 族长生命值+500
+        CatAttackFlat    // 小猫攻击力+20
     }
 
     /// <summary>
@@ -631,10 +658,12 @@ namespace TribeSystem
         public TribeType? catTribeType; // 猫的族群类型
         public CatQuality? catQuality;  // 猫的品质
         public ConsumableEffectType? consumableEffectType; // 消耗品效果类型
+        public ArtifactEffectType? artifactEffectType; // 奇物效果类型
         public int basePrice;
         public string name;
         public string description;
         public int stock;               // 库存，买完后从商店移除
+        public string iconAddress;      // 图标资源地址（Addressable）
 
         public ShopItem()
         {
@@ -646,6 +675,7 @@ namespace TribeSystem
             name = "";
             description = "";
             stock = 1;
+            iconAddress = "";
         }
 
         /// <summary>
@@ -663,123 +693,16 @@ namespace TribeSystem
         }
     }
 
-    /// <summary>
-    /// 族群配置
-    /// </summary>
-    [Serializable]
-    public class TribeConfig
-    {
-        public TribeType tribeType;
-        public string tribeName;
-        public string description;
-        public int initialCatCount;
-        public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
-        public LeaderBaseStats leaderBaseStats;
-        public LeaderBaseStats catBaseStats;  // 小猫的基础属性（command属性不使用）
-
-        public TribeConfig()
-        {
-            tribeType = TribeType.Tabby;
-            tribeName = "";
-            description = "";
-            initialCatCount = 3;
-            deployCostPerCat = 10;
-            leaderBaseStats = new LeaderBaseStats();
-            catBaseStats = new LeaderBaseStats();
-        }
-    }
-
-    /// <summary>
-    /// 族长基础属性配置
-    /// </summary>
-    [Serializable]
-    public class LeaderBaseStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public int speed;
-        public int command;
-
-        public LeaderBaseStats()
-        {
-            attack = 100;
-            defense = 80;
-            hp = 1000;
-            speed = 1000;
-            command = 10;
-        }
-    }
-
-    /// <summary>
-    /// 品质配置
-    /// </summary>
-    [Serializable]
-    public class QualityConfig
-    {
-        public CatQuality quality;
-        public string qualityName;
-        public float minRatio;
-        public float maxRatio;
-        public float baseProbability;
-
-        public QualityConfig()
-        {
-            quality = CatQuality.White;
-            qualityName = "菜鸟";
-            minRatio = 0.1f;
-            maxRatio = 0.2f;
-            baseProbability = 0.4f;
-        }
-    }
-
-    /// <summary>
-    /// 计算后的族长属性
-    /// </summary>
-    public struct LeaderStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public int speed;
-        public int command;
-
-        public LeaderStats(int atk, int def, int hp, int spd, int cmd)
-        {
-            attack = atk;
-            defense = def;
-            this.hp = hp;
-            speed = spd;
-            command = cmd;
-        }
-    }
-
-    /// <summary>
-    /// 计算后的小猫属性
-    /// </summary>
-    public struct CatStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public int speed;
-
-        public CatStats(int atk, int def, int hp, int spd)
-        {
-            attack = atk;
-            defense = def;
-            this.hp = hp;
-            speed = spd;
-        }
-    }
+    // ═══════════════════════════════════════════════════════════
+    //  事件相关
+    // ═══════════════════════════════════════════════════════════
 
     /// <summary>
     /// 新部族事件选项类型
     /// </summary>
     public enum NewTribeEventOptionType
     {
-        NewRandomTribe,   // 获得随机新部族
-        CatFoodReward     // 获得1000猫粮
+        NewTribe,         // 选择一个新部族
     }
 
     /// <summary>
@@ -789,11 +712,13 @@ namespace TribeSystem
     public class NewTribeEventOption
     {
         public NewTribeEventOptionType optionType;
+        public TribeType tribeType;
         public string description;
 
         public NewTribeEventOption()
         {
-            optionType = NewTribeEventOptionType.NewRandomTribe;
+            optionType = NewTribeEventOptionType.NewTribe;
+            tribeType = TribeType.None;
             description = "";
         }
     }
@@ -850,37 +775,6 @@ namespace TribeSystem
                 case EnemyFormationType.Swarm: return "群敌";
                 default: return f.ToString();
             }
-        }
-    }
-
-    /// <summary>
-    /// 种族在特定地形/天气下的属性修正
-    /// </summary>
-    public struct TerrainWeatherBuff
-    {
-        public float attackPercent;
-        public float defensePercent;
-        public float hpPercent;
-        public float speedPercent;
-
-        public bool IsNeutral =>
-            Mathf.Approximately(attackPercent, 0f) &&
-            Mathf.Approximately(defensePercent, 0f) &&
-            Mathf.Approximately(hpPercent, 0f) &&
-            Mathf.Approximately(speedPercent, 0f);
-
-        public string GetDescription()
-        {
-            var parts = new System.Collections.Generic.List<string>();
-            if (!Mathf.Approximately(attackPercent, 0f))
-                parts.Add($"攻{(attackPercent > 0 ? "+" : "")}{Mathf.RoundToInt(attackPercent * 100)}%");
-            if (!Mathf.Approximately(defensePercent, 0f))
-                parts.Add($"防{(defensePercent > 0 ? "+" : "")}{Mathf.RoundToInt(defensePercent * 100)}%");
-            if (!Mathf.Approximately(hpPercent, 0f))
-                parts.Add($"血{(hpPercent > 0 ? "+" : "")}{Mathf.RoundToInt(hpPercent * 100)}%");
-            if (!Mathf.Approximately(speedPercent, 0f))
-                parts.Add($"速{(speedPercent > 0 ? "+" : "")}{Mathf.RoundToInt(speedPercent * 100)}%");
-            return parts.Count > 0 ? string.Join(" ", parts.ToArray()) : "无修正";
         }
     }
 }

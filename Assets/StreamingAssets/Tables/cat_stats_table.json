@@ -3,26 +3,29 @@
     {
       "tribeType": 1,
       "quality": 0,
-      "attack": 2,
-      "defense": 13,
-      "hp": 49,
-      "speed": 1100
+      "attack": 5,
+      "defense": 23,
+      "hp": 91,
+      "moveSpeed": 1100,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 1,
       "quality": 1,
-      "attack": 3,
-      "defense": 16,
-      "hp": 63,
-      "speed": 1100
+      "attack": 5,
+      "defense": 23,
+      "hp": 91,
+      "moveSpeed": 1100,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 1,
       "quality": 2,
-      "attack": 4,
-      "defense": 20,
-      "hp": 77,
-      "speed": 1100
+      "attack": 5,
+      "defense": 23,
+      "hp": 91,
+      "moveSpeed": 1100,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 1,
@@ -30,31 +33,35 @@
       "attack": 5,
       "defense": 23,
       "hp": 91,
-      "speed": 1100
+      "moveSpeed": 1100,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 2,
       "quality": 0,
-      "attack": 2,
-      "defense": 17,
-      "hp": 63,
-      "speed": 2500
+      "attack": 4,
+      "defense": 31,
+      "hp": 117,
+      "moveSpeed": 2500,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 2,
       "quality": 1,
-      "attack": 3,
-      "defense": 22,
-      "hp": 81,
-      "speed": 2500
+      "attack": 4,
+      "defense": 31,
+      "hp": 117,
+      "moveSpeed": 2500,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 2,
       "quality": 2,
-      "attack": 3,
-      "defense": 26,
-      "hp": 99,
-      "speed": 2500
+      "attack": 4,
+      "defense": 31,
+      "hp": 117,
+      "moveSpeed": 2500,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 2,
@@ -62,31 +69,35 @@
       "attack": 4,
       "defense": 31,
       "hp": 117,
-      "speed": 2500
+      "moveSpeed": 2500,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 3,
       "quality": 0,
-      "attack": 2,
-      "defense": 18,
-      "hp": 70,
-      "speed": 950
+      "attack": 4,
+      "defense": 34,
+      "hp": 130,
+      "moveSpeed": 950,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 3,
       "quality": 1,
-      "attack": 3,
-      "defense": 23,
-      "hp": 90,
-      "speed": 950
+      "attack": 4,
+      "defense": 34,
+      "hp": 130,
+      "moveSpeed": 950,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 3,
       "quality": 2,
-      "attack": 3,
-      "defense": 29,
-      "hp": 110,
-      "speed": 950
+      "attack": 4,
+      "defense": 34,
+      "hp": 130,
+      "moveSpeed": 950,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 3,
@@ -94,31 +105,35 @@
       "attack": 4,
       "defense": 34,
       "hp": 130,
-      "speed": 950
+      "moveSpeed": 950,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 4,
       "quality": 0,
-      "attack": 2,
-      "defense": 12,
-      "hp": 46,
-      "speed": 1200
+      "attack": 5,
+      "defense": 21,
+      "hp": 84,
+      "moveSpeed": 1200,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 4,
       "quality": 1,
-      "attack": 3,
-      "defense": 15,
-      "hp": 58,
-      "speed": 1200
+      "attack": 5,
+      "defense": 21,
+      "hp": 84,
+      "moveSpeed": 1200,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 4,
       "quality": 2,
-      "attack": 4,
-      "defense": 18,
-      "hp": 72,
-      "speed": 1200
+      "attack": 5,
+      "defense": 21,
+      "hp": 84,
+      "moveSpeed": 1200,
+      "attackSpeed": 2000
     },
     {
       "tribeType": 4,
@@ -126,7 +141,8 @@
       "attack": 5,
       "defense": 21,
       "hp": 84,
-      "speed": 1200
+      "moveSpeed": 1200,
+      "attackSpeed": 2000
     }
   ]
 }

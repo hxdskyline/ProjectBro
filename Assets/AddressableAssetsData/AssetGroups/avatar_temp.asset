@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: avatar_temp
   m_Data:
     m_SerializedData: []
-  m_GUID: e0aa3d59467db9640896817ac5d64175
+  m_GUID: 9bd84e5270dd6584e87a5ef4771513f2
   m_SerializeEntries:
   - m_GUID: 19110bee0eafc944980ebfa255305510
     m_Address: avatartemp/nainiu1
