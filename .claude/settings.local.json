@@ -92,7 +92,10 @@
       "Bash(find \"f:/ProjectBro/Library\" -name \"*.meta\" -exec grep -l \"ContentSizeFitter\" {} \\\\;)",
       "Bash(grep -E '&[0-9]{19,}' \"f:/ProjectBro/Assets/Bundle/UI/BattlePreparePanel.prefab\")",
       "Bash(grep '&0$')",
-      "Bash(npx unity-mcp-cli:*)"
+      "Bash(npx unity-mcp-cli:*)",
+      "Bash(find Assets/StreamingAssets/Tables -name \"*.json\" -exec grep -l \"猫爪护符\" {} \\\\;)",
+      "Bash(find Assets/StreamingAssets/Tables -name \"choice_config*\" -exec cat {} \\\\;)",
+      "Bash(python3 -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1777401327\\)\\)\")"
     ]
   }
 }

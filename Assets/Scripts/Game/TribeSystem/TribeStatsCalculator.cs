@@ -89,18 +89,22 @@ namespace TribeSystem
             float catMoveSpd = cat.staticMoveSpeed;
             float catAtkSpd = cat.staticAttackSpeed > 0 ? cat.staticAttackSpeed : 0.5f;
 
+            float atkPercentSum = 0f;
+            float defPercentSum = 0f;
+            float hpPercentSum = 0f;
+            int atkFlatSum = 0;
+            int defFlatSum = 0;
+            int hpFlatSum = 0;
+
             // 应用小猫自身的 buff（攻防血）
             if (cat.buffEntries != null && cat.buffEntries.Count > 0)
             {
-                float atkPercentSum = 0f;
-                float defPercentSum = 0f;
-                float hpPercentSum = 0f;
-                int atkFlatSum = 0;
-                int defFlatSum = 0;
-                int hpFlatSum = 0;
-
                 foreach (var entry in cat.buffEntries)
                 {
+                    // 跳过全局奇物 buff，由 PlayerData.globalCatAttackFlatBonus 动态计算
+                    if (entry.source == BuffSource.Artifact && entry.choiceId == "Artifact_CatAttackFlat_Global")
+                        continue;
+
                     switch (entry.statType)
                     {
                         case StatType.Attack:
@@ -117,11 +121,16 @@ namespace TribeSystem
                             break;
                     }
                 }
-
-                catAtk = ApplyModifiers(catAtk, atkPercentSum, atkFlatSum);
-                catDef = ApplyModifiers(catDef, defPercentSum, defFlatSum);
-                catHp = ApplyModifiers(catHp, hpPercentSum, hpFlatSum);
             }
+
+            // 全局奇物加成：直接从 PlayerData 读取，确保所有小猫一致
+            var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
+            if (globalBonus > 0)
+                atkFlatSum += globalBonus;
+
+            catAtk = ApplyModifiers(catAtk, atkPercentSum, atkFlatSum);
+            catDef = ApplyModifiers(catDef, defPercentSum, defFlatSum);
+            catHp = ApplyModifiers(catHp, hpPercentSum, hpFlatSum);
 
             return new CatStats(
                 Mathf.Max(1, Mathf.RoundToInt(catAtk)),

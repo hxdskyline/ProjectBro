@@ -263,39 +263,13 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 必定额外获得饰品或猫粮
+        /// 必定额外获得猫粮
         /// </summary>
         private void ApplyGuaranteedBonus(PrayerEffectType effectType, PrayerGrade grade, int costTierIndex, TribeRecord tribe, PrayerResult result)
         {
-            // 50%概率给饰品，50%概率给猫粮
-            bool giveAccessory = Random.value > 0.5f;
-
-            if (giveAccessory)
-            {
-                // 尝试给饰品（优先未获取）
-                string accessoryId = TryGetUnaccessedAccessory(effectType, grade, costTierIndex);
-                if (accessoryId != null)
-                {
-                    _dataManager.UnlockAccessory(accessoryId);
-                    // 同时注册为 EquipmentRecord
-                    RegisterAccessoryAsEquipment(accessoryId);
-                    result.bonusDescription = $"额外获得: 饰品 [{accessoryId}]";
-                    Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
-                }
-                else
-                {
-                    // 所有饰品已获得，改为猫粮
-                    int catFoodBonus = GetBonusCatFoodAmount(grade, costTierIndex);
-                    _dataManager.AddCatFood(catFoodBonus);
-                    result.bonusDescription = $"额外获得: {catFoodBonus}猫粮（饰品已全收集）";
-                }
-            }
-            else
-            {
-                int catFoodBonus = GetBonusCatFoodAmount(grade, costTierIndex);
-                _dataManager.AddCatFood(catFoodBonus);
-                result.bonusDescription = $"额外获得: {catFoodBonus}猫粮";
-            }
+            int catFoodBonus = GetBonusCatFoodAmount(grade, costTierIndex);
+            _dataManager.AddCatFood(catFoodBonus);
+            result.bonusDescription = $"额外获得: {catFoodBonus}猫粮";
         }
 
         // ─── 品质/效果数值配置 ─────────────────────────────────────────
@@ -361,30 +335,6 @@ namespace TribeSystem
             }
         }
 
-        /// <summary>
-        /// 尝试获取一个未解锁的饰品ID（简化版，实际需要饰品配置表）
-        /// </summary>
-        private string TryGetUnaccessedAccessory(PrayerEffectType effectType, PrayerGrade grade, int costTierIndex)
-        {
-            // 简化实现：生成一个饰品ID，检查是否已解锁
-            // 后续需要饰品配置表来定义掉落库
-            int accessoryPoolSize = 12;
-            var unlocked = _dataManager.GetUnlockedAccessories();
-
-            var candidates = new List<string>();
-            for (int i = 1; i <= accessoryPoolSize; i++)
-            {
-                string id = $"accessory_{i}";
-                if (!unlocked.Contains(id))
-                    candidates.Add(id);
-            }
-
-            if (candidates.Count == 0)
-                return null;
-
-            return candidates[Random.Range(0, candidates.Count)];
-        }
-
         // ─── 兼容旧 UI 的内部方法 ────────────────────────────────────
 
         private RitualRewardItem SelectAndCreateBlessing(RitualTier tier)
@@ -443,11 +393,6 @@ namespace TribeSystem
                     item.amount = Random.Range(cfg.minAmount, cfg.maxAmount + 1);
                     item.displayName = $"获得 {item.amount} 猫粮";
                     break;
-
-                case RitualRewardType.Accessory:
-                    item.accessoryId = Random.Range(1, 10);
-                    item.displayName = "获得随机饰品";
-                    break;
             }
             return item;
         }
@@ -474,11 +419,6 @@ namespace TribeSystem
                 case RitualRewardType.CatFood:
                     _dataManager.AddCatFood(item.amount);
                     break;
-                case RitualRewardType.Accessory:
-                    _dataManager.UnlockAccessory($"accessory_{item.accessoryId}");
-                    RegisterAccessoryAsEquipment($"accessory_{item.accessoryId}");
-                    Debug.Log($"[RitualService] Received accessory: {item.accessoryId}");
-                    break;
             }
         }
 
@@ -487,93 +427,9 @@ namespace TribeSystem
         /// </summary>
         private void ApplyGuaranteedBonusLegacy(RitualRewardItem blessing)
         {
-            bool giveAccessory = Random.value > 0.5f;
-            if (giveAccessory)
-            {
-                string accessoryId = TryGetUnaccessedAccessory(PrayerEffectType.Luck, PrayerGrade.Purple, 1);
-                if (accessoryId != null)
-                {
-                    _dataManager.UnlockAccessory(accessoryId);
-                    RegisterAccessoryAsEquipment(accessoryId);
-                    Debug.Log($"[RitualService] Bonus accessory: {accessoryId}");
-                }
-                else
-                {
-                    int bonus = 100;
-                    _dataManager.AddCatFood(bonus);
-                    Debug.Log($"[RitualService] Bonus cat food: {bonus} (accessories all collected)");
-                }
-            }
-            else
-            {
-                int bonus = 100;
-                _dataManager.AddCatFood(bonus);
-                Debug.Log($"[RitualService] Bonus cat food: {bonus}");
-            }
-        }
-
-        /// <summary>
-        /// 从 accessory_config.json 读取饰品效果并注册为 EquipmentRecord
-        /// </summary>
-        private void RegisterAccessoryAsEquipment(string accessoryId)
-        {
-            string configPath = UnityEngine.Application.streamingAssetsPath + "/Tables/accessory_config.json";
-            if (!System.IO.File.Exists(configPath)) return;
-
-            var configText = System.IO.File.ReadAllText(configPath);
-            var root = LitJson.JsonMapper.ToObject(configText);
-            var accessoriesJson = root["accessories"];
-
-            for (int i = 0; i < accessoriesJson.Count; i++)
-            {
-                var acc = accessoriesJson[i];
-                if (acc["id"].ToString() != accessoryId) continue;
-
-                string name = acc.ContainsKey("name") ? acc["name"].ToString() : accessoryId;
-                string desc = acc.ContainsKey("description") ? acc["description"].ToString() : "";
-
-                var equip = new EquipmentRecord
-                {
-                    equipmentId = $"Equip_{accessoryId}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-                    configId = accessoryId,
-                    displayName = name,
-                    description = desc,
-                    buffScope = BuffApplyScope.All,
-                    buffApplyType = BuffApplyType.Aura,
-                    acquiredRound = _dataManager.GetCurrentRound(),
-                    effects = new List<BuffEffectItem>()
-                };
-
-                var effectsJson = acc["effects"];
-                for (int j = 0; j < effectsJson.Count; j++)
-                {
-                    var effObj = effectsJson[j];
-                    int typeVal = effObj["type"].IsInt ? (int)effObj["type"] : int.Parse(effObj["type"].ToString());
-                    float value = float.TryParse(effObj["value"].ToString(), out float v) ? v : 0f;
-                    var statType = MapAccessoryEffectType(typeVal);
-                    bool isPercent = typeVal <= 4; // type 0-4 是百分比
-                    equip.effects.Add(new BuffEffectItem(statType, isPercent, value, typeVal));
-                }
-
-                _auraService?.RegisterEquipment(equip);
-                return;
-            }
-        }
-
-        /// <summary>
-        /// 将 accessory_config.json 的 type 数字映射到 StatType
-        /// </summary>
-        private StatType MapAccessoryEffectType(int type)
-        {
-            switch (type)
-            {
-                case 0: return StatType.Attack;
-                case 1: return StatType.Defense;
-                case 2: return StatType.Hp;
-                case 3: return StatType.MoveSpeed;
-                case 4: return StatType.Attack; // 全属性+X%，分别加到各属性上
-                default: return StatType.Attack;
-            }
+            int bonus = 100;
+            _dataManager.AddCatFood(bonus);
+            Debug.Log($"[RitualService] Bonus cat food: {bonus}");
         }
 
         private void ApplyTemporaryStatBoost(TribeRecord tribe, StatType stat, int amount)
@@ -621,7 +477,6 @@ namespace TribeSystem
             for (int i = 0; i < count; i++)
             {
                 var cat = CatData.CreateWithQuality(quality, tribe.tribeType);
-                cat.ApplyGlobalArtifactBonus();
                 _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
                 tribe.cats.Add(cat);
             }

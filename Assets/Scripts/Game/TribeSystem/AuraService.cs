@@ -104,7 +104,8 @@ namespace TribeSystem
             List<BuffEffectItem> effects, string displayName, TribeType? targetTribeType)
         {
             if (effects == null || effects.Count == 0) return;
-            if (applyType != BuffApplyType.CurrentUnit) return; // Aura 由新单位创建时调用 ApplyAurasTo*
+            // Aura 和 CurrentUnit 类型都需要应用到已有的单位
+            // Aura 类型用于新单位创建时的补发，CurrentUnit 用于立即应用
 
             var playerData = _dataManager.PlayerData;
             if (playerData.tribes == null) return;

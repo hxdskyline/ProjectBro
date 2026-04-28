@@ -248,7 +248,6 @@ namespace TribeSystem
             for (int i = 0; i < catsToAdd; i++)
             {
                 var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
-                cat.ApplyGlobalArtifactBonus();
                 _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
                 tribe.cats.Add(cat);
             }
@@ -317,7 +316,6 @@ namespace TribeSystem
             for (int i = 0; i < config.initialCatCount; i++)
             {
                 var cat = CatData.CreateWithQuality(CatQuality.White, tribeType);
-                cat.ApplyGlobalArtifactBonus();
                 _auraService?.ApplyAurasToNewCat(cat, tribeType);
                 newTribe.cats.Add(cat);
             }

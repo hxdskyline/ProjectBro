@@ -250,8 +250,18 @@ namespace TribeSystem.UI
                 int finalValue = GetCatFinalValue(catStats, stat);
 
                 var allEntries = _selectedCat.GetBuffEntriesForStat(stat);
+                // 过滤掉全局奇物 buff
+                allEntries.RemoveAll(e => e.source == BuffSource.Artifact && e.choiceId == "Artifact_CatAttackFlat_Global");
                 var flatEntries = allEntries.FindAll(e => !e.isPercent);
                 var percentEntries = allEntries.FindAll(e => e.isPercent);
+
+                // 攻击属性：补上全局奇物加成条目，使 tooltip 公式与 finalValue 一致
+                if (stat == StatType.Attack)
+                {
+                    var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
+                    if (globalBonus > 0)
+                        flatEntries.Add(new BuffEntry { source = BuffSource.Artifact, statType = StatType.Attack, isPercent = false, value = globalBonus, displayName = "奇物：苍蝇拍" });
+                }
 
                 EnsureTooltipInstance();
                 if (_tooltipInstance != null)
@@ -373,10 +383,10 @@ namespace TribeSystem.UI
                 // 显示小猫的 buff
                 AddCatBuffEntries(_selectedCat, font);
 
-                // 同时显示族长的永久 buff（招募加成等）
+                // 同时显示族长的永久 buff（招募加成等），但过滤掉只影响族长的 buff（如猫爬架）
                 var leader = _tribe.leader;
                 if (leader?.permanentBuffs != null)
-                    AddPermanentBuffEntries(leader.permanentBuffs, font);
+                    AddPermanentBuffEntriesFiltered(leader.permanentBuffs, font);
             }
             else
             {
@@ -412,10 +422,12 @@ namespace TribeSystem.UI
         {
             if (cat?.buffEntries == null || cat.buffEntries.Count == 0) return;
 
-            // 按属性分组显示
+            // 按属性分组显示（跳过全局奇物 buff，由 PlayerData 动态计算）
             var statGroups = new Dictionary<StatType, List<BuffEntry>>();
             foreach (var entry in cat.buffEntries)
             {
+                if (entry.source == BuffSource.Artifact && entry.choiceId == "Artifact_CatAttackFlat_Global")
+                    continue;
                 if (!statGroups.ContainsKey(entry.statType))
                     statGroups[entry.statType] = new List<BuffEntry>();
                 statGroups[entry.statType].Add(entry);
@@ -428,6 +440,14 @@ namespace TribeSystem.UI
                 new Color(0.2f, 0.8f, 0.3f, 0.8f), // 生命绿
                 new Color(0.6f, 0.3f, 0.8f, 0.8f)  // 统御紫
             };
+
+            // 攻击属性：补上全局奇物加成
+            if (statGroups.ContainsKey(StatType.Attack))
+            {
+                var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
+                if (globalBonus > 0)
+                    statGroups[StatType.Attack].Add(new BuffEntry { source = BuffSource.Artifact, statType = StatType.Attack, isPercent = false, value = globalBonus, displayName = "奇物：苍蝇拍" });
+            }
 
             foreach (var kvp in statGroups)
             {
@@ -465,6 +485,42 @@ namespace TribeSystem.UI
                 CreateBuffEntry("def_icon", "防御强化", FormatStatBuff("防御", pb.defenseBonus, pb.defensePercent), font, new Color(0.3f, 0.5f, 0.9f, 0.8f), StatType.Defense);
             if (pb.hpVisible && (pb.hpBonus != 0 || pb.hpPercent != 0f))
                 CreateBuffEntry("hp_icon", "生命强化", FormatStatBuff("生命", pb.hpBonus, pb.hpPercent), font, new Color(0.2f, 0.8f, 0.3f, 0.8f), StatType.Hp);
+        }
+
+        /// <summary>
+        /// 显示族长的永久 buff，但过滤掉只影响族长的 buff（用于小猫视图）
+        /// </summary>
+        private void AddPermanentBuffEntriesFiltered(PermanentBuffs pb, Font font)
+        {
+            if (pb == null || pb.buffEntries == null) return;
+
+            // 从 buffEntries 中过滤出影响小猫的条目，重新计算汇总值
+            float atkFlat = 0f, atkPct = 0f;
+            float defFlat = 0f, defPct = 0f;
+            float hpFlat = 0f, hpPct = 0f;
+            foreach (var e in pb.buffEntries)
+            {
+                if (e.scope == BuffScope.Leader) continue; // 跳过只影响族长的
+                switch (e.statType)
+                {
+                    case StatType.Attack:
+                        if (e.isPercent) atkPct += e.value; else atkFlat += e.value;
+                        break;
+                    case StatType.Defense:
+                        if (e.isPercent) defPct += e.value; else defFlat += e.value;
+                        break;
+                    case StatType.Hp:
+                        if (e.isPercent) hpPct += e.value; else hpFlat += e.value;
+                        break;
+                }
+            }
+
+            if (atkFlat != 0f || atkPct != 0f)
+                CreateBuffEntry("atk_icon", "攻击强化", FormatStatBuff("攻击", Mathf.RoundToInt(atkFlat), atkPct), font, new Color(0.9f, 0.3f, 0.2f, 0.8f), StatType.Attack);
+            if (defFlat != 0f || defPct != 0f)
+                CreateBuffEntry("def_icon", "防御强化", FormatStatBuff("防御", Mathf.RoundToInt(defFlat), defPct), font, new Color(0.3f, 0.5f, 0.9f, 0.8f), StatType.Defense);
+            if (hpFlat != 0f || hpPct != 0f)
+                CreateBuffEntry("hp_icon", "生命强化", FormatStatBuff("生命", Mathf.RoundToInt(hpFlat), hpPct), font, new Color(0.2f, 0.8f, 0.3f, 0.8f), StatType.Hp);
         }
 
         private void AddTemporaryBuffEntry(TemporaryBuff tb, Font font)
@@ -577,8 +633,18 @@ namespace TribeSystem.UI
                 int finalValue = GetCatFinalValue(catStats, stat);
 
                 var allEntries = _selectedCat.GetBuffEntriesForStat(stat);
+                // 过滤掉全局奇物 buff
+                allEntries.RemoveAll(e => e.source == BuffSource.Artifact && e.choiceId == "Artifact_CatAttackFlat_Global");
                 var flatEntries = allEntries.FindAll(e => !e.isPercent);
                 var percentEntries = allEntries.FindAll(e => e.isPercent);
+
+                // 攻击属性：补上全局奇物加成条目，使 tooltip 公式与 finalValue 一致
+                if (stat == StatType.Attack)
+                {
+                    var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
+                    if (globalBonus > 0)
+                        flatEntries.Add(new BuffEntry { source = BuffSource.Artifact, statType = StatType.Attack, isPercent = false, value = globalBonus, displayName = "奇物：苍蝇拍" });
+                }
 
                 EnsureTooltipInstance();
                 if (_tooltipInstance != null)

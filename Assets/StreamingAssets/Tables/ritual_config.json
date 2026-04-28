@@ -30,10 +30,9 @@
       "cost": 600,
       "drawCount": 3,
       "blessings": [
-        { "type": "LeaderStatBoostPercent",   "weight": 35, "statTypes": ["Attack","Defense","Hp"], "minPercent": 0.05, "maxPercent": 0.15 },
-        { "type": "Cats",                     "weight": 25, "qualities": ["Purple","Gold"], "minCount": 2, "maxCount": 5 },
-        { "type": "Accessory",                "weight": 20, "minCount": 1, "maxCount": 1 },
-        { "type": "CatFood",                  "weight": 20, "minAmount": 300, "maxAmount": 800 }
+        { "type": "LeaderStatBoostPercent",   "weight": 40, "statTypes": ["Attack","Defense","Hp"], "minPercent": 0.05, "maxPercent": 0.15 },
+        { "type": "Cats",                     "weight": 30, "qualities": ["Purple","Gold"], "minCount": 2, "maxCount": 5 },
+        { "type": "CatFood",                  "weight": 30, "minAmount": 300, "maxAmount": 800 }
       ]
     }
   ]

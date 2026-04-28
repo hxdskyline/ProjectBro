@@ -105,7 +105,6 @@ namespace TribeSystem.UI
             for (int i = 0; i < config.initialCatCount; i++)
             {
                 var cat = CatData.CreateWithQuality(CatQuality.White, tribeType);
-                cat.ApplyGlobalArtifactBonus();
                 tribe.cats.Add(cat);
             }
 
