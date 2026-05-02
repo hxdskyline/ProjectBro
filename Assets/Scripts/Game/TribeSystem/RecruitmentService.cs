@@ -52,9 +52,10 @@ namespace TribeSystem
                 var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
                 if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
                 {
-                    // 有单位类型定义 → 每个等级都生成一个选项
+                    // 有单位类型定义 → 每个等级生成选项（T3 临时屏蔽）
                     foreach (var ut in config.unitTypes)
                     {
+                        if (ut.tier == 3) continue; // 三级兵暂不开放招募
                         addCatsOptions.Add(CreateAddCatsOptionWithTier(tribe, (UnitTier)ut.tier));
                     }
                 }
@@ -77,21 +78,33 @@ namespace TribeSystem
                 var allAuraOptions = new List<RecruitmentOption>();
                 foreach (var tribe in playerData.tribes)
                 {
-                    // 获取该种族的兵种专属 buff（随机选一个 tier）
+                    // 获取该种族的兵种专属 buff（随机选一个玩家拥有的 tier）
                     var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
                     if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
                     {
-                        int tierIdx = Random.Range(0, config.unitTypes.Count);
-                        UnitTier tier = (UnitTier)config.unitTypes[tierIdx].tier;
-                        var tierAuras = _tribeAuraService.GetAvailableAuras(tribe.tribeType, tier);
-                        foreach (var aura in tierAuras)
+                        // 只筛选玩家已拥有对应 tier 单位的 aura
+                        var ownedTiers = new HashSet<UnitTier>();
+                        if (tribe.cats != null)
                         {
-                            allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
+                            foreach (var cat in tribe.cats)
+                                ownedTiers.Add(cat.tier);
+                        }
+
+                        var validUnitTypes = config.unitTypes.FindAll(u => ownedTiers.Contains((UnitTier)u.tier));
+                        if (validUnitTypes.Count > 0)
+                        {
+                            int tierIdx = Random.Range(0, validUnitTypes.Count);
+                            UnitTier tier = (UnitTier)validUnitTypes[tierIdx].tier;
+                            var tierAuras = _tribeAuraService.GetAvailableAuras(tribe.tribeType, tier);
+                            foreach (var aura in tierAuras)
+                            {
+                                allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
+                            }
                         }
                     }
 
                     // 获取该种族的通用 buff
-                    var generalAuras = _tribeAuraService.GetAvailableGeneralAuras(tribe.tribeType);
+                    var generalAuras = _tribeAuraService.GetAvailableGeneralAuras(tribe.tribeType, tribe.cats);
                     foreach (var aura in generalAuras)
                     {
                         allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
@@ -121,7 +134,7 @@ namespace TribeSystem
         private RecruitmentOption CreateBuffOptionFromArchetype(TribeRecord tribe, ChoiceArchetype archetype)
         {
             // 解析 scope
-            BuffApplyScope scope = ParseBuffScope(archetype.buffScope);
+            BuffScopeFilter scopeFilter = ParseBuffScope(archetype.buffScope);
             BuffApplyType applyType = archetype.buffApplyType == "Aura" ? BuffApplyType.Aura : BuffApplyType.CurrentUnit;
 
             // 构造 GameChoice 用于后续执行
@@ -140,7 +153,7 @@ namespace TribeSystem
                 archetype.displayName,
                 FormatDescription(archetype.descriptionTemplate, tribe.tribeType, buffEffects),
                 ChoiceSource.Recruitment,
-                scope,
+                scopeFilter,
                 applyType,
                 buffEffects,
                 tribe.tribeType);
@@ -180,8 +193,10 @@ namespace TribeSystem
             var seenArchetypes = new HashSet<string>();
             foreach (var opt in remaining)
             {
-                if (opt.gameChoice == null) continue;
-                string archetypeId = opt.gameChoice.choiceId;
+                // 有 gameChoice 用 choiceId 去重，否则用 optionType+tribe+tier 作为 key
+                string archetypeId = opt.gameChoice != null
+                    ? opt.gameChoice.choiceId
+                    : $"{opt.optionType}_{opt.targetTribeType}_{opt.targetTier}";
                 if (seenArchetypes.Add(archetypeId))
                 {
                     result.Add(opt);
@@ -212,17 +227,9 @@ namespace TribeSystem
             return 0;
         }
 
-        private BuffApplyScope ParseBuffScope(string scope)
+        private BuffScopeFilter ParseBuffScope(string scope)
         {
-            switch (scope)
-            {
-                case "All": return BuffApplyScope.All;
-                case "AllLeaders": return BuffApplyScope.AllLeaders;
-                case "AllCats": return BuffApplyScope.AllCats;
-                case "SingleTribeLeader": return BuffApplyScope.SingleTribeLeader;
-                case "SingleTribeCat": return BuffApplyScope.SingleTribeCat;
-                default: return BuffApplyScope.All;
-            }
+            return BuffScopeFilter.Parse(scope);
         }
 
         private StatType ParseStatType(string stat)
@@ -276,6 +283,12 @@ namespace TribeSystem
             }
 
             int catsToAdd = config.initialCatCount;
+            if (tier.HasValue)
+            {
+                var unitType = config.GetUnitType(tier.Value);
+                if (unitType != null && unitType.recruitCount > 0)
+                    catsToAdd = unitType.recruitCount;
+            }
 
             for (int i = 0; i < catsToAdd; i++)
             {
@@ -309,7 +322,7 @@ namespace TribeSystem
                 "招募强化",
                 $"族长属性提升",
                 ChoiceSource.Recruitment,
-                BuffApplyScope.SingleTribeLeader,
+                new BuffScopeFilter { role = ScopeRoleFilter.Leader, tribe = tribe.tribeType },
                 BuffApplyType.CurrentUnit,
                 effects,
                 tribe.tribeType);
@@ -422,20 +435,18 @@ namespace TribeSystem
         private LeaderData CreateLeader(TribeConfig config)
         {
             var buffs = new PermanentBuffs();
-            // 添加天生特殊 buff
-            var innateBuff = PermanentBuffs.CreateInnateBuff(config.tribeType);
-            if (innateBuff != null)
-                buffs.specialBuffs.Add(innateBuff);
+            // 从 fighter_config.json 读取族长属性
+            var leaderConfig = TribeConfigLoader.Instance?.GetFighterConfig(config.leaderFighterId);
 
             return new LeaderData
             {
                 leaderId = Random.Range(1000, 9999),
-                name = $"{config.tribeName}族长",
-                baseAttack = config.leaderBaseStats.attack,
-                baseDefense = config.leaderBaseStats.defense,
-                baseHp = config.leaderBaseStats.hp,
-                baseMoveSpeed = config.leaderBaseStats.moveSpeed,
-                command = config.leaderBaseStats.command,
+                name = leaderConfig?.fighterName ?? $"{config.tribeName}族长",
+                baseAttack = leaderConfig?.attack ?? 0,
+                baseDefense = leaderConfig?.defense ?? 0,
+                baseHp = leaderConfig?.hp ?? 0,
+                baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
+                command = leaderConfig?.command ?? 0,
                 skillIds = new List<int>(),
                 permanentBuffs = buffs,
                 temporaryBuff = null
@@ -463,12 +474,21 @@ namespace TribeSystem
             var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
             int catCount = config != null ? config.initialCatCount : 1;
             string tierName = GetUnitTierName(tier);
-            // 从 unitTypes 读取单位名
+            // 从 fighter_config.json 读取单位名和招募数量
             string unitName = "";
             if (config != null)
             {
                 var unitType = config.GetUnitType(tier);
-                if (unitType != null) unitName = unitType.unitName;
+                if (unitType != null && unitType.fighterId > 0)
+                {
+                    var fighterConfig = TribeConfigLoader.Instance.GetFighterConfig(unitType.fighterId);
+                    if (fighterConfig != null)
+                    {
+                        unitName = fighterConfig.fighterName;
+                        if (fighterConfig.recruitCount > 0)
+                            catCount = fighterConfig.recruitCount;
+                    }
+                }
             }
             string display = string.IsNullOrEmpty(unitName)
                 ? $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只{tierName}"
@@ -522,13 +542,13 @@ namespace TribeSystem
                 }
             }
 
-            // 创建 GameChoice
+            // 创建 GameChoice — scope 从 JSON 配置读取
             var choice = GameChoice.CreateBuff(
                 aura.auraId,
                 aura.auraName,
                 aura.description,
                 ChoiceSource.Recruitment,
-                BuffApplyScope.SingleTribeCat,
+                BuffScopeFilter.Parse(aura.scope),
                 BuffApplyType.Aura,
                 buffEffects,
                 tribe.tribeType);

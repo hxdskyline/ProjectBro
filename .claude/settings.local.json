@@ -95,7 +95,14 @@
       "Bash(npx unity-mcp-cli:*)",
       "Bash(find Assets/StreamingAssets/Tables -name \"*.json\" -exec grep -l \"猫爪护符\" {} \\\\;)",
       "Bash(find Assets/StreamingAssets/Tables -name \"choice_config*\" -exec cat {} \\\\;)",
-      "Bash(python3 -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1777401327\\)\\)\")"
+      "Bash(python3 -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1777401327\\)\\)\")",
+      "Bash(wc -l Assets/Scripts/Game/Battle/**/*.cs Assets/Scripts/Game/Battle/*.cs)",
+      "Bash(sort -t/ -k6)",
+      "Bash(uuidgen)",
+      "Bash(python3 -c \"import uuid; print\\(uuid.uuid4\\(\\).hex\\)\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('runEquipments',[]\\), indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('runChoices',[]\\), indent=2, ensure_ascii=False\\)\\)\")"
     ]
   }
 }

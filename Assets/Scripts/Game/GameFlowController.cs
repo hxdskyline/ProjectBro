@@ -170,7 +170,7 @@ public class GameFlowController : MonoBehaviour
 
         // 显示初始族群选择面板
         var panel = _uiManager.ShowPanel<InitialTribeSelectionPanel>(
-            "ui/tribebuild/initialtribeselectionpanel",
+            "ui/initialtribeselectionpanel",
             UIManager.UILayer.Normal
         );
 

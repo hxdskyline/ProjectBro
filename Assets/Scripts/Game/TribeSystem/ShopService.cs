@@ -212,9 +212,9 @@ namespace TribeSystem
             StatType stat = effectType == ArtifactEffectType.LeaderHpFlat ? StatType.Hp : StatType.Attack;
 
             // 确定影响范围：族长加血→全体族长，小猫加攻→全体小猫
-            BuffApplyScope scope = effectType == ArtifactEffectType.LeaderHpFlat
-                ? BuffApplyScope.AllLeaders
-                : BuffApplyScope.AllCats;
+            var scopeFilter = effectType == ArtifactEffectType.LeaderHpFlat
+                ? new BuffScopeFilter { role = ScopeRoleFilter.Leader }
+                : new BuffScopeFilter { role = ScopeRoleFilter.Soldier };
 
             // 小猫攻击力奇物：累计全局值，新小猫自动继承
             if (effectType == ArtifactEffectType.CatAttackFlat)
@@ -229,7 +229,8 @@ namespace TribeSystem
                 configId = $"Artifact_{effectType}",
                 displayName = artifactName,
                 description = effectType == ArtifactEffectType.LeaderHpFlat ? $"族长生命值+{value}" : $"小猫攻击力+{value}",
-                buffScope = scope,
+                buffScopeFilter = scopeFilter,
+                buffScopeText = scopeFilter.GetDisplayString(),
                 buffApplyType = BuffApplyType.Aura,
                 acquiredRound = _dataManager.GetCurrentRound(),
                 effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, value) }

@@ -5,6 +5,8 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using TribeSystem;
 using TribeSystem.UI;
+using BattleSystem;
+using BattleSystem.Fighter;
 
 /// <summary>
 /// 战前准备界面 - 族群系统版本（含地形/天气/难度/出战消耗）

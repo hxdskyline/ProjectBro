@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: data
   m_Data:
     m_SerializedData: []
-  m_GUID: 0a46447240946814bb8203e635944b2c
+  m_GUID: c19a6baf3af94b848ab0ceb47f414ec9
   m_SerializeEntries:
   - m_GUID: 31d080bbf47946a99e67db72dd8e9f0d
     m_Address: data/avatar/definitions/xianluo_avataranimdef
@@ -24,6 +24,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 47ac81f44b87fd74b87a7df731ce985f
     m_Address: data/avatar/definitions/hero_avataranimdef
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 70bc8fb24c634754a2cf9474b1606a5c
+    m_Address: data/avatar/definitions/cangying_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -55,6 +60,4 @@ MonoBehaviour:
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas:
-    - {fileID: 11400000, guid: 7b80e57762a75094681607dade1e9809, type: 2}
-    - {fileID: 11400000, guid: b7375176834f2df458d361790727f007, type: 2}
+    m_Schemas: []

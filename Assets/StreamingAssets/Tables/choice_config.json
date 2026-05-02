@@ -6,7 +6,7 @@
       "descriptionTemplate": "全体小猫攻击力+{value}（光环）",
       "source": "recruitment",
       "category": "buff",
-      "buffScope": "AllCats",
+      "buffScope": "Soldier",
       "buffApplyType": "Aura",
       "buffEffects": [
         { "statType": "Attack", "isPercent": false, "value": 3, "gameEffectType": -1 }
@@ -19,7 +19,7 @@
       "descriptionTemplate": "全体小猫攻击力+3 生命值+20（光环）",
       "source": "recruitment",
       "category": "buff",
-      "buffScope": "AllCats",
+      "buffScope": "Soldier",
       "buffApplyType": "Aura",
       "buffEffects": [
         { "statType": "Attack", "isPercent": false, "value": 3, "gameEffectType": -1 },

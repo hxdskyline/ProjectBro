@@ -316,7 +316,7 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 创建指定品质的小猫（从 tribe_config.json 的 catBaseStats 读取静态属性）
+        /// 创建指定品质的小猫（从 fighter_config.json 读取静态属性）
         /// </summary>
         public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType, UnitTier? tier = null)
         {
@@ -328,15 +328,17 @@ namespace TribeSystem
                 tier = tier ?? UnitTier.Tier1
             };
 
-            // 从 tribe_config.json 读取小猫基础属性
+            // 从 fighter_config.json 读取小猫基础属性
             var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-            if (tribeConfig?.catBaseStats != null)
+            var unitType = tribeConfig?.GetUnitType(cat.tier);
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitType?.fighterId ?? 0);
+            if (fighterConfig != null)
             {
-                cat.staticAttack = tribeConfig.catBaseStats.attack;
-                cat.staticDefense = tribeConfig.catBaseStats.defense;
-                cat.staticHp = tribeConfig.catBaseStats.hp;
-                cat.staticMoveSpeed = tribeConfig.catBaseStats.moveSpeed;
-                cat.staticAttackSpeed = tribeConfig.catBaseStats.attackSpeed;
+                cat.staticAttack = fighterConfig.attack;
+                cat.staticDefense = fighterConfig.defense;
+                cat.staticHp = fighterConfig.hp;
+                cat.staticMoveSpeed = fighterConfig.moveSpeed;
+                cat.staticAttackSpeed = fighterConfig.attackSpeed;
             }
 
             return cat;

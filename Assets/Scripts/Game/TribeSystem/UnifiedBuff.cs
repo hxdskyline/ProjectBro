@@ -58,7 +58,7 @@ namespace TribeSystem
         public float tickTimer;            // 当前 tick 计时器
 
         // ── 状态标记 ──
-        public bool IsExpired => remainingDuration >= 0 && remainingDuration <= 0;
+        public bool IsExpired => !IsPermanent && remainingDuration <= 0;
         public bool IsPermanent => remainingDuration < 0;
         public bool IsStackable => stackRule == BuffStackRule.Stack;
 
@@ -68,12 +68,14 @@ namespace TribeSystem
         public static UnifiedBuff CreateStatBuff(
             string buffId, string displayName, BuffSource source, string sourceId,
             StatType statType, bool isPercent, float value,
-            BuffScope scope = BuffScope.Leader, int gameEffectType = -1)
+            BuffScope scope = BuffScope.Leader, int gameEffectType = -1,
+            string description = null)
         {
             return new UnifiedBuff
             {
                 buffId = buffId,
                 displayName = displayName,
+                description = description,
                 source = source,
                 sourceId = sourceId,
                 persistence = BuffPersistence.Persistent,
@@ -165,6 +167,7 @@ namespace TribeSystem
                 isPercent = isPercent,
                 value = value,
                 gameEffect = gameEffect,
+                gameEffectType = gameEffectType,
                 effectParam1 = effectParam1,
                 effectParam2 = effectParam2,
                 remainingDuration = remainingDuration,

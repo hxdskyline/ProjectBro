@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace TribeSystem.BuffEffects
 {
@@ -25,7 +26,7 @@ namespace TribeSystem.BuffEffects
             if (ctx.Owner == null || ctx.Enemies == null) return;
 
             // 找随机存活敌人
-            var candidates = new System.Collections.Generic.List<global::BattleFighter>();
+            var candidates = new List<IBattleUnit>();
             for (int i = 0; i < ctx.Enemies.Length; i++)
             {
                 if (ctx.Enemies[i] != null && ctx.Enemies[i].IsAlive)

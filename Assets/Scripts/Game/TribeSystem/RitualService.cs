@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using LitJson;
+using BattleSystem;
 
 namespace TribeSystem
 {
@@ -549,11 +550,12 @@ namespace TribeSystem
         private void ApplyPermanentStatBoost(TribeRecord tribe, StatType stat, int amount)
         {
             var effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, amount) };
+            var scopeFilter = new BuffScopeFilter { role = ScopeRoleFilter.Leader, tribe = tribe.tribeType };
             var choice = GameChoice.CreateBuff(
                 $"Ritual_StatBoost_{tribe.tribeType}_{stat}_{amount}",
                 "祈愿强化", $"祈愿：{GetStatName(stat)} +{amount}",
                 ChoiceSource.Ritual,
-                BuffApplyScope.SingleTribeLeader, BuffApplyType.CurrentUnit,
+                scopeFilter, BuffApplyType.CurrentUnit,
                 effects, tribe.tribeType);
             _auraService?.RegisterChoice(choice);
         }
@@ -561,11 +563,12 @@ namespace TribeSystem
         private void ApplyPermanentStatPercentBoost(TribeRecord tribe, StatType stat, float pct)
         {
             var effects = new List<BuffEffectItem> { new BuffEffectItem(stat, true, pct) };
+            var scopeFilter = new BuffScopeFilter { role = ScopeRoleFilter.Leader, tribe = tribe.tribeType };
             var choice = GameChoice.CreateBuff(
                 $"Ritual_StatPct_{tribe.tribeType}_{stat}_{Mathf.RoundToInt(pct * 100)}",
                 "祈愿强化", $"祈愿：{GetStatName(stat)} +{Mathf.RoundToInt(pct * 100)}%",
                 ChoiceSource.Ritual,
-                BuffApplyScope.SingleTribeLeader, BuffApplyType.CurrentUnit,
+                scopeFilter, BuffApplyType.CurrentUnit,
                 effects, tribe.tribeType);
             _auraService?.RegisterChoice(choice);
         }

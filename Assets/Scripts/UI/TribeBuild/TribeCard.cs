@@ -345,7 +345,12 @@ namespace TribeSystem.UI
                 case StatType.MoveSpeed: return Mathf.RoundToInt(leader.baseMoveSpeed * 1000);
                 case StatType.AttackSpeed:
                     var cfg = TribeConfigLoader.Instance?.GetTribeConfig(_tribe.tribeType);
-                    return cfg != null ? Mathf.RoundToInt(cfg.leaderBaseStats.attackSpeed * 1000) : 500;
+                    if (cfg != null)
+                    {
+                        var leaderConfig = TribeConfigLoader.Instance?.GetFighterConfig(cfg.leaderFighterId);
+                        return leaderConfig != null ? Mathf.RoundToInt(leaderConfig.attackSpeed * 1000) : 500;
+                    }
+                    return 500;
                 default: return 0;
             }
         }
@@ -421,18 +426,25 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 按属性分组显示 UnifiedBuff 列表（用于 buff 栏）
+        /// 按来源分组显示 UnifiedBuff 列表（用于 buff 栏）
+        /// 同一来源的多个buff合并显示，如"苍蝇拍x2 +40"
         /// </summary>
         private void AddUnifiedBuffEntries(List<UnifiedBuff> buffs, Font font)
         {
             if (buffs == null || buffs.Count == 0) return;
 
-            var statGroups = new Dictionary<StatType, List<UnifiedBuff>>();
+            // 按来源名称分组
+            var sourceGroups = new Dictionary<string, List<UnifiedBuff>>();
+            var sourceOrder = new List<string>(); // 保持插入顺序
             foreach (var buff in buffs)
             {
-                if (!statGroups.ContainsKey(buff.statType))
-                    statGroups[buff.statType] = new List<UnifiedBuff>();
-                statGroups[buff.statType].Add(buff);
+                string key = buff.displayName ?? buff.sourceId ?? buff.buffId;
+                if (!sourceGroups.ContainsKey(key))
+                {
+                    sourceGroups[key] = new List<UnifiedBuff>();
+                    sourceOrder.Add(key);
+                }
+                sourceGroups[key].Add(buff);
             }
 
             Color[] statColors = {
@@ -440,32 +452,79 @@ namespace TribeSystem.UI
                 new Color(0.3f, 0.5f, 0.9f, 0.8f), // 防御蓝
                 new Color(0.8f, 0.6f, 0.1f, 0.8f), // 速度金
                 new Color(0.2f, 0.8f, 0.3f, 0.8f), // 生命绿
+                new Color(0.9f, 0.5f, 0.1f, 0.8f), // 攻速橙
                 new Color(0.6f, 0.3f, 0.8f, 0.8f)  // 统御紫
             };
 
-            foreach (var kvp in statGroups)
+            foreach (var sourceName in sourceOrder)
             {
-                float flatSum = 0f;
-                float percentSum = 0f;
-                foreach (var b in kvp.Value)
+                var group = sourceGroups[sourceName];
+                int totalCount = 0;
+                // 按属性类型汇总该来源的所有buff
+                var statSums = new Dictionary<StatType, (float flat, float pct)>();
+                foreach (var b in group)
                 {
+                    totalCount++;
                     float totalVal = b.value * b.currentStacks;
-                    if (b.isPercent) percentSum += totalVal; else flatSum += totalVal;
+                    if (!statSums.ContainsKey(b.statType))
+                        statSums[b.statType] = (0f, 0f);
+                    var s = statSums[b.statType];
+                    if (b.isPercent)
+                        statSums[b.statType] = (s.flat, s.pct + totalVal);
+                    else
+                        statSums[b.statType] = (s.flat + totalVal, s.pct);
                 }
 
-                int colorIndex = kvp.Key == StatType.Attack ? 0 :
-                                 kvp.Key == StatType.Defense ? 1 :
-                                 kvp.Key == StatType.MoveSpeed ? 2 :
-                                 kvp.Key == StatType.Hp ? 3 : 4;
+                // 构建描述文本
+                string desc;
+                bool isStackable = group[0].stackRule == TribeSystem.BuffStackRule.Stack;
+                if (!isStackable && !string.IsNullOrEmpty(group[0].description))
+                {
+                    // 非叠层 buff：使用原始描述
+                    desc = group[0].description;
+                }
+                else
+                {
+                    // 叠层 buff 或无描述：从属性自动拼接
+                    var descParts = new List<string>();
+                    foreach (var sKvp in statSums)
+                    {
+                        string statName;
+                        switch (sKvp.Key)
+                        {
+                            case StatType.Attack:      statName = "攻击"; break;
+                            case StatType.Defense:     statName = "防御"; break;
+                            case StatType.MoveSpeed:   statName = "速度"; break;
+                            case StatType.Hp:          statName = "生命"; break;
+                            case StatType.AttackSpeed: statName = "攻速"; break;
+                            default:                   statName = "统御"; break;
+                        }
+                        descParts.Add(FormatStatBuff(statName, Mathf.RoundToInt(sKvp.Value.flat), sKvp.Value.pct));
+                    }
+                    desc = string.Join(" ", descParts.ToArray());
+                }
 
-                string statName = kvp.Key == StatType.Attack ? "攻击" :
-                                  kvp.Key == StatType.Defense ? "防御" :
-                                  kvp.Key == StatType.MoveSpeed ? "速度" :
-                                  kvp.Key == StatType.Hp ? "生命" : "统御";
+                // 显示名称：对可叠加 buff 显示层数，否则显示来源名
+                int displayCount = totalCount;
+                if (isStackable && group[0].currentStacks > 1)
+                    displayCount = group[0].currentStacks;
+                string displayName = displayCount > 1 ? $"{sourceName}x{displayCount}" : sourceName;
 
-                CreateBuffEntry($"{statName}_icon", $"{statName}强化",
-                    FormatStatBuff(statName, Mathf.RoundToInt(flatSum), percentSum),
-                    font, statColors[colorIndex], kvp.Key);
+                // 选择颜色：取第一个buff的属性类型对应颜色
+                StatType firstStat = group[0].statType;
+                int colorIndex;
+                switch (firstStat)
+                {
+                    case StatType.Attack:      colorIndex = 0; break;
+                    case StatType.Defense:     colorIndex = 1; break;
+                    case StatType.MoveSpeed:   colorIndex = 2; break;
+                    case StatType.Hp:          colorIndex = 3; break;
+                    case StatType.AttackSpeed: colorIndex = 4; break;
+                    default:                   colorIndex = 5; break;
+                }
+
+                CreateBuffEntry($"{sourceName}_icon", displayName, desc,
+                    font, statColors[colorIndex], firstStat);
             }
         }
 

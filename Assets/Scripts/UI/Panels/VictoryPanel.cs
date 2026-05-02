@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using System.Collections;
 using TribeSystem.UI;
+using BattleSystem;
 
 /// <summary>
 /// 胜利界面 - 显示战斗胜利和奖励

@@ -5,13 +5,16 @@
       "fighterName": "丛林弓箭手",
       "tribeType": 1,
       "tier": 1,
-      "attack": 6,
-      "defense": 0,
-      "hp": 15,
+      "attack": 26,
+      "defense": 4,
+      "hp": 225,
       "moveSpeed": 1.1,
-      "attackSpeed": 1.5,
+      "attackSpeed": 1.75,
       "attackRange": 5.0,
-      "innateBuffIds": []
+      "command": 8,
+      "recruitCount": 0,
+      "innateBuffIds": [],
+      "avatarId": ""
     },
     {
       "fighterId": 1002,
@@ -24,7 +27,10 @@
       "moveSpeed": 1.3,
       "attackSpeed": 1.2,
       "attackRange": 1.0,
-      "innateBuffIds": [401]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [401],
+      "avatarId": "cangying"
     },
     {
       "fighterId": 1003,
@@ -37,20 +43,26 @@
       "moveSpeed": 1.1,
       "attackSpeed": 1.3,
       "attackRange": 5.0,
-      "innateBuffIds": [402, 403]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [402, 403],
+      "avatarId": ""
     },
     {
       "fighterId": 2001,
       "fighterName": "吃瓜小猫",
       "tribeType": 2,
       "tier": 1,
-      "attack": 6,
-      "defense": 1,
-      "hp": 25,
-      "moveSpeed": 1.0,
-      "attackSpeed": 1.5,
+      "attack": 28,
+      "defense": 2,
+      "hp": 317,
+      "moveSpeed": 1.8,
+      "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "innateBuffIds": []
+      "command": 12,
+      "recruitCount": 0,
+      "innateBuffIds": [],
+      "avatarId": ""
     },
     {
       "fighterId": 2002,
@@ -63,7 +75,10 @@
       "moveSpeed": 1.5,
       "attackSpeed": 1.0,
       "attackRange": 1.0,
-      "innateBuffIds": [404]
+      "command": 0,
+      "recruitCount": 3,
+      "innateBuffIds": [404],
+      "avatarId": "cangying"
     },
     {
       "fighterId": 2003,
@@ -76,20 +91,26 @@
       "moveSpeed": 0.5,
       "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "innateBuffIds": [405]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [405],
+      "avatarId": ""
     },
     {
       "fighterId": 3001,
       "fighterName": "侍僧",
       "tribeType": 3,
       "tier": 1,
-      "attack": 2,
-      "defense": 0,
-      "hp": 10,
-      "moveSpeed": 1.0,
-      "attackSpeed": 1.5,
+      "attack": 25,
+      "defense": 4,
+      "hp": 237,
+      "moveSpeed": 2.0,
+      "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "innateBuffIds": []
+      "command": 11,
+      "recruitCount": 0,
+      "innateBuffIds": [],
+      "avatarId": ""
     },
     {
       "fighterId": 3002,
@@ -102,20 +123,26 @@
       "moveSpeed": 0.6,
       "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "innateBuffIds": [406]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [406],
+      "avatarId": "cangying"
     },
     {
       "fighterId": 4001,
       "fighterName": "灵能学徒",
       "tribeType": 4,
       "tier": 1,
-      "attack": 4,
-      "defense": 1,
-      "hp": 12,
-      "moveSpeed": 1.2,
-      "attackSpeed": 1.5,
+      "attack": 32,
+      "defense": 5,
+      "hp": 230,
+      "moveSpeed": 9.999,
+      "attackSpeed": 2.0,
       "attackRange": 3.0,
-      "innateBuffIds": []
+      "command": 9,
+      "recruitCount": 0,
+      "innateBuffIds": [],
+      "avatarId": ""
     },
     {
       "fighterId": 4002,
@@ -128,7 +155,10 @@
       "moveSpeed": 1.0,
       "attackSpeed": 1.3,
       "attackRange": 4.0,
-      "innateBuffIds": [407]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [407],
+      "avatarId": "cangying"
     },
     {
       "fighterId": 4003,
@@ -141,7 +171,10 @@
       "moveSpeed": 1.1,
       "attackSpeed": 1.5,
       "attackRange": 3.0,
-      "innateBuffIds": [408, 409]
+      "command": 0,
+      "recruitCount": 0,
+      "innateBuffIds": [408, 409],
+      "avatarId": ""
     }
   ]
 }

@@ -33,6 +33,8 @@ namespace TribeSystem
         private ShopConfig _shopConfig;
         private List<CatStaticStats> _catStaticStats;
         private ChoiceConfigWrapper _choiceConfig;
+        private List<FighterConfig> _fighterConfigs;
+        private List<BuffConfig> _buffConfigs;
 
         // 配置文件路径 (StreamingAssets)
         private const string TRIBE_CONFIG_PATH = "Tables/tribe_config.json";
@@ -42,6 +44,8 @@ namespace TribeSystem
         private const string SHOP_CONFIG_PATH = "Tables/shop_config.json";
         private const string CAT_STATS_TABLE_PATH = "Tables/cat_stats_table.json";
         private const string CHOICE_CONFIG_PATH = "Tables/choice_config.json";
+        private const string FIGHTER_CONFIG_PATH = "Tables/fighter_config.json";
+        private const string BUFF_CONFIG_PATH = "Tables/buff_config.json";
 
         private string GetStreamingAssetsPath(string relativePath)
         {
@@ -76,6 +80,8 @@ namespace TribeSystem
             _shopConfig = LoadShopConfig();
             _catStaticStats = LoadCatStaticStats();
             _choiceConfig = LoadChoiceConfig();
+            _fighterConfigs = LoadFighterConfigs();
+            _buffConfigs = LoadBuffConfigs();
 
             _isLoaded = true;
 
@@ -183,6 +189,42 @@ namespace TribeSystem
             return _choiceConfig.archetypes.Find(a => a.id == id);
         }
 
+        /// <summary>
+        /// 按 fighterId 获取 fighter 配置
+        /// </summary>
+        public FighterConfig GetFighterConfig(int fighterId)
+        {
+            EnsureLoaded();
+            return _fighterConfigs?.Find(f => f.fighterId == fighterId);
+        }
+
+        /// <summary>
+        /// 按 tribeType 获取所有 fighter 配置
+        /// </summary>
+        public List<FighterConfig> GetFighterConfigsByTribe(int tribeType)
+        {
+            EnsureLoaded();
+            return _fighterConfigs?.FindAll(f => f.tribeType == tribeType) ?? new List<FighterConfig>();
+        }
+
+        /// <summary>
+        /// 按 buffId 获取 buff 配置
+        /// </summary>
+        public BuffConfig GetBuffConfig(int buffId)
+        {
+            EnsureLoaded();
+            return _buffConfigs?.Find(b => b.buffId == buffId);
+        }
+
+        /// <summary>
+        /// 获取所有 buff 配置
+        /// </summary>
+        public List<BuffConfig> GetAllBuffConfigs()
+        {
+            EnsureLoaded();
+            return _buffConfigs;
+        }
+
         private void EnsureLoaded()
         {
             if (!_isLoaded)
@@ -206,17 +248,6 @@ namespace TribeSystem
             {
                 string jsonText = File.ReadAllText(filePath);
                 var json = JsonMapper.ToObject<TribeConfigWrapper>(jsonText);
-                // JSON 中速度值为整数（*1000），转换回 float
-                foreach (var tribe in json.tribes)
-                {
-                    tribe.leaderBaseStats.moveSpeed /= 1000f;
-                    tribe.leaderBaseStats.attackSpeed /= 1000f;
-                    if (tribe.catBaseStats != null)
-                    {
-                        tribe.catBaseStats.moveSpeed /= 1000f;
-                        tribe.catBaseStats.attackSpeed /= 1000f;
-                    }
-                }
                 Debug.Log($"[TribeConfigLoader] Loaded {json.tribes.Count} tribe configs");
                 return json.tribes;
             }
@@ -371,6 +402,52 @@ namespace TribeSystem
             }
         }
 
+        private List<FighterConfig> LoadFighterConfigs()
+        {
+            string filePath = GetStreamingAssetsPath(FIGHTER_CONFIG_PATH);
+            if (!File.Exists(filePath))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] fighter_config.json not found at {filePath}");
+                return new List<FighterConfig>();
+            }
+
+            try
+            {
+                string jsonText = File.ReadAllText(filePath);
+                var json = JsonMapper.ToObject<FighterConfigWrapper>(jsonText);
+                Debug.Log($"[TribeConfigLoader] Loaded {json.fighters.Count} fighter configs");
+                return json.fighters;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[TribeConfigLoader] Error parsing fighter config: {e.Message}");
+                return new List<FighterConfig>();
+            }
+        }
+
+        private List<BuffConfig> LoadBuffConfigs()
+        {
+            string filePath = GetStreamingAssetsPath(BUFF_CONFIG_PATH);
+            if (!File.Exists(filePath))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] buff_config.json not found at {filePath}");
+                return new List<BuffConfig>();
+            }
+
+            try
+            {
+                string jsonText = File.ReadAllText(filePath);
+                var json = JsonMapper.ToObject<BuffConfigWrapper>(jsonText);
+                Debug.Log($"[TribeConfigLoader] Loaded {json.buffs.Count} buff configs");
+                return json.buffs;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[TribeConfigLoader] Error parsing buff config: {e.Message}");
+                return new List<BuffConfig>();
+            }
+        }
+
         #endregion
 
         #region Default Config Creators
@@ -386,7 +463,7 @@ namespace TribeSystem
                     tribeType = type,
                     tribeName = type.ToString(),
                     initialCatCount = 3,
-                    leaderBaseStats = new LeaderBaseStats()
+                    leaderFighterId = 0
                 });
             }
             return configs;
@@ -611,6 +688,56 @@ namespace TribeSystem
         public float priceVariation;
         public float sellRatio = 0.5f;
         public Dictionary<string, List<string>> tribeIcons;
+    }
+
+    #endregion
+
+    #region Fighter & Buff Config Classes
+
+    [System.Serializable]
+    public class FighterConfigWrapper
+    {
+        public List<FighterConfig> fighters;
+    }
+
+    [System.Serializable]
+    public class FighterConfig
+    {
+        public int fighterId;
+        public string fighterName;
+        public int tribeType;
+        public int tier;
+        public int attack;
+        public int defense;
+        public int hp;
+        public float moveSpeed;
+        public float attackSpeed;
+        public float attackRange;
+        public int command;           // 族长统帅值（非族长为0）
+        public int recruitCount;      // 招募数量（0=使用族群的initialCatCount）
+        public List<int> innateBuffIds;
+        public string avatarId;       // 外观 ID（空=使用族群默认外观）
+    }
+
+    [System.Serializable]
+    public class BuffConfigWrapper
+    {
+        public List<BuffConfig> buffs;
+    }
+
+    [System.Serializable]
+    public class BuffConfig
+    {
+        public int buffId;
+        public string buffName;
+        public string description;
+        public int gameEffectType;
+        public float effectParam1;
+        public float effectParam2;
+        public int duration;
+        public string category;
+        public bool visible;
+        public int iconColorIndex;
     }
 
     #endregion

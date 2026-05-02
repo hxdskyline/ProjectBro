@@ -631,6 +631,9 @@ public class DataManager : MonoBehaviour
             }
         }
 
+        // 从 runChoices / runEquipments 重建 leader/cat 的 ActiveBuffs
+        RebuildAuraBuffs();
+
         if (_playerData.unlockedAccessories == null)
         {
             _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
@@ -685,6 +688,105 @@ public class DataManager : MonoBehaviour
         MigrateLegacyCurrencyField(CurrencyManager.GetCurrencyKey(CurrencyType.Gold), _playerData.gold);
         MigrateLegacyCurrencyField(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond), _playerData.diamond);
         SyncLegacyCurrencyFields();
+    }
+
+    /// <summary>
+    /// 从 runChoices / runEquipments 重建 leader/cat 的 ActiveBuffs
+    /// ActiveBuffs 是 [NonSerialized] 的，加载存档后需要从持久化的 runChoices 重建
+    /// </summary>
+    private void RebuildAuraBuffs()
+    {
+        if (_playerData.tribes == null) return;
+
+        // 收集所有需要应用的 aura buff（runChoices + runEquipments 中 BuffApplyType.Aura 的条目）
+        var auraEntries = new System.Collections.Generic.List<TribeSystem.GameChoice>();
+        if (_playerData.runChoices != null)
+        {
+            foreach (var choice in _playerData.runChoices)
+            {
+                if (choice.category != TribeSystem.ChoiceCategory.Buff) continue;
+                if (choice.buffApplyType != TribeSystem.BuffApplyType.Aura) continue;
+                auraEntries.Add(choice);
+            }
+        }
+        if (_playerData.runEquipments != null)
+        {
+            foreach (var equip in _playerData.runEquipments)
+            {
+                if (equip.buffApplyType != TribeSystem.BuffApplyType.Aura) continue;
+                auraEntries.Add(new TribeSystem.GameChoice
+                {
+                    choiceId = equip.equipmentId,
+                    displayName = equip.displayName,
+                    description = equip.description,
+                    buffScopeFilter = equip.GetScopeFilter(),
+                    buffScopeText = equip.buffScopeText,
+                    buffApplyType = equip.buffApplyType,
+                    buffEffects = equip.effects,
+                    targetTribeType = null
+                });
+            }
+        }
+
+        if (auraEntries.Count == 0) return;
+
+        foreach (var tribe in _playerData.tribes)
+        {
+            if (tribe == null || !tribe.isActive) continue;
+
+            foreach (var entry in auraEntries)
+            {
+                var filter = entry.GetScopeFilter();
+
+                // 检查族长是否匹配
+                if (tribe.leader != null && filter.Matches(true, tribe.tribeType, null))
+                {
+                    ApplyAuraEffectsToLeader(tribe.leader, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
+                }
+
+                // 检查每个小猫是否匹配
+                if (tribe.cats != null)
+                {
+                    foreach (var cat in tribe.cats)
+                    {
+                        if (filter.Matches(false, tribe.tribeType, cat.tier))
+                        {
+                            ApplyAuraEffectsToCat(cat, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ApplyAuraEffectsToLeader(TribeSystem.LeaderData leader, System.Collections.Generic.List<TribeSystem.BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+    {
+        if (effects == null) return;
+        foreach (var eff in effects)
+        {
+            var buff = TribeSystem.UnifiedBuff.CreateStatBuff(
+                $"aura_{uniqueId}_{eff.statType}", displayName,
+                TribeSystem.BuffSource.Equipment, displayName,
+                eff.statType, eff.isPercent, eff.value,
+                gameEffectType: eff.gameEffectType,
+                description: description);
+            leader.AddUnifiedBuff(buff);
+        }
+    }
+
+    private static void ApplyAuraEffectsToCat(TribeSystem.CatData cat, System.Collections.Generic.List<TribeSystem.BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+    {
+        if (effects == null) return;
+        foreach (var eff in effects)
+        {
+            var buff = TribeSystem.UnifiedBuff.CreateStatBuff(
+                $"aura_{uniqueId}_{eff.statType}", displayName,
+                TribeSystem.BuffSource.Equipment, displayName,
+                eff.statType, eff.isPercent, eff.value,
+                gameEffectType: eff.gameEffectType,
+                description: description);
+            cat.AddUnifiedBuff(buff);
+        }
     }
 
     private void MigrateLegacyCurrencyField(string currencyId, long legacyAmount)

@@ -82,6 +82,9 @@ namespace TribeSystem.UI
             var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
             if (config == null) return;
 
+            // 从 fighter_config.json 读取族长属性
+            var leaderConfig = TribeConfigLoader.Instance.GetFighterConfig(config.leaderFighterId);
+
             var tribe = new TribeRecord
             {
                 tribeId = dataManager.GetTribes()?.Count ?? 0,
@@ -89,12 +92,12 @@ namespace TribeSystem.UI
                 leader = new LeaderData
                 {
                     leaderId = UnityEngine.Random.Range(1000, 9999),
-                    name = $"{config.tribeName}族长",
-                    baseAttack = config.leaderBaseStats.attack,
-                    baseDefense = config.leaderBaseStats.defense,
-                    baseHp = config.leaderBaseStats.hp,
-                    baseMoveSpeed = config.leaderBaseStats.moveSpeed,
-                    command = config.leaderBaseStats.command,
+                    name = leaderConfig?.fighterName ?? $"{config.tribeName}族长",
+                    baseAttack = leaderConfig?.attack ?? 0,
+                    baseDefense = leaderConfig?.defense ?? 0,
+                    baseHp = leaderConfig?.hp ?? 0,
+                    baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
+                    command = leaderConfig?.command ?? 0,
                     skillIds = new List<int>(),
                     permanentBuffs = new PermanentBuffs()
                 },

@@ -92,13 +92,23 @@
     {
       "skillId": 2002,
       "skillName": "第二顿早餐",
-      "description": "空投食物，周围最多 3 只橘猫恢复 50% 生命，并获得 1 层饱食",
+      "description": "空投食物，周围最多 3 只橘猫恢复 50% 生命，并获得 2 层饱食",
       "tribeType": "Orange",
       "skillType": "Active",
       "cooldown": 8,
       "passiveCheckInterval": 0,
       "effects": [
-        { "effectType": "Heal", "value": 0.5, "duration": 0, "target": "AllAllies", "areaRadius": 5 }
+        { "effectType": "Heal", "value": 0.5, "duration": 0, "target": "AllAllies", "areaRadius": 5 },
+        {
+          "effectType": "ApplyBuff", "value": 1, "duration": 0, "target": "AllAllies", "areaRadius": 5, "buffId": "fullness_stack",
+          "conditionBuffId": "aura_orange_gen_big_appetite_Hp",
+          "conditionEffects": [
+            { "effectType": "ApplyBuff", "value": 2, "duration": 0, "target": "AllAllies", "areaRadius": 5, "buffId": "fullness_stack" }
+          ],
+          "conditionFallbackEffects": [
+            { "effectType": "ApplyBuff", "value": 1, "duration": 0, "target": "AllAllies", "areaRadius": 5, "buffId": "fullness_stack" }
+          ]
+        }
       ]
     },
     {

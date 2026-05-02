@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using BattleSystem;
 
 /// <summary>
 /// 游戏总管理器 - 负责整个游戏的生命周期管理

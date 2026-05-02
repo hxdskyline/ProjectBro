@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using BattleSystem;
 
 namespace TribeSystem
 {

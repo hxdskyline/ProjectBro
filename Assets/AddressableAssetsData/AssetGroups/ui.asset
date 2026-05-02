@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: ff82415fc853a2e4680748f063b436c3
+  m_GUID: 9cf772fd8553d7a46a75d94ae6ca6d62
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
@@ -48,7 +48,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0ec661d05ff4a76449266709a770e31d
-    m_Address: ui/tribebuild/initialtribeselectionpanel
+    m_Address: ui/initialtribeselectionpanel
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -88,7 +88,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 35a195ffe147fe041b72a270660f6e76
-    m_Address: ui/tribebuild/initialtribeeventoptioncard
+    m_Address: ui/initialtribeeventoptioncard
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -99,6 +99,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 36d55bbd7dd148b47a136c28a9a9e69a
     m_Address: ui/tribebuild/shop/shoppanel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 380b41a702c49bd418edc9071d3b5554
+    m_Address: ui/sprite/addcat/greenbg
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -555,6 +560,4 @@ MonoBehaviour:
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 95508063ffb922a4a97ea696f55408a9, type: 2}
   m_SchemaSet:
-    m_Schemas:
-    - {fileID: 11400000, guid: e1cb797cee0872f41b727bbddf88bf02, type: 2}
-    - {fileID: 11400000, guid: dc87d57bbfaba99448838da809d7a581, type: 2}
+    m_Schemas: []

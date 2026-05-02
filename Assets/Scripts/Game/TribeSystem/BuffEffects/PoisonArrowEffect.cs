@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleSystem.Effects;
 
 namespace TribeSystem.BuffEffects
 {

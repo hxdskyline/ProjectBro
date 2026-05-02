@@ -79,9 +79,9 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 获取指定种族的通用光环列表
+        /// 获取指定种族的通用光环列表（过滤掉依赖兵种不存在的光环）
         /// </summary>
-        public List<TribeAuraOption> GetAvailableGeneralAuras(TribeType tribeType)
+        public List<TribeAuraOption> GetAvailableGeneralAuras(TribeType tribeType, List<CatData> cats)
         {
             if (!_isLoaded) LoadConfig();
             if (_configTable == null) return new List<TribeAuraOption>();
@@ -90,11 +90,26 @@ namespace TribeSystem
             if (tribeAura == null || tribeAura.generalAuras == null)
                 return new List<TribeAuraOption>();
 
+            // 构建该族群拥有的兵种名集合
+            var ownedUnitNames = new HashSet<string>();
+            if (cats != null)
+            {
+                foreach (var cat in cats)
+                {
+                    var tierAura = tribeAura.GetTierAura(cat.tier);
+                    if (tierAura != null && !string.IsNullOrEmpty(tierAura.unitName))
+                        ownedUnitNames.Add(tierAura.unitName);
+                }
+            }
+
             var result = new List<TribeAuraOption>();
             foreach (var option in tribeAura.generalAuras.options)
             {
-                if (!_chosenAuraIds.Contains(option.auraId))
-                    result.Add(option);
+                if (_chosenAuraIds.Contains(option.auraId)) continue;
+                // 检查依赖兵种是否存在
+                if (!string.IsNullOrEmpty(option.requiredUnitName) && !ownedUnitNames.Contains(option.requiredUnitName))
+                    continue;
+                result.Add(option);
             }
             return result;
         }
@@ -220,19 +235,26 @@ namespace TribeSystem
                     eff.gameEffectType));
             }
 
+            var scopeFilter = ParseScope(aura.scope);
+
             // 创建 GameChoice 并注册
             var choice = GameChoice.CreateBuff(
                 aura.auraId,
                 aura.auraName,
                 aura.description,
                 ChoiceSource.Recruitment,
-                BuffApplyScope.SingleTribeCat,
+                scopeFilter,
                 BuffApplyType.Aura,
                 buffEffects,
                 tribeType);
 
             _auraService?.RegisterChoice(choice);
-            Debug.Log($"[TribeAuraService] Applied aura: {aura.auraName} to tribe {tribeType}");
+            Debug.Log($"[TribeAuraService] Applied aura: {aura.auraName} to tribe {tribeType}, scope={scopeFilter.GetDisplayString()}");
+        }
+
+        private BuffScopeFilter ParseScope(string scopeStr)
+        {
+            return BuffScopeFilter.Parse(scopeStr);
         }
 
         private StatType ParseStatType(string stat)
@@ -313,6 +335,8 @@ namespace TribeSystem
         public string auraId;
         public string auraName;
         public string description;
+        public string scope;            // 影响范围：Tabby | T1 | Soldier 等
+        public string requiredUnitName; // 依赖的兵种名（为空则始终可用），如 "丛林弓箭手"
         public List<TribeAuraEffect> effects;
     }
 

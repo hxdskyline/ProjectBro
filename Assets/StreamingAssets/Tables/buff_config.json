@@ -1,0 +1,160 @@
+{
+  "buffs": [
+    {
+      "buffId": 300,
+      "buffName": "饕餮",
+      "description": "击杀回血10%最大生命",
+      "gameEffectType": 300,
+      "effectParam1": 0.1,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 301,
+      "buffName": "牧群领袖",
+      "description": "每个友方单位+1攻击",
+      "gameEffectType": 301,
+      "effectParam1": 1.0,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 302,
+      "buffName": "狩猎印记",
+      "description": "攻击标记目标，被标记目标受伤+30%",
+      "gameEffectType": 302,
+      "effectParam1": 0.3,
+      "effectParam2": 5.0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 303,
+      "buffName": "龙语回响",
+      "description": "施法时对随机敌人造成10点火伤",
+      "gameEffectType": 303,
+      "effectParam1": 10.0,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 401,
+      "buffName": "影遁",
+      "description": "移动速度+30%",
+      "gameEffectType": 202,
+      "effectParam1": 0.3,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 402,
+      "buffName": "狩猎本能",
+      "description": "攻击时30%概率标记目标",
+      "gameEffectType": 302,
+      "effectParam1": 0.3,
+      "effectParam2": 5.0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 403,
+      "buffName": "召唤猎豹",
+      "description": "击杀时召唤一只猎豹协助战斗",
+      "gameEffectType": 0,
+      "effectParam1": 0,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 404,
+      "buffName": "蜂群飞舞",
+      "description": "移动速度+50%，攻击速度+20%",
+      "gameEffectType": 202,
+      "effectParam1": 0.5,
+      "effectParam2": 0.2,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 405,
+      "buffName": "熔炉之怒",
+      "description": "攻击时对周围敌人造成范围伤害",
+      "gameEffectType": 0,
+      "effectParam1": 5.0,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 406,
+      "buffName": "绞肉机",
+      "description": "击杀回复5%最大生命",
+      "gameEffectType": 300,
+      "effectParam1": 0.05,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 407,
+      "buffName": "专注",
+      "description": "攻击速度+30%",
+      "gameEffectType": 202,
+      "effectParam1": 0.3,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 408,
+      "buffName": "法术光环",
+      "description": "每3秒对随机敌人造成5点伤害",
+      "gameEffectType": 303,
+      "effectParam1": 5.0,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    },
+    {
+      "buffId": 409,
+      "buffName": "灵能化身",
+      "description": "减伤20%",
+      "gameEffectType": 201,
+      "effectParam1": 0.2,
+      "effectParam2": 0,
+      "duration": -1,
+      "category": "Innate",
+      "visible": true,
+      "iconColorIndex": 0
+    }
+  ]
+}

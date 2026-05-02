@@ -31,8 +31,7 @@ namespace TribeSystem
         public int initialCatCount;
         public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
         public string avatarDefinitionAddress; // 战斗 avatar 模型地址
-        public LeaderBaseStats leaderBaseStats;
-        public CatBaseStats catBaseStats;      // 小猫基础属性
+        public int leaderFighterId;           // fighter_config.json 中的族长 fighterId
         public List<UnitTypeData> unitTypes;   // 单位类型列表（Tier1/2/3）
 
         public TribeConfig()
@@ -43,8 +42,7 @@ namespace TribeSystem
             initialCatCount = 3;
             deployCostPerCat = 10;
             avatarDefinitionAddress = "";
-            leaderBaseStats = new LeaderBaseStats();
-            catBaseStats = new CatBaseStats();
+            leaderFighterId = 0;
             unitTypes = new List<UnitTypeData>();
         }
 
@@ -70,74 +68,14 @@ namespace TribeSystem
     public class UnitTypeData
     {
         public int tier;            // UnitTier 枚举值 (1/2/3)
-        public string unitName;     // 单位名（如 "侍僧"、"绞肉机"）
-        public int attack;          // 基础攻击力
-        public int defense;         // 基础防御力
-        public int hp;              // 基础血量
-        public float moveSpeed;     // 移动速度
-        public float attackSpeed;   // 攻击冷却（秒）
-        public float attackRange;   // 攻击范围
-        public List<string> innateSkills;  // 天生技能 ID 列表
+        public int fighterId;       // fighter_config.json 中的 fighterId
+        public int recruitCount;    // 招募数量（0=使用族群的initialCatCount）
 
         public UnitTypeData()
         {
             tier = 1;
-            unitName = "";
-            attack = 5;
-            defense = 0;
-            hp = 50;
-            moveSpeed = 1.0f;
-            attackSpeed = 0.5f;
-            attackRange = 1.0f;
-            innateSkills = new List<string>();
-        }
-    }
-
-    /// <summary>
-    /// 族长基础属性配置
-    /// </summary>
-    [Serializable]
-    public class LeaderBaseStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public float moveSpeed;
-        public float attackSpeed;
-        public int command;
-
-        public LeaderBaseStats()
-        {
-            attack = 100;
-            defense = 80;
-            hp = 1000;
-            moveSpeed = 1.0f;
-            attackSpeed = 0.5f;
-            command = 10;
-        }
-    }
-
-    /// <summary>
-    /// 小猫基础属性配置
-    /// </summary>
-    [Serializable]
-    public class CatBaseStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public float moveSpeed;
-        public float attackSpeed;
-        public int command;
-
-        public CatBaseStats()
-        {
-            attack = 5;
-            defense = 10;
-            hp = 50;
-            moveSpeed = 1.0f;
-            attackSpeed = 0.5f;
-            command = 0;
+            fighterId = 0;
+            recruitCount = 0;
         }
     }
 

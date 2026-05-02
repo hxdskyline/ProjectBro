@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using TribeSystem;
+using BattleSystem.Fighter;
 
 /// <summary>
 /// 战斗血条面板 - 左上角显示双方阵营的竖向血条

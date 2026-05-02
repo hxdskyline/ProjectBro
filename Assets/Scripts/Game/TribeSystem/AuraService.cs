@@ -22,7 +22,8 @@ namespace TribeSystem
         {
             if (choice == null) return;
             _dataManager.PlayerData.runChoices.Add(choice);
-            ApplyToExistingUnits(choice.buffScope, choice.buffApplyType, choice.buffEffects, choice.displayName, choice.targetTribeType);
+            var scopeFilter = choice.GetScopeFilter();
+            ApplyToExistingUnits(scopeFilter, choice.buffApplyType, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
             _dataManager.SavePlayerData();
         }
 
@@ -33,7 +34,8 @@ namespace TribeSystem
         {
             if (equip == null) return;
             _dataManager.PlayerData.runEquipments.Add(equip);
-            ApplyToExistingUnits(equip.buffScope, equip.buffApplyType, equip.effects, equip.displayName, null);
+            var scopeFilter = equip.GetScopeFilter();
+            ApplyToExistingUnits(scopeFilter, equip.buffApplyType, equip.effects, equip.displayName, equip.equipmentId, equip.description);
             _dataManager.SavePlayerData();
         }
 
@@ -90,23 +92,23 @@ namespace TribeSystem
 
             var playerData = _dataManager.PlayerData;
 
-            // 遍历 runChoices 中的 Aura buff
             foreach (var choice in playerData.runChoices)
             {
                 if (choice.category != ChoiceCategory.Buff) continue;
                 if (choice.buffApplyType != BuffApplyType.Aura) continue;
-                if (!MatchesLeader(choice.buffScope, tribeType)) continue;
+                var filter = choice.GetScopeFilter();
+                if (!filter.Matches(true, tribeType, null)) continue;
 
-                ApplyEffectsToLeader(leader, choice.buffEffects, choice.displayName);
+                ApplyEffectsToLeader(leader, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
             }
 
-            // 遍历 runEquipments 中的 Aura buff
             foreach (var equip in playerData.runEquipments)
             {
                 if (equip.buffApplyType != BuffApplyType.Aura) continue;
-                if (!MatchesLeader(equip.buffScope, tribeType)) continue;
+                var filter = equip.GetScopeFilter();
+                if (!filter.Matches(true, tribeType, null)) continue;
 
-                ApplyEffectsToLeader(leader, equip.effects, equip.displayName);
+                ApplyEffectsToLeader(leader, equip.effects, equip.displayName, equip.equipmentId, equip.description);
             }
         }
 
@@ -119,37 +121,35 @@ namespace TribeSystem
 
             var playerData = _dataManager.PlayerData;
 
-            // 遍历 runChoices 中的 Aura buff
             foreach (var choice in playerData.runChoices)
             {
                 if (choice.category != ChoiceCategory.Buff) continue;
                 if (choice.buffApplyType != BuffApplyType.Aura) continue;
-                if (!MatchesCat(choice.buffScope, tribeType)) continue;
+                var filter = choice.GetScopeFilter();
+                if (!filter.Matches(false, tribeType, null)) continue;
 
-                ApplyEffectsToCat(cat, choice.buffEffects, choice.displayName);
+                ApplyEffectsToCat(cat, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
             }
 
-            // 遍历 runEquipments 中的 Aura buff
             foreach (var equip in playerData.runEquipments)
             {
                 if (equip.buffApplyType != BuffApplyType.Aura) continue;
-                if (!MatchesCat(equip.buffScope, tribeType)) continue;
+                var filter = equip.GetScopeFilter();
+                if (!filter.Matches(false, tribeType, null)) continue;
 
-                ApplyEffectsToCat(cat, equip.effects, equip.displayName);
+                ApplyEffectsToCat(cat, equip.effects, equip.displayName, equip.equipmentId, equip.description);
             }
         }
 
         // ─── 私有方法 ──────────────────────────────────────────
 
         /// <summary>
-        /// 按 scope 分发 buff 到当前已有的 leader/cat
+        /// 按 scopeFilter 分发 buff 到当前已有的 leader/cat
         /// </summary>
-        private void ApplyToExistingUnits(BuffApplyScope scope, BuffApplyType applyType,
-            List<BuffEffectItem> effects, string displayName, TribeType? targetTribeType)
+        private void ApplyToExistingUnits(BuffScopeFilter scopeFilter, BuffApplyType applyType,
+            List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
         {
             if (effects == null || effects.Count == 0) return;
-            // Aura 和 CurrentUnit 类型都需要应用到已有的单位
-            // Aura 类型用于新单位创建时的补发，CurrentUnit 用于立即应用
 
             var playerData = _dataManager.PlayerData;
             if (playerData.tribes == null) return;
@@ -158,37 +158,27 @@ namespace TribeSystem
             {
                 if (tribe == null || !tribe.isActive) continue;
 
-                switch (scope)
+                // 检查族长是否匹配
+                if (tribe.leader != null && scopeFilter.Matches(true, tribe.tribeType, null))
                 {
-                    case BuffApplyScope.All:
-                        ApplyToLeader(tribe, effects, displayName);
-                        ApplyToCats(tribe, effects, displayName);
-                        break;
-                    case BuffApplyScope.AllLeaders:
-                        ApplyToLeader(tribe, effects, displayName);
-                        break;
-                    case BuffApplyScope.AllCats:
-                        ApplyToCats(tribe, effects, displayName);
-                        break;
-                    case BuffApplyScope.SingleTribeLeader:
-                        if (targetTribeType.HasValue && tribe.tribeType == targetTribeType.Value)
-                            ApplyToLeader(tribe, effects, displayName);
-                        break;
-                    case BuffApplyScope.SingleTribeCat:
-                        if (targetTribeType.HasValue && tribe.tribeType == targetTribeType.Value)
-                            ApplyToCats(tribe, effects, displayName);
-                        break;
+                    ApplyEffectsToLeader(tribe.leader, effects, displayName, uniqueId, description);
+                }
+
+                // 检查每个小猫是否匹配
+                if (tribe.cats != null)
+                {
+                    foreach (var cat in tribe.cats)
+                    {
+                        if (scopeFilter.Matches(false, tribe.tribeType, cat.tier))
+                        {
+                            ApplyEffectsToCat(cat, effects, displayName, uniqueId, description);
+                        }
+                    }
                 }
             }
         }
 
-        private void ApplyToLeader(TribeRecord tribe, List<BuffEffectItem> effects, string displayName)
-        {
-            if (tribe.leader == null) return;
-            ApplyEffectsToLeader(tribe.leader, effects, displayName);
-        }
-
-        private void ApplyEffectsToLeader(LeaderData leader, List<BuffEffectItem> effects, string displayName)
+        private void ApplyEffectsToLeader(LeaderData leader, List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
         {
             if (leader.permanentBuffs == null)
                 leader.permanentBuffs = new PermanentBuffs();
@@ -196,67 +186,26 @@ namespace TribeSystem
             foreach (var eff in effects)
             {
                 var unifiedBuff = UnifiedBuff.CreateStatBuff(
-                    $"aura_{displayName}_{eff.statType}", displayName,
-                    BuffSource.Equipment, displayName,
+                    $"aura_{uniqueId}_{eff.statType}", displayName,
+                    BuffSource.Equipment, uniqueId,
                     eff.statType, eff.isPercent, eff.value,
-                    gameEffectType: eff.gameEffectType);
+                    gameEffectType: eff.gameEffectType,
+                    description: description);
                 leader.AddUnifiedBuff(unifiedBuff);
             }
         }
 
-        private void ApplyToCats(TribeRecord tribe, List<BuffEffectItem> effects, string displayName)
-        {
-            if (tribe.cats == null) return;
-            foreach (var cat in tribe.cats)
-            {
-                ApplyEffectsToCat(cat, effects, displayName);
-            }
-        }
-
-        private void ApplyEffectsToCat(CatData cat, List<BuffEffectItem> effects, string displayName)
+        private void ApplyEffectsToCat(CatData cat, List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
         {
             foreach (var eff in effects)
             {
                 var unifiedBuff = UnifiedBuff.CreateStatBuff(
-                    $"aura_{displayName}_{eff.statType}", displayName,
-                    BuffSource.Equipment, displayName,
+                    $"aura_{uniqueId}_{eff.statType}", displayName,
+                    BuffSource.Equipment, uniqueId,
                     eff.statType, eff.isPercent, eff.value,
-                    gameEffectType: eff.gameEffectType);
+                    gameEffectType: eff.gameEffectType,
+                    description: description);
                 cat.AddUnifiedBuff(unifiedBuff);
-            }
-        }
-
-        /// <summary>
-        /// scope 是否匹配族长
-        /// </summary>
-        private bool MatchesLeader(BuffApplyScope scope, TribeType tribeType)
-        {
-            switch (scope)
-            {
-                case BuffApplyScope.All:
-                case BuffApplyScope.AllLeaders:
-                    return true;
-                case BuffApplyScope.SingleTribeLeader:
-                    return true; // 由调用方已确定 tribeType 匹配
-                default:
-                    return false;
-            }
-        }
-
-        /// <summary>
-        /// scope 是否匹配小猫
-        /// </summary>
-        private bool MatchesCat(BuffApplyScope scope, TribeType tribeType)
-        {
-            switch (scope)
-            {
-                case BuffApplyScope.All:
-                case BuffApplyScope.AllCats:
-                    return true;
-                case BuffApplyScope.SingleTribeCat:
-                    return true; // 由调用方已确定 tribeType 匹配
-                default:
-                    return false;
             }
         }
     }
