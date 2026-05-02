@@ -41,7 +41,7 @@ namespace TribeSystem.UI
         /// 显示属性 tooltip，锚定在指定 RectTransform 旁边
         /// </summary>
         public static void Show(StatType stat, int finalValue, int baseValue,
-            List<BuffEntry> flatEntries, List<BuffEntry> percentEntries, RectTransform anchor)
+            List<UnifiedBuff> flatEntries, List<UnifiedBuff> percentEntries, RectTransform anchor)
         {
             if (_instance == null) return;
 
@@ -86,7 +86,7 @@ namespace TribeSystem.UI
                 _instance.gameObject.SetActive(false);
         }
 
-        private void RebuildBuffList(List<BuffEntry> flatEntries, List<BuffEntry> percentEntries)
+        private void RebuildBuffList(List<UnifiedBuff> flatEntries, List<UnifiedBuff> percentEntries)
         {
             if (_buffListContainer == null || _buffLinePrefab == null) return;
 
@@ -95,7 +95,7 @@ namespace TribeSystem.UI
                 Destroy(_buffListContainer.GetChild(i).gameObject);
 
             // 合并所有条目
-            var allEntries = new List<BuffEntry>();
+            var allEntries = new List<UnifiedBuff>();
             if (flatEntries != null) allEntries.AddRange(flatEntries);
             if (percentEntries != null) allEntries.AddRange(percentEntries);
 
@@ -105,26 +105,33 @@ namespace TribeSystem.UI
                 Text lineText = lineGo.GetComponentInChildren<Text>();
                 if (lineText != null)
                 {
-                    string valueStr = entry.GetValueString();
+                    string valueStr = FormatBuffValue(entry);
                     lineText.text = $"{entry.displayName} {valueStr}";
                     lineText.color = GetSourceColor(entry.source);
                 }
             }
         }
 
+        private static string FormatBuffValue(UnifiedBuff buff)
+        {
+            float totalValue = buff.value * buff.currentStacks;
+            if (buff.isPercent) return $"+{Mathf.RoundToInt(totalValue * 100)}%";
+            return $"+{Mathf.RoundToInt(totalValue)}";
+        }
+
         private static string BuildFormula(StatType stat, int finalValue, int baseValue,
-            List<BuffEntry> flatEntries, List<BuffEntry> percentEntries)
+            List<UnifiedBuff> flatEntries, List<UnifiedBuff> percentEntries)
         {
             float sumFlat = 0f;
             if (flatEntries != null)
             {
-                foreach (var e in flatEntries) sumFlat += e.value;
+                foreach (var e in flatEntries) sumFlat += e.value * e.currentStacks;
             }
 
             float sumPercent = 0f;
             if (percentEntries != null)
             {
-                foreach (var e in percentEntries) sumPercent += e.value;
+                foreach (var e in percentEntries) sumPercent += e.value * e.currentStacks;
             }
 
             // 公式：final = (base+flat1+flat2) x (1+pct1)
@@ -142,7 +149,7 @@ namespace TribeSystem.UI
             {
                 // 构建 (base+6+20)
                 var parts = new List<string> { baseValue.ToString() };
-                foreach (var e in flatEntries) parts.Add($"+{Mathf.RoundToInt(e.value)}");
+                foreach (var e in flatEntries) parts.Add($"+{Mathf.RoundToInt(e.value * e.currentStacks)}");
                 formula += $"({string.Join("", parts.ToArray())})";
             }
             else

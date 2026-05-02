@@ -107,3 +107,6 @@ Located in `DesignDocs/`:
 - `Combat_Power_System.md` — damage formulas, stat tables
 - `新需求/新的需求改动很大.txt` — requirements spec (source of truth for recent changes)
 - `场景配置说明.txt` — scene setup requirements
+
+**人工添加**
+研发期间，功能全部都不做存档兼容。每次运行我都会清空存档。

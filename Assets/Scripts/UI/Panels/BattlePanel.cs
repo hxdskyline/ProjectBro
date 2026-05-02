@@ -308,28 +308,52 @@ public class BattlePanel : UIPanel
         if (tribe.leader == null)
             return false;
 
-        CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat);
+        // 优先使用单位类型配置（Tier 系统），否则回退到品质计算
+        UnitStaticAttributes staticAttributes;
+        string unitName;
+        float scaleMultiplier = 0.65f;
 
-        // 狸花小猫射程4倍
-        float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
+        var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribe.tribeType);
+        var unitTypeData = tribeConfig?.GetUnitType(cat.tier);
 
-        UnitStaticAttributes staticAttributes = new UnitStaticAttributes
+        if (unitTypeData != null)
         {
-            MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
-            Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
-            Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
-            MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.moveSpeed * 1000)),
-            AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.attackSpeed * 1000)),
-            AttackRange = Mathf.Max(0.1f, catAttackRange)
-        };
+            // 使用 Tier 单位配置
+            staticAttributes = new UnitStaticAttributes
+            {
+                MaxHp = Mathf.Max(1, unitTypeData.hp),
+                Attack = Mathf.Max(1, unitTypeData.attack),
+                Defense = Mathf.Max(0, unitTypeData.defense),
+                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(unitTypeData.moveSpeed * 1000)),
+                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(unitTypeData.attackSpeed * 1000)),
+                AttackRange = Mathf.Max(0.1f, unitTypeData.attackRange)
+            };
+            unitName = $"[{unitTypeData.unitName}] {GetTribeTypeName(tribe.tribeType)}";
+            scaleMultiplier = cat.tier == UnitTier.Tier3 ? 0.85f : cat.tier == UnitTier.Tier2 ? 0.75f : 0.65f;
+        }
+        else
+        {
+            // 回退：使用品质计算的属性
+            CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat);
+            float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
 
-        string catName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
+            staticAttributes = new UnitStaticAttributes
+            {
+                MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
+                Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
+                Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
+                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.moveSpeed * 1000)),
+                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.attackSpeed * 1000)),
+                AttackRange = Mathf.Max(0.1f, catAttackRange)
+            };
+            unitName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
+        }
 
         definition = new BattleFighterSpawnDefinition(
-            catName,
+            unitName,
             staticAttributes,
             GetTribeAvatarDefinition(tribe.tribeType),
-            0.65f,
+            scaleMultiplier,
             tribe.tribeType);
 
         return true;

@@ -44,6 +44,19 @@ namespace TribeSystem
         HealAll = 52,            // 全体回复 value% 生命
         BuffAttack = 53,         // 全体攻击 +value%（临时）
         BuffDefense = 54,        // 全体防御 +value%（临时）
+
+        // ── 状态效果类（DoT / 控制 / 减益） ──
+        Poison = 60,             // 毒：每秒 effectParam1 点，currentStacks 层
+        Bleed = 61,              // 流血：每秒 effectParam1 点
+        Burn = 62,               // 燃烧：每秒 effectParam1 点
+        Freeze = 63,             // 冻结：定身 effectParam1 秒
+        Slow = 64,               // 减速：移速 -effectParam1%，持续 effectParam2 秒
+        HuntMark = 65,           // 狸花猫狩猎标记：受到伤害 +effectParam1%
+
+        // ── 战斗内成长类（可叠加层数） ──
+        FullnessStack = 66,      // 橘猫饱食：每层 +value 生命 / +value 攻击
+        DragonCharge = 67,       // 无毛猫龙语充能：每层 +value% 法术伤害
+        HunterFocus = 68,        // 狸花猫猎手专注：每层 +value% 对标记目标伤害
     }
 
     /// <summary>

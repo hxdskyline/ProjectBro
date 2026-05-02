@@ -27,8 +27,8 @@ public class BattleSimulation
     private readonly BattleSimulationConfig _config;
 
     private float _battleElapsed;
-    private float _attackBuffTimer;
-    private float _defenseBuffTimer;
+    private CorpseManager _corpseManager;
+    private SummonManager _summonManager;
 
     public bool IsReady =>
         _playerFighters != null && _enemyFighters != null &&
@@ -40,9 +40,21 @@ public class BattleSimulation
         _enemyFighters = enemyFighters;
         _config = config;
         _battleElapsed = 0f;
-        _attackBuffTimer = 0f;
-        _defenseBuffTimer = 0f;
+
+        _corpseManager = new CorpseManager();
+        _summonManager = new SummonManager();
+        _summonManager.Initialize(playerFighters, enemyFighters);
     }
+
+    /// <summary>
+    /// 获取尸体管理器
+    /// </summary>
+    public CorpseManager CorpseManager => _corpseManager;
+
+    /// <summary>
+    /// 获取召唤物管理器
+    /// </summary>
+    public SummonManager SummonManager => _summonManager;
 
     /// <summary>
     /// 施放消耗品效果（对全体目标生效，无需选位）
@@ -85,11 +97,13 @@ public class BattleSimulation
     private void ApplyFreezeTrap()
     {
         if (_enemyFighters == null) return;
+        var freezeBuff = StatusEffectFactory.CreateFreeze(3f);
         for (int i = 0; i < _enemyFighters.Length; i++)
         {
             var f = _enemyFighters[i];
             if (f == null || !f.IsAlive) continue;
-            f.FreezeTimer = 3f;
+            f.RuntimeAttributes?.ApplyBuff(freezeBuff);
+            f.FreezeTimer = Mathf.Max(f.FreezeTimer, 3f);
         }
         Debug.Log("[Consumable] FreezeTrap: all enemies frozen for 3s");
     }
@@ -110,57 +124,92 @@ public class BattleSimulation
     private void ApplyAttackBuff()
     {
         if (_playerFighters == null) return;
+        var buff = UnifiedBuff.CreateTimedBuff(
+            "consumable_attack_buff", "攻击强化",
+            BuffSource.Consumable, "AttackBuff",
+            StatType.Attack, true, 0.3f,
+            15f, BuffStackRule.None, 1);
         for (int i = 0; i < _playerFighters.Length; i++)
         {
             var f = _playerFighters[i];
             if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            f.RuntimeAttributes.ApplyBuff(buff);
             f.RuntimeAttributes.AttackPercentBuff += 0.3f;
             f.RuntimeAttributes.Recalculate();
         }
-        _attackBuffTimer = 15f;
         Debug.Log("[Consumable] AttackBuff: +30% ATK for 15s");
     }
 
     private void ApplyDefenseBuff()
     {
         if (_playerFighters == null) return;
+        var buff = UnifiedBuff.CreateTimedBuff(
+            "consumable_defense_buff", "防御强化",
+            BuffSource.Consumable, "DefenseBuff",
+            StatType.Defense, true, 0.3f,
+            15f, BuffStackRule.None, 1);
         for (int i = 0; i < _playerFighters.Length; i++)
         {
             var f = _playerFighters[i];
             if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+            f.RuntimeAttributes.ApplyBuff(buff);
             f.RuntimeAttributes.DefensePercentBuff += 0.3f;
             f.RuntimeAttributes.Recalculate();
         }
-        _defenseBuffTimer = 15f;
         Debug.Log("[Consumable] DefenseBuff: +30% DEF for 15s");
     }
 
     private void UpdateTimers(float deltaTime)
     {
-        // Freeze timers
+        // Freeze timers（保留，用于非 buff 系统的冻结）
         UpdateFreezeTimers(_playerFighters, deltaTime);
         UpdateFreezeTimers(_enemyFighters, deltaTime);
+    }
 
-        // Attack buff expiry
-        if (_attackBuffTimer > 0f)
-        {
-            _attackBuffTimer -= deltaTime;
-            if (_attackBuffTimer <= 0f)
-            {
-                RemoveBuffFromFighters(_playerFighters, buffType: 0);
-                Debug.Log("[Consumable] AttackBuff expired");
-            }
-        }
+    /// <summary>
+    /// Tick 所有 fighter 的 UnifiedBuff：递减 duration、执行 DoT、移除过期 buff
+    /// </summary>
+    private void TickAllBuffs(float deltaTime)
+    {
+        TickFighterBuffs(_playerFighters, deltaTime);
+        TickFighterBuffs(_enemyFighters, deltaTime);
+    }
 
-        // Defense buff expiry
-        if (_defenseBuffTimer > 0f)
+    private void TickFighterBuffs(BattleFighter[] fighters, float deltaTime)
+    {
+        if (fighters == null) return;
+        for (int i = 0; i < fighters.Length; i++)
         {
-            _defenseBuffTimer -= deltaTime;
-            if (_defenseBuffTimer <= 0f)
+            var f = fighters[i];
+            if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+
+            var result = f.RuntimeAttributes.TickBuffs(deltaTime);
+
+            // 应用 DoT 伤害
+            if (result.dotDamage > 0)
             {
-                RemoveBuffFromFighters(_playerFighters, buffType: 1);
-                Debug.Log("[Consumable] DefenseBuff expired");
+                f.RuntimeAttributes.CurrentHp = Mathf.Max(0, f.RuntimeAttributes.CurrentHp - result.dotDamage);
+                // 显示伤害数字
+                if (f.Transform != null)
+                {
+                    var hud = f.Transform.GetComponent<FighterHUD>();
+                    if (hud != null)
+                    {
+                        hud.ShowDamage(result.dotDamage);
+                        hud.UpdateHp(f.RuntimeAttributes.CurrentHp);
+                    }
+                }
+                if (f.RuntimeAttributes.CurrentHp <= 0)
+                    StartDeath(f);
             }
+
+            // 应用冻结
+            if (result.freezeDuration > 0f)
+                f.FreezeTimer = Mathf.Max(f.FreezeTimer, result.freezeDuration);
+
+            // 需要重新计算属性（减速过期等）
+            if (result.needsRecalculate)
+                f.RuntimeAttributes.Recalculate();
         }
     }
 
@@ -175,30 +224,15 @@ public class BattleSimulation
         }
     }
 
-    /// <summary>
-    /// buffType: 0=Attack, 1=Defense
-    /// </summary>
-    private void RemoveBuffFromFighters(BattleFighter[] fighters, int buffType)
-    {
-        if (fighters == null) return;
-        for (int i = 0; i < fighters.Length; i++)
-        {
-            var f = fighters[i];
-            if (f == null || f.RuntimeAttributes == null) continue;
-            if (buffType == 0)
-                f.RuntimeAttributes.AttackPercentBuff -= 0.3f;
-            else
-                f.RuntimeAttributes.DefensePercentBuff -= 0.3f;
-            f.RuntimeAttributes.Recalculate();
-        }
-    }
-
     public bool Tick(float deltaTime, out bool playerVictory)
     {
         playerVictory = false;
         _battleElapsed += deltaTime;
 
         UpdateTimers(deltaTime);
+        TickAllBuffs(deltaTime);
+        _corpseManager?.Tick(deltaTime);
+        _summonManager?.Tick(deltaTime);
         UpdatePendingHits(_playerFighters, deltaTime);
         UpdatePendingHits(_enemyFighters, deltaTime);
         UpdateDeathStates(_playerFighters, deltaTime);
@@ -466,6 +500,55 @@ public class BattleSimulation
         {
             StartDeath(defender);
         }
+
+        // 攻击触发状态效果
+        ApplyAttackTriggeredEffects(attacker, defender);
+
+        // IBuffEffect.OnAttackHit 回调（穿刺箭、毒箭等）
+        attackerRuntime.TriggerAttackEffects(defender);
+    }
+
+    /// <summary>
+    /// 攻击命中时触发状态效果（毒、流血等）。
+    /// 由 UpdatePendingHit（近战）和 BattleBullet（远程）调用。
+    /// </summary>
+    public static void ApplyAttackTriggeredEffects(BattleFighter attacker, BattleFighter defender)
+    {
+        if (attacker == null || defender == null || !defender.IsAlive) return;
+        var attackerRuntime = attacker.RuntimeAttributes;
+        var defenderRuntime = defender.RuntimeAttributes;
+        if (attackerRuntime == null || defenderRuntime == null) return;
+        if (attackerRuntime.ActiveBuffs == null) return;
+
+        for (int i = 0; i < attackerRuntime.ActiveBuffs.Count; i++)
+        {
+            var buff = attackerRuntime.ActiveBuffs[i];
+            if (buff.IsExpired) continue;
+
+            switch (buff.gameEffect)
+            {
+                case GameEffect.Poison:
+                    // 攻击附加毒：effectParam1 = 每秒伤害, effectParam2 = 持续时间
+                    defenderRuntime.ApplyBuff(StatusEffectFactory.CreatePoison(buff.effectParam1, buff.effectParam2));
+                    break;
+                case GameEffect.Bleed:
+                    // 攻击附加流血
+                    defenderRuntime.ApplyBuff(StatusEffectFactory.CreateBleed(buff.effectParam1, buff.effectParam2));
+                    break;
+                case GameEffect.Burn:
+                    // 攻击附加燃烧
+                    defenderRuntime.ApplyBuff(StatusEffectFactory.CreateBurn(buff.effectParam1, buff.effectParam2));
+                    break;
+                case GameEffect.Slow:
+                    // 攻击附加减速
+                    defenderRuntime.ApplyBuff(StatusEffectFactory.CreateSlow(buff.effectParam1, buff.effectParam2));
+                    break;
+                case GameEffect.HuntMark:
+                    // 攻击标记目标
+                    defenderRuntime.ApplyBuff(StatusEffectFactory.CreateHuntMark(buff.effectParam1, buff.effectParam2));
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -513,6 +596,25 @@ public class BattleSimulation
         fighter.PendingTarget = null;
         fighter.DeathTimer = Mathf.Max(0.1f, _config.DeathDuration);
 
+        // 触发死亡者的 OnDeath 回调
+        fighter.RuntimeAttributes?.TriggerDeathEffects();
+
+        // 触发击杀回调（通知所有存活的玩家单位）
+        if (!IsPlayerFighter(fighter))
+        {
+            for (int i = 0; i < _playerFighters.Length; i++)
+            {
+                var pf = _playerFighters[i];
+                if (pf != null && pf.IsAlive)
+                    pf.RuntimeAttributes?.TriggerKillEffects(fighter);
+            }
+        }
+
+        // 记录尸体
+        bool isPlayerUnit = IsPlayerFighter(fighter);
+        Vector3 deathPos = fighter.Transform != null ? fighter.Transform.position : Vector3.zero;
+        _corpseManager?.AddCorpse(fighter, deathPos, isPlayerUnit);
+
         // Keep death presentation consistent: face left from death start until removal.
         if (fighter.Transform != null)
         {
@@ -522,6 +624,16 @@ public class BattleSimulation
         }
 
         fighter.Avatar?.PlayDeath();
+    }
+
+    private bool IsPlayerFighter(BattleFighter fighter)
+    {
+        if (_playerFighters == null) return false;
+        for (int i = 0; i < _playerFighters.Length; i++)
+        {
+            if (_playerFighters[i] == fighter) return true;
+        }
+        return false;
     }
 
     private void UpdateDeathStates(BattleFighter[] fighters, float deltaTime)

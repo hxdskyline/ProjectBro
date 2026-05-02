@@ -38,6 +38,50 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 注销一条 choice（从 runChoices 移除 + 回退所有已应用的 buff）
+        /// </summary>
+        public bool UnregisterChoice(string choiceId)
+        {
+            if (string.IsNullOrEmpty(choiceId)) return false;
+            var playerData = _dataManager.PlayerData;
+
+            // 从 runChoices 列表中移除
+            bool removed = playerData.runChoices.RemoveAll(c => c.choiceId == choiceId) > 0;
+
+            // 回退已应用的 buff
+            var buffService = new BuffService();
+            buffService.RemoveChoiceBuffs(choiceId);
+
+            if (removed)
+            {
+                _dataManager.SavePlayerData();
+                Debug.Log($"[AuraService] 注销 choice: {choiceId}");
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// 注销一件装备（从 runEquipments 移除 + 回退所有已应用的 buff）
+        /// </summary>
+        public bool UnregisterEquipment(string equipmentId)
+        {
+            if (string.IsNullOrEmpty(equipmentId)) return false;
+            var playerData = _dataManager.PlayerData;
+
+            bool removed = playerData.runEquipments.RemoveAll(e => e.equipmentId == equipmentId) > 0;
+
+            var buffService = new BuffService();
+            buffService.RemoveEquipmentBuffs(equipmentId);
+
+            if (removed)
+            {
+                _dataManager.SavePlayerData();
+                Debug.Log($"[AuraService] 注销 equipment: {equipmentId}");
+            }
+            return removed;
+        }
+
+        /// <summary>
         /// 当新 leader 创建后调用，遍历所有 Aura 类型的 choice/equipment 补发 buff
         /// </summary>
         public void ApplyAurasToNewLeader(LeaderData leader, TribeType tribeType)
@@ -151,9 +195,12 @@ namespace TribeSystem
 
             foreach (var eff in effects)
             {
-                leader.permanentBuffs.AddBuffEntry(
-                    BuffSource.Equipment, displayName, eff.statType, eff.isPercent, eff.value,
-                    displayName);
+                var unifiedBuff = UnifiedBuff.CreateStatBuff(
+                    $"aura_{displayName}_{eff.statType}", displayName,
+                    BuffSource.Equipment, displayName,
+                    eff.statType, eff.isPercent, eff.value,
+                    gameEffectType: eff.gameEffectType);
+                leader.AddUnifiedBuff(unifiedBuff);
             }
         }
 
@@ -170,7 +217,12 @@ namespace TribeSystem
         {
             foreach (var eff in effects)
             {
-                cat.AddBuffEntry(BuffSource.Equipment, displayName, eff.statType, eff.isPercent, eff.value, displayName);
+                var unifiedBuff = UnifiedBuff.CreateStatBuff(
+                    $"aura_{displayName}_{eff.statType}", displayName,
+                    BuffSource.Equipment, displayName,
+                    eff.statType, eff.isPercent, eff.value,
+                    gameEffectType: eff.gameEffectType);
+                cat.AddUnifiedBuff(unifiedBuff);
             }
         }
 

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
+using LitJson;
 
 namespace TribeSystem
 {
@@ -73,6 +75,13 @@ namespace TribeSystem
                         result.Add(item);
                     }
                 }
+            }
+
+            // 额外生成1个族长技能选项（如果可用）
+            var skillOption = GenerateLeaderSkillOption();
+            if (skillOption != null)
+            {
+                result.Add(skillOption);
             }
 
             return result;
@@ -419,6 +428,16 @@ namespace TribeSystem
                 case RitualRewardType.CatFood:
                     _dataManager.AddCatFood(item.amount);
                     break;
+                case RitualRewardType.LeaderSkill:
+                    if (tribe != null && item.leaderSkillId > 0)
+                    {
+                        if (!tribe.leader.skillIds.Contains(item.leaderSkillId))
+                        {
+                            tribe.leader.skillIds.Add(item.leaderSkillId);
+                            Debug.Log($"[RitualService] Unlocked leader skill {item.leaderSkillId} for tribe {tribe.tribeType}");
+                        }
+                    }
+                    break;
             }
         }
 
@@ -431,6 +450,85 @@ namespace TribeSystem
             _dataManager.AddCatFood(bonus);
             Debug.Log($"[RitualService] Bonus cat food: {bonus}");
         }
+
+        /// <summary>
+        /// 生成族长技能选项（从 leader_skill_config.json 读取）
+        /// </summary>
+        private RitualRewardItem GenerateLeaderSkillOption()
+        {
+            var playerData = _dataManager?.PlayerData;
+            if (playerData?.tribes == null || playerData.tribes.Count == 0) return null;
+
+            // 加载技能配置
+            var config = LoadLeaderSkillConfig();
+            if (config == null) return null;
+
+            // 收集所有可用技能（玩家已有种族 + 未解锁的）
+            var availableSkills = new List<LeaderSkillData>();
+            foreach (var tribe in playerData.tribes)
+            {
+                if (tribe.leader == null) continue;
+                var tribeSkills = config.GetSkillsForTribe(tribe.tribeType);
+                if (tribeSkills == null) continue;
+
+                foreach (var skill in tribeSkills)
+                {
+                    // 跳过已解锁的技能
+                    if (tribe.leader.skillIds.Contains(skill.skillId)) continue;
+                    availableSkills.Add(skill);
+                }
+            }
+
+            if (availableSkills.Count == 0) return null;
+
+            // 随机选1个
+            var selected = availableSkills[Random.Range(0, availableSkills.Count)];
+
+            // 找到对应的族长
+            TribeRecord targetTribe = null;
+            foreach (var tribe in playerData.tribes)
+            {
+                if (tribe.leader == null) continue;
+                var tribeSkills = config.GetSkillsForTribe(tribe.tribeType);
+                if (tribeSkills == null) continue;
+                foreach (var s in tribeSkills)
+                {
+                    if (s.skillId == selected.skillId)
+                    {
+                        targetTribe = tribe;
+                        break;
+                    }
+                }
+                if (targetTribe != null) break;
+            }
+
+            return new RitualRewardItem
+            {
+                rewardType = RitualRewardType.LeaderSkill,
+                leaderSkillId = selected.skillId,
+                catTribeType = targetTribe?.tribeType ?? TribeType.Tabby,
+                displayName = $"技能: {selected.skillName}"
+            };
+        }
+
+        private LeaderSkillConfigTable LoadLeaderSkillConfig()
+        {
+            string path = Path.Combine(Application.streamingAssetsPath, "Tables/leader_skill_config.json");
+            try
+            {
+                if (File.Exists(path))
+                {
+                    string json = File.ReadAllText(path);
+                    return JsonMapper.ToObject<LeaderSkillConfigTable>(json);
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[RitualService] 加载首领技能配置失败: {e.Message}");
+            }
+            return null;
+        }
+
 
         private void ApplyTemporaryStatBoost(TribeRecord tribe, StatType stat, int amount)
         {

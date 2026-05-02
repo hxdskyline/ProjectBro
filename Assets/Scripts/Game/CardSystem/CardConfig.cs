@@ -33,6 +33,7 @@ namespace TribeSystem
         public string avatarDefinitionAddress; // 战斗 avatar 模型地址
         public LeaderBaseStats leaderBaseStats;
         public CatBaseStats catBaseStats;      // 小猫基础属性
+        public List<UnitTypeData> unitTypes;   // 单位类型列表（Tier1/2/3）
 
         public TribeConfig()
         {
@@ -44,6 +45,51 @@ namespace TribeSystem
             avatarDefinitionAddress = "";
             leaderBaseStats = new LeaderBaseStats();
             catBaseStats = new CatBaseStats();
+            unitTypes = new List<UnitTypeData>();
+        }
+
+        /// <summary>
+        /// 获取指定等级的单位数据，找不到则返回 null
+        /// </summary>
+        public UnitTypeData GetUnitType(UnitTier tier)
+        {
+            if (unitTypes == null) return null;
+            for (int i = 0; i < unitTypes.Count; i++)
+            {
+                if (unitTypes[i].tier == (int)tier)
+                    return unitTypes[i];
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 单位类型数据（每个种族的 Tier1/2/3 单位）
+    /// </summary>
+    [Serializable]
+    public class UnitTypeData
+    {
+        public int tier;            // UnitTier 枚举值 (1/2/3)
+        public string unitName;     // 单位名（如 "侍僧"、"绞肉机"）
+        public int attack;          // 基础攻击力
+        public int defense;         // 基础防御力
+        public int hp;              // 基础血量
+        public float moveSpeed;     // 移动速度
+        public float attackSpeed;   // 攻击冷却（秒）
+        public float attackRange;   // 攻击范围
+        public List<string> innateSkills;  // 天生技能 ID 列表
+
+        public UnitTypeData()
+        {
+            tier = 1;
+            unitName = "";
+            attack = 5;
+            defense = 0;
+            hp = 50;
+            moveSpeed = 1.0f;
+            attackSpeed = 0.5f;
+            attackRange = 1.0f;
+            innateSkills = new List<string>();
         }
     }
 

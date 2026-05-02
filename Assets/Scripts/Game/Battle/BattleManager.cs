@@ -40,12 +40,11 @@ public class BattleManager : MonoBehaviour
     private UnitStaticAttributes? _enemyStaticAttributes;
     private TerrainType _currentTerrain = TerrainType.Plain;
     private WeatherType _currentWeather = WeatherType.Sunny;
-    private BattleFighter _cowLeaderFighter;
-    private int _cowLeaderLastCatCount;
-    private int _cowAttackPerCat;
     private BattleFighter _artifactLeaderFighter;
     private int _artifactAtkPerDeadCat;
     private int _artifactLeaderLastDeadCount;
+    private LeaderSkillExecutor _leaderSkillExecutor;
+    private int _lastEnemyDeathCount;
 
     public System.Action<bool> BattleEnded;
 
@@ -111,7 +110,8 @@ public class BattleManager : MonoBehaviour
         ApplyAccessoryBuffs();
 
         // 应用天生特殊 buff
-        ApplyInnateBuffs();
+        // 初始化首领技能执行器
+        InitLeaderSkillExecutor();
 
         _simulation = new BattleSimulation(
             _playerFighters,
@@ -154,6 +154,14 @@ public class BattleManager : MonoBehaviour
 
         // Battle summary log
         LogBattleSummary(victory);
+
+        // 清除所有战斗内 buff（BattleOnly 类型）
+        var buffService = new BuffService();
+        buffService.ClearAllBattleBuffs();
+
+        // 清理尸体和召唤物
+        _simulation?.CorpseManager?.Clear();
+        _simulation?.SummonManager?.Clear();
 
         // Ensure settlement UI appears over a clean battlefield.
         ClearBattlefield();
@@ -244,9 +252,14 @@ public class BattleManager : MonoBehaviour
         while (_isInBattle)
         {
             // 动态更新奶牛族长的猫群之力 buff
-            UpdateCowLeaderBuff();
+            // 天生 buff 的动态更新由 IBuffEffect.OnTick 处理
             // 动态更新奇物：每死一只小猫族长+攻击
             UpdateArtifactLeaderBuff();
+            // 首领技能 tick
+            if (_leaderSkillExecutor != null)
+                _leaderSkillExecutor.Tick(Time.deltaTime, _playerFighters, _enemyFighters);
+            // 战斗内成长触发
+            UpdateBattleGrowth();
 
             if (_simulation.Tick(Time.deltaTime, out bool playerVictory))
             {
@@ -271,12 +284,11 @@ public class BattleManager : MonoBehaviour
         _simulation = null;
         _playerFighters = null;
         _enemyFighters = null;
-        _cowLeaderFighter = null;
-        _cowLeaderLastCatCount = 0;
-        _cowAttackPerCat = 0;
         _artifactLeaderFighter = null;
         _artifactAtkPerDeadCat = 0;
         _artifactLeaderLastDeadCount = 0;
+        _leaderSkillExecutor = null;
+        _lastEnemyDeathCount = 0;
         ClearOldAvatars();
     }
 
@@ -405,90 +417,51 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 应用族长天生特殊 buff 效果
+    /// 初始化首领技能执行器
     /// </summary>
-    private void ApplyInnateBuffs()
+    private void InitLeaderSkillExecutor()
     {
-        if (_playerFighters == null || _playerFighters.Length == 0)
-            return;
+        if (_playerFighters == null) return;
 
+        // 找到族长（有 InnateBuffs 的单位）
+        BattleFighter leader = null;
         for (int i = 0; i < _playerFighters.Length; i++)
         {
-            BattleFighter fighter = _playerFighters[i];
-            if (fighter == null || fighter.InnateBuffs == null || fighter.InnateBuffs.Count == 0)
-                continue;
-
-            UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
-            if (attrs == null) continue;
-
-            foreach (var buff in fighter.InnateBuffs)
+            if (_playerFighters[i] != null && _playerFighters[i].InnateBuffs != null && _playerFighters[i].InnateBuffs.Count > 0)
             {
-                switch (buff.effectType)
-                {
-                    case TribeSystem.InnateEffectType.DamageReduce:
-                        // 受到伤害 -value
-                        attrs.DamageReceiveFlatBuff -= Mathf.RoundToInt(buff.effectValue);
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（伤害-{Mathf.RoundToInt(buff.effectValue)}）");
-                        break;
-
-                    case TribeSystem.InnateEffectType.AttackPerDefeatedCat:
-                        // 每有一只被击败的本族小猫，+value 攻击力（动态更新）
-                        _cowLeaderFighter = fighter;
-                        _cowAttackPerCat = Mathf.RoundToInt(buff.effectValue);
-                        _cowLeaderLastCatCount = -1; // 强制首次更新
-                        break;
-
-                    case TribeSystem.InnateEffectType.DoubleHit:
-                        // value% 概率造成双倍伤害
-                        fighter.HasDoubleHit = true;
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（{buff.effectValue * 100}%双倍伤害）");
-                        break;
-
-                    case TribeSystem.InnateEffectType.SpeedFlat:
-                        // 速度 +value
-                        attrs.SpeedFlatBuff += Mathf.RoundToInt(buff.effectValue);
-                        attrs.Recalculate();
-                        Debug.Log($"[BattleManager] {fighter.Name} 天生buff: {buff.displayName}（速度+{Mathf.RoundToInt(buff.effectValue)}）");
-                        break;
-                }
+                leader = _playerFighters[i];
+                break;
             }
         }
-    }
+        if (leader == null) return;
 
-    /// <summary>
-    /// 动态更新奶牛族长的薄葬 buff（根据被击败的小猫数量）
-    /// </summary>
-    private void UpdateCowLeaderBuff()
-    {
-        if (_cowLeaderFighter == null || _cowLeaderFighter.IsDead || _cowLeaderFighter.IsRemoved)
-            return;
+        _leaderSkillExecutor = new LeaderSkillExecutor(leader, leader.TribeType);
 
-        // 统计本族被击败的小猫数量（IsDead 或 IsRemoved）
-        int defeatedCatCount = 0;
-        for (int i = 0; i < _playerFighters.Length; i++)
+        // 加载技能配置
+        var configText = LoadLeaderSkillConfig();
+        if (configText != null)
         {
-            var f = _playerFighters[i];
-            if (f == null || f == _cowLeaderFighter) continue;
-            if (f.TribeType != _cowLeaderFighter.TribeType) continue;
-            if (f.InnateBuffs != null && f.InnateBuffs.Count > 0) continue; // 跳过族长
-            if (f.IsDead || f.IsRemoved) defeatedCatCount++;
+            var config = JsonUtility.FromJson<LeaderSkillConfigTable>(configText);
+            _leaderSkillExecutor.LoadSkills(config);
         }
-
-        // 数量没变化则跳过
-        if (defeatedCatCount == _cowLeaderLastCatCount)
-            return;
-
-        // 回退旧的 buff，应用新的
-        UnitRuntimeAttributes attrs = _cowLeaderFighter.RuntimeAttributes;
-        if (attrs == null) return;
-
-        attrs.AttackFlatBuff -= _cowLeaderLastCatCount * _cowAttackPerCat;
-        _cowLeaderLastCatCount = defeatedCatCount;
-        attrs.AttackFlatBuff += defeatedCatCount * _cowAttackPerCat;
-        attrs.Recalculate();
-
-        Debug.Log($"[BattleManager] {_cowLeaderFighter.Name} 薄葬更新: {defeatedCatCount}只小猫被击败，+{defeatedCatCount * _cowAttackPerCat}攻击");
     }
+
+    private string LoadLeaderSkillConfig()
+    {
+        string path = System.IO.Path.Combine(Application.streamingAssetsPath, "Tables/leader_skill_config.json");
+        try
+        {
+            if (System.IO.File.Exists(path))
+                return System.IO.File.ReadAllText(path);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[BattleManager] 加载首领技能配置失败: {e.Message}");
+        }
+        return null;
+    }
+
+
 
     /// <summary>
     /// 动态更新奇物效果：每有一只死去的小猫，族长增加攻击力
@@ -527,6 +500,59 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 战斗内成长触发：检测敌人死亡，为橘猫添加饱食层
+    /// </summary>
+    private void UpdateBattleGrowth()
+    {
+        if (_enemyFighters == null || _playerFighters == null) return;
+
+        // 统计当前死亡/已移除的敌人数量
+        int enemyDeathCount = 0;
+        for (int i = 0; i < _enemyFighters.Length; i++)
+        {
+            if (_enemyFighters[i] != null && (_enemyFighters[i].IsDying || _enemyFighters[i].IsRemoved))
+                enemyDeathCount++;
+        }
+
+        if (enemyDeathCount <= _lastEnemyDeathCount) return;
+        int newKills = enemyDeathCount - _lastEnemyDeathCount;
+        _lastEnemyDeathCount = enemyDeathCount;
+
+        // 为橘猫添加饱食层
+        for (int k = 0; k < newKills; k++)
+        {
+            // 找到最近的活着的橘猫
+            BattleFighter closestOrange = null;
+            float closestDist = float.MaxValue;
+            for (int i = 0; i < _playerFighters.Length; i++)
+            {
+                var f = _playerFighters[i];
+                if (f == null || !f.IsAlive || f.TribeType != TribeType.Orange) continue;
+                if (f.RuntimeAttributes == null) continue;
+                if (closestOrange == null)
+                {
+                    closestOrange = f;
+                    continue;
+                }
+                // 选第一个活着的橘猫即可
+                closestOrange = f;
+                break;
+            }
+
+            if (closestOrange != null && closestOrange.RuntimeAttributes != null)
+            {
+                closestOrange.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessStack(60f, 4f));
+                // 同步 HP 和 ATK 上限
+                closestOrange.RuntimeAttributes.MaxHp += 60;
+                closestOrange.RuntimeAttributes.CurrentHp += 60;
+                closestOrange.RuntimeAttributes.AttackFlatBuff += 4;
+                closestOrange.RuntimeAttributes.Recalculate();
+                Debug.Log($"[BattleGrowth] {closestOrange.Name} 获得饱食层！(+60HP, +4ATK)");
+            }
+        }
+    }
+
+    /// <summary>
     /// 生成子弹（狸花远程攻击）
     /// </summary>
     private void SpawnBullet(BulletData data)
@@ -538,7 +564,7 @@ public class BattleManager : MonoBehaviour
         bulletGo.transform.SetParent(transform);
 
         var bullet = bulletGo.AddComponent<BattleBullet>();
-        bullet.Setup(data.Target, data.Damage, data.IsCritical);
+        bullet.Setup(data.Attacker, data.Target, data.Damage, data.IsCritical);
     }
 
     private void LogBattleSummary(bool victory)

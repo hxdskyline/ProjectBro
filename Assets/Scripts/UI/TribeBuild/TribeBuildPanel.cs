@@ -40,6 +40,7 @@ namespace TribeSystem.UI
         private BackpackPanel _backpackPanelInstance;
         private AccessoryCodexPanel _codexPanel;
         private RecruitmentResultPanel _recruitmentResultPanel;
+        [SerializeField] private TribeAuraChoicePanel _auraChoicePanel;
 
         [Header("强制弹窗根节点")]
         [SerializeField] private RectTransform _forcedPopupRoot;
@@ -47,6 +48,7 @@ namespace TribeSystem.UI
 
         private DataManager _dataManager;
         private AuraService _auraService;
+        private TribeAuraService _tribeAuraService;
         private RecruitmentService _recruitmentService;
         private RitualService _ritualService;
         private ShopService _shopService;
@@ -89,7 +91,10 @@ namespace TribeSystem.UI
         {
             _dataManager = GameManager.Instance?.DataManager;
             _auraService = new AuraService();
+            _tribeAuraService = new TribeAuraService(_auraService);
+            _tribeAuraService.LoadConfig();
             _recruitmentService = new RecruitmentService();
+            _recruitmentService.SetTribeAuraService(_tribeAuraService);
             _ritualService = new RitualService();
             _shopService = new ShopService();
             _recruitmentService.SetAuraService(_auraService);
@@ -455,8 +460,25 @@ namespace TribeSystem.UI
                     if (tribe == null) break;
                     string tribeName = GetTribeTypeName(tribe.tribeType);
                     var beforeCats = SnapshotCats(tribe.cats);
-                    _recruitmentService.ExecuteAddCats(tribe, option.cost);
+                    _recruitmentService.ExecuteAddCats(tribe, option.cost, option.targetTier);
                     _tribes = _dataManager.GetTribes();
+
+                    // 招募后检查是否有光环选择
+                    if (option.targetTier.HasValue && _auraChoicePanel != null)
+                    {
+                        var auraChoice = _tribeAuraService?.GetAuraChoice(tribe.tribeType, option.targetTier.Value);
+                        if (auraChoice != null && auraChoice.options.Count > 0)
+                        {
+                            _auraChoicePanel.Show(auraChoice, (chosenIds) =>
+                            {
+                                _tribeAuraService?.ApplyChosenAuras(tribe.tribeType, option.targetTier.Value, chosenIds);
+                                RefreshUI();
+                                ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                            });
+                            return;
+                        }
+                    }
+
                     RefreshUI();
                     ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
                     return;
@@ -614,6 +636,12 @@ namespace TribeSystem.UI
         {
             if (tier == null) { ProcessNextPopupEvent(); return; } // 玩家跳过祭祀
             _ritualService.ExecuteRitual(tier, blessing);
+
+            // 展示获得的技能
+            if (blessing.rewardType == RitualRewardType.LeaderSkill)
+            {
+                Debug.Log($"[TribeBuildPanel] 获得族长技能: {blessing.displayName}");
+            }
 
             _dataManager.SetRitualCompletedForRound(_roundManager.CurrentRound);
             _isProcessingRitual = false;

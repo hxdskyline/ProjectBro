@@ -33,14 +33,39 @@ namespace TribeSystem
             float moveSpd = leader.baseMoveSpeed;
             float atkSpd = 0.5f; // 默认攻速
 
-            // 应用永久加成
-            if (leader.permanentBuffs != null)
+            // 从 ActiveBuffs 汇总永久加成
+            if (leader.ActiveBuffs != null)
             {
-                var b = leader.permanentBuffs;
-                atk = ApplyModifiers(atk, b.attackPercent, b.attackBonus);
-                def = ApplyModifiers(def, b.defensePercent, b.defenseBonus);
-                hp = ApplyModifiers(hp, b.hpPercent, b.hpBonus);
-                moveSpd = ApplyModifiers(moveSpd, b.speedPercent, 0f);
+                float atkFlat = 0f, atkPct = 0f;
+                float defFlat = 0f, defPct = 0f;
+                float hpFlat = 0f, hpPct = 0f;
+                float spdFlat = 0f, spdPct = 0f;
+
+                foreach (var buff in leader.ActiveBuffs)
+                {
+                    if (buff.persistence != BuffPersistence.Persistent) continue;
+                    float totalVal = buff.value * buff.currentStacks;
+                    switch (buff.statType)
+                    {
+                        case StatType.Attack:
+                            if (buff.isPercent) atkPct += totalVal; else atkFlat += totalVal;
+                            break;
+                        case StatType.Defense:
+                            if (buff.isPercent) defPct += totalVal; else defFlat += totalVal;
+                            break;
+                        case StatType.Hp:
+                            if (buff.isPercent) hpPct += totalVal; else hpFlat += totalVal;
+                            break;
+                        case StatType.MoveSpeed:
+                            if (buff.isPercent) spdPct += totalVal; else spdFlat += totalVal;
+                            break;
+                    }
+                }
+
+                atk = ApplyModifiers(atk, atkPct, atkFlat);
+                def = ApplyModifiers(def, defPct, defFlat);
+                hp = ApplyModifiers(hp, hpPct, hpFlat);
+                moveSpd = ApplyModifiers(moveSpd, spdPct, spdFlat);
             }
 
             // 应用限时加成（只有百分比）
@@ -97,27 +122,25 @@ namespace TribeSystem
             int hpFlatSum = 0;
 
             // 应用小猫自身的 buff（攻防血）
-            if (cat.buffEntries != null && cat.buffEntries.Count > 0)
+            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0)
             {
-                foreach (var entry in cat.buffEntries)
+                foreach (var buff in cat.ActiveBuffs)
                 {
-                    // 跳过全局奇物 buff，由 PlayerData.globalCatAttackFlatBonus 动态计算
-                    if (entry.source == BuffSource.Artifact && entry.choiceId == "Artifact_CatAttackFlat_Global")
-                        continue;
+                    if (buff.persistence != BuffPersistence.Persistent) continue;
 
-                    switch (entry.statType)
+                    switch (buff.statType)
                     {
                         case StatType.Attack:
-                            if (entry.isPercent) atkPercentSum += entry.value;
-                            else atkFlatSum += Mathf.RoundToInt(entry.value);
+                            if (buff.isPercent) atkPercentSum += buff.value * buff.currentStacks;
+                            else atkFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
                             break;
                         case StatType.Defense:
-                            if (entry.isPercent) defPercentSum += entry.value;
-                            else defFlatSum += Mathf.RoundToInt(entry.value);
+                            if (buff.isPercent) defPercentSum += buff.value * buff.currentStacks;
+                            else defFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
                             break;
                         case StatType.Hp:
-                            if (entry.isPercent) hpPercentSum += entry.value;
-                            else hpFlatSum += Mathf.RoundToInt(entry.value);
+                            if (buff.isPercent) hpPercentSum += buff.value * buff.currentStacks;
+                            else hpFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
                             break;
                     }
                 }

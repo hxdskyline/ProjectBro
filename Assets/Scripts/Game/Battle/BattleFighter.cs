@@ -22,7 +22,6 @@ public class BattleFighter
     public TribeType TribeType; // 用于地形/天气 BUFF
     public List<TribeBuff> InnateBuffs; // 天生特殊 buff
     public bool HasDoubleHit; // 狸花连击标记
-    public List<BuffEntry> BuffEntries; // buff 来源记录（用于 UI 显示）
 
     public int CurrentHp => RuntimeAttributes?.CurrentHp ?? 0;
     public bool IsDead => CurrentHp <= 0;

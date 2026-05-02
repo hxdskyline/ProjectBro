@@ -1,19 +1,20 @@
 using UnityEngine;
-using TribeSystem;
 
 /// <summary>
 /// 战斗子弹 - 从攻击者飞向目标，到达时造成伤害
 /// </summary>
 public class BattleBullet : MonoBehaviour
 {
+    private BattleFighter _attacker;
     private BattleFighter _target;
     private int _damage;
     private bool _isCritical;
     private float _speed = 12f;
     private bool _hasHit;
 
-    public void Setup(BattleFighter target, int damage, bool isCritical = false)
+    public void Setup(BattleFighter attacker, BattleFighter target, int damage, bool isCritical = false)
     {
+        _attacker = attacker;
         _target = target;
         _damage = damage;
         _isCritical = isCritical;
@@ -77,6 +78,13 @@ public class BattleBullet : MonoBehaviour
         {
             _target.IsDying = true;
         }
+
+        // 攻击触发状态效果
+        BattleSimulation.ApplyAttackTriggeredEffects(_attacker, _target);
+
+        // IBuffEffect.OnAttackHit 回调（穿刺箭、毒箭等）
+        if (_attacker?.RuntimeAttributes != null)
+            _attacker.RuntimeAttributes.TriggerAttackEffects(_target);
     }
 
     private static Sprite CreateSquareSprite()

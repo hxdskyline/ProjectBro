@@ -40,6 +40,10 @@ namespace TribeSystem
         AttackPerDefeatedCat,  // 每有一只被击败的本族小猫，攻击 +value
         DoubleHit,             // value% 概率造成双倍伤害
         SpeedFlat,             // 速度 +value（固定值）
+        KillHealSatiety,       // 饕餮：击杀回血 value% 最大生命 + 获得1层饱食
+        AttackPerFriendlyUnit, // 牧群领袖：每个友方单位（含尸体）+value 攻击
+        MarkTargetDamageAmp,   // 狩猎印记：攻击标记目标，被标记目标受伤 +value%
+        DragonBreathOnCast,    // 龙语回响：施法时对随机敌人造成 value 火伤
     }
 
     /// <summary>
@@ -112,7 +116,6 @@ namespace TribeSystem
         public int speedBonus;
         public float speedPercent;
         public List<TribeBuff> specialBuffs;
-        public List<BuffEntry> buffEntries;
 
         // 显示控制：false = 在 buff 栏中隐藏该属性
         public bool attackVisible = true;
@@ -131,54 +134,6 @@ namespace TribeSystem
             speedBonus = 0;
             speedPercent = 0f;
             specialBuffs = new List<TribeBuff>();
-            buffEntries = new List<BuffEntry>();
-        }
-
-        /// <summary>
-        /// 添加一条 buff 记录并同步更新汇总字段
-        /// </summary>
-        public void AddBuffEntry(BuffSource source, string choiceId, StatType stat, bool isPercent, float value, string displayName, BuffScope scope = BuffScope.Leader)
-        {
-            if (buffEntries == null) buffEntries = new List<BuffEntry>();
-            buffEntries.Add(new BuffEntry
-            {
-                source = source,
-                scope = scope,
-                choiceId = choiceId,
-                statType = stat,
-                isPercent = isPercent,
-                value = value,
-                displayName = displayName
-            });
-            ApplyEntryToBonus(stat, isPercent, value);
-        }
-
-        private void ApplyEntryToBonus(StatType stat, bool isPercent, float value)
-        {
-            switch (stat)
-            {
-                case StatType.Attack:
-                    if (isPercent) attackPercent += value; else attackBonus += Mathf.RoundToInt(value);
-                    break;
-                case StatType.Defense:
-                    if (isPercent) defensePercent += value; else defenseBonus += Mathf.RoundToInt(value);
-                    break;
-                case StatType.Hp:
-                    if (isPercent) hpPercent += value; else hpBonus += Mathf.RoundToInt(value);
-                    break;
-                case StatType.MoveSpeed:
-                    if (isPercent) speedPercent += value; else speedBonus += Mathf.RoundToInt(value);
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// 查询某属性的所有 buff 条目
-        /// </summary>
-        public List<BuffEntry> GetBuffEntriesForStat(StatType stat)
-        {
-            if (buffEntries == null) return new List<BuffEntry>();
-            return buffEntries.FindAll(e => e.statType == stat);
         }
 
         /// <summary>
@@ -210,10 +165,10 @@ namespace TribeSystem
         {
             switch (tribeType)
             {
-                case TribeType.Orange:  return "innate_damage_reduce";
-                case TribeType.Cow:     return "innate_defeated_attack";
-                case TribeType.Tabby:   return "innate_double_hit";
-                case TribeType.Siamese: return "innate_teleport";
+                case TribeType.Orange:  return "innate_饕餮";
+                case TribeType.Cow:     return "innate_牧群领袖";
+                case TribeType.Tabby:   return "innate_狩猎印记";
+                case TribeType.Siamese: return "innate_龙语回响";
                 default: return null;
             }
         }
@@ -228,54 +183,54 @@ namespace TribeSystem
                 case TribeType.Orange:
                     return new TribeBuff
                     {
-                        buffId = "innate_damage_reduce",
-                        displayName = "厚甲",
-                        description = "受到的所有伤害-1",
+                        buffId = "innate_饕餮",
+                        displayName = "饕餮",
+                        description = "击杀单位恢复10%最大生命，并获得1层饱食",
                         category = BuffCategory.Special,
                         visible = true,
                         iconColorIndex = 3, // 金
                         duration = -1,
-                        effectType = InnateEffectType.DamageReduce,
-                        effectValue = 1f
+                        effectType = InnateEffectType.KillHealSatiety,
+                        effectValue = 0.1f
                     };
                 case TribeType.Cow:
                     return new TribeBuff
                     {
-                        buffId = "innate_defeated_attack",
-                        displayName = "薄葬",
-                        description = "每只被击败的小猫为族长提供+9攻击力",
+                        buffId = "innate_牧群领袖",
+                        displayName = "牧群领袖",
+                        description = "场上每有一个友方单位（含尸体），族长攻击力+1",
                         category = BuffCategory.Special,
                         visible = true,
                         iconColorIndex = 2, // 绿
                         duration = -1,
-                        effectType = InnateEffectType.AttackPerDefeatedCat,
-                        effectValue = 9f
+                        effectType = InnateEffectType.AttackPerFriendlyUnit,
+                        effectValue = 1f
                     };
                 case TribeType.Tabby:
                     return new TribeBuff
                     {
-                        buffId = "innate_double_hit",
-                        displayName = "致命射击",
-                        description = "15%概率造成双倍伤害",
+                        buffId = "innate_狩猎印记",
+                        displayName = "狩猎印记",
+                        description = "攻击标记目标5秒，被标记目标受到的伤害+30%",
                         category = BuffCategory.Special,
                         visible = true,
                         iconColorIndex = 0, // 红
                         duration = -1,
-                        effectType = InnateEffectType.DoubleHit,
-                        effectValue = 0.15f
+                        effectType = InnateEffectType.MarkTargetDamageAmp,
+                        effectValue = 0.3f
                     };
                 case TribeType.Siamese:
                     return new TribeBuff
                     {
-                        buffId = "innate_teleport",
-                        displayName = "传送",
-                        description = "瞬移代替走路",
+                        buffId = "innate_龙语回响",
+                        displayName = "龙语回响",
+                        description = "每次施法，对随机敌人喷射小型龙息（10火伤，内置冷却1秒）",
                         category = BuffCategory.Special,
                         visible = true,
                         iconColorIndex = 4, // 紫
                         duration = -1,
-                        effectType = InnateEffectType.SpeedFlat,
-                        effectValue = 99999f
+                        effectType = InnateEffectType.DragonBreathOnCast,
+                        effectValue = 10f
                     };
                 default:
                     return null;

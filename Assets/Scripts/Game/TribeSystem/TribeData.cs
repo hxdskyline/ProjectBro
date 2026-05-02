@@ -4,6 +4,16 @@ using UnityEngine;
 
 namespace TribeSystem
 {
+    /// <summary>
+    /// 单位等级（Tier1=一级兵，Tier2=二级兵，Tier3=三级兵）
+    /// </summary>
+    public enum UnitTier
+    {
+        Tier1 = 1,
+        Tier2 = 2,
+        Tier3 = 3
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  玩家状态 — 族群实例、族长、小猫
     // ═══════════════════════════════════════════════════════════
@@ -66,6 +76,17 @@ namespace TribeSystem
         public TemporaryBuff temporaryBuff;
         public int restTurns;
 
+        // ── 统一 buff 运行时列表（不序列化，加载存档时从 buffEntries 转换） ──
+        [NonSerialized] private List<UnifiedBuff> _activeBuffs;
+        public List<UnifiedBuff> ActiveBuffs
+        {
+            get
+            {
+                if (_activeBuffs == null) _activeBuffs = new List<UnifiedBuff>();
+                return _activeBuffs;
+            }
+        }
+
         public LeaderData()
         {
             leaderId = -1;
@@ -80,6 +101,89 @@ namespace TribeSystem
             temporaryBuff = null;
             restTurns = 0;
         }
+
+        /// <summary>
+        /// 添加一个统一 buff（自动处理叠加/刷新）
+        /// </summary>
+        public bool AddUnifiedBuff(UnifiedBuff buff)
+        {
+            if (buff == null) return false;
+            // 尝试叠加现有同类 buff
+            for (int i = 0; i < ActiveBuffs.Count; i++)
+            {
+                if (ActiveBuffs[i].buffId == buff.buffId)
+                {
+                    ActiveBuffs[i].TryStackOrRefresh(buff);
+                    return true;
+                }
+            }
+            ActiveBuffs.Add(buff.Clone());
+            return true;
+        }
+
+        /// <summary>
+        /// 移除指定 buffId 的 buff
+        /// </summary>
+        public bool RemoveBuff(string buffId)
+        {
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].buffId == buffId)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 移除指定来源的所有 buff
+        /// </summary>
+        public int RemoveBuffBySource(string sourceId)
+        {
+            int removed = 0;
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].sourceId == sourceId)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    removed++;
+                }
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// 获取指定持久性的所有 buff
+        /// </summary>
+        public List<UnifiedBuff> GetBuffsByPersistence(BuffPersistence persistence)
+        {
+            var result = new List<UnifiedBuff>();
+            for (int i = 0; i < ActiveBuffs.Count; i++)
+            {
+                if (ActiveBuffs[i].persistence == persistence)
+                    result.Add(ActiveBuffs[i]);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 清除所有战斗内 buff（战斗结束时调用）
+        /// </summary>
+        public int ClearBattleBuffs()
+        {
+            int removed = 0;
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].persistence == BuffPersistence.BattleOnly)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    removed++;
+                }
+            }
+            return removed;
+        }
     }
 
     /// <summary>
@@ -91,6 +195,7 @@ namespace TribeSystem
         public long catId;
         public CatQuality quality;
         public TribeType tribeType;
+        public UnitTier tier;
         public float attackMultiplier;
         public float defenseMultiplier;
         public float hpMultiplier;
@@ -100,13 +205,23 @@ namespace TribeSystem
         public int staticHp;
         public float staticMoveSpeed;
         public float staticAttackSpeed;
-        // 小猫自身的 buff 列表
-        public List<BuffEntry> buffEntries;
+
+        // ── 统一 buff 运行时列表 ──
+        [NonSerialized] private List<UnifiedBuff> _activeBuffs;
+        public List<UnifiedBuff> ActiveBuffs
+        {
+            get
+            {
+                if (_activeBuffs == null) _activeBuffs = new List<UnifiedBuff>();
+                return _activeBuffs;
+            }
+        }
 
         public CatData()
         {
             catId = -1;
             quality = CatQuality.White;
+            tier = UnitTier.Tier1;
             attackMultiplier = 1.0f;
             defenseMultiplier = 1.0f;
             hpMultiplier = 1.0f;
@@ -116,59 +231,101 @@ namespace TribeSystem
             staticHp = 0;
             staticMoveSpeed = 1.0f;
             staticAttackSpeed = 0.5f;
-            buffEntries = new List<BuffEntry>();
         }
 
         /// <summary>
-        /// 添加一条 buff 记录
+        /// 添加一个统一 buff（自动处理叠加/刷新）
         /// </summary>
-        public void AddBuffEntry(BuffSource source, string choiceId, StatType stat, bool isPercent, float value, string displayName)
+        public bool AddUnifiedBuff(UnifiedBuff buff)
         {
-            if (buffEntries == null) buffEntries = new List<BuffEntry>();
-            buffEntries.Add(new BuffEntry
+            if (buff == null) return false;
+            for (int i = 0; i < ActiveBuffs.Count; i++)
             {
-                source = source,
-                scope = BuffScope.Cat,
-                choiceId = choiceId,
-                statType = stat,
-                isPercent = isPercent,
-                value = value,
-                displayName = displayName
-            });
-        }
-
-        /// <summary>
-        /// 查询某属性的所有 buff 条目
-        /// </summary>
-        public List<BuffEntry> GetBuffEntriesForStat(StatType stat)
-        {
-            if (buffEntries == null) return new List<BuffEntry>();
-            return buffEntries.FindAll(e => e.statType == stat);
-        }
-
-        /// <summary>
-        /// 应用全局奇物加成到新创建的小猫
-        /// </summary>
-        public void ApplyGlobalArtifactBonus()
-        {
-            if (GameManager.Instance?.DataManager?.PlayerData == null) return;
-            int globalBonus = GameManager.Instance.DataManager.PlayerData.globalCatAttackFlatBonus;
-            if (globalBonus > 0)
-            {
-                AddBuffEntry(BuffSource.Artifact, "Artifact_CatAttackFlat_Global", StatType.Attack, false, globalBonus, "奇物：苍蝇拍");
+                if (ActiveBuffs[i].buffId == buff.buffId)
+                {
+                    ActiveBuffs[i].TryStackOrRefresh(buff);
+                    return true;
+                }
             }
+            ActiveBuffs.Add(buff.Clone());
+            return true;
+        }
+
+        /// <summary>
+        /// 移除指定 buffId 的 buff
+        /// </summary>
+        public bool RemoveBuff(string buffId)
+        {
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].buffId == buffId)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 移除指定来源的所有 buff
+        /// </summary>
+        public int RemoveBuffBySource(string sourceId)
+        {
+            int removed = 0;
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].sourceId == sourceId)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    removed++;
+                }
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// 获取指定持久性的所有 buff
+        /// </summary>
+        public List<UnifiedBuff> GetBuffsByPersistence(BuffPersistence persistence)
+        {
+            var result = new List<UnifiedBuff>();
+            for (int i = 0; i < ActiveBuffs.Count; i++)
+            {
+                if (ActiveBuffs[i].persistence == persistence)
+                    result.Add(ActiveBuffs[i]);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 清除所有战斗内 buff（战斗结束时调用）
+        /// </summary>
+        public int ClearBattleBuffs()
+        {
+            int removed = 0;
+            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
+            {
+                if (ActiveBuffs[i].persistence == BuffPersistence.BattleOnly)
+                {
+                    ActiveBuffs.RemoveAt(i);
+                    removed++;
+                }
+            }
+            return removed;
         }
 
         /// <summary>
         /// 创建指定品质的小猫（从 tribe_config.json 的 catBaseStats 读取静态属性）
         /// </summary>
-        public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType)
+        public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType, UnitTier? tier = null)
         {
             var cat = new CatData
             {
                 catId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 quality = quality,
-                tribeType = tribeType
+                tribeType = tribeType,
+                tier = tier ?? UnitTier.Tier1
             };
 
             // 从 tribe_config.json 读取小猫基础属性
@@ -491,6 +648,7 @@ namespace TribeSystem
         public int bonusAttack;            // 固定攻击加成
         public int bonusHp;                // 固定血量加成
         public string description;
+        public UnitTier? targetTier;        // 目标单位等级（招募特定等级兵时）
 
         [System.NonSerialized]
         public GameChoice gameChoice;      // 关联的 GameChoice（从 choice_config 生成时附带）
@@ -505,6 +663,7 @@ namespace TribeSystem
             bonusAttack = 0;
             bonusHp = 0;
             description = "";
+            targetTier = null;
             gameChoice = null;
         }
     }
@@ -524,7 +683,8 @@ namespace TribeSystem
         Cats,                       // 小猫
         Consumable,                 // 一次性道具
         CatFood,                    // 猫粮
-        Accessory                   // 饰品
+        Accessory,                  // 饰品
+        LeaderSkill                 // 族长技能
     }
 
     /// <summary>
@@ -576,6 +736,7 @@ namespace TribeSystem
         public CatQuality? catQuality;     // 小猫品质
         public int consumableId;           // 道具ID
         public int accessoryId;            // 饰品ID
+        public int leaderSkillId;          // 族长技能ID
         public string displayName;         // UI 显示文本（在 DrawBlessings 时生成）
 
         public RitualRewardItem()
@@ -588,6 +749,7 @@ namespace TribeSystem
             catQuality = null;
             consumableId = -1;
             accessoryId = -1;
+            leaderSkillId = -1;
             displayName = "";
         }
     }

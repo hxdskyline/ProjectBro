@@ -10,6 +10,7 @@ namespace TribeSystem
     {
         private DataManager _dataManager;
         private AuraService _auraService;
+        private TribeAuraService _tribeAuraService;
 
         public RecruitmentService()
         {
@@ -19,6 +20,11 @@ namespace TribeSystem
         public void SetAuraService(AuraService auraService)
         {
             _auraService = auraService;
+        }
+
+        public void SetTribeAuraService(TribeAuraService tribeAuraService)
+        {
+            _tribeAuraService = tribeAuraService;
         }
 
         /// <summary>
@@ -39,36 +45,62 @@ namespace TribeSystem
             if (currentTribeCount == 0)
                 return options;
 
-            // 1. 随机选 1 个加小猫选项
+            // 1. 从所有种族的所有可用等级中生成加小猫选项
             var addCatsOptions = new List<RecruitmentOption>();
             foreach (var tribe in playerData.tribes)
             {
-                addCatsOptions.Add(CreateAddCatsOption(tribe));
+                var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+                if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
+                {
+                    // 有单位类型定义 → 每个等级都生成一个选项
+                    foreach (var ut in config.unitTypes)
+                    {
+                        addCatsOptions.Add(CreateAddCatsOptionWithTier(tribe, (UnitTier)ut.tier));
+                    }
+                }
+                else
+                {
+                    // 无单位类型定义 → 旧逻辑
+                    addCatsOptions.Add(CreateAddCatsOption(tribe));
+                }
             }
             if (addCatsOptions.Count > 0)
             {
-                int idx = Random.Range(0, addCatsOptions.Count);
-                options.Add(addCatsOptions[idx]);
+                // 权重随机选 2 个加猫选项（包含各等级兵种）
+                var selected = WeightedRandomSelect(addCatsOptions, Mathf.Min(2, addCatsOptions.Count));
+                options.AddRange(selected);
             }
 
-            // 2. 从 choice_config.json 读取 buff 原型，按权重随机选 2 个
-            var buffArchetypes = TribeConfigLoader.Instance.GetArchetypesBySource("recruitment");
-            if (buffArchetypes != null && buffArchetypes.Count > 0)
+            // 2. 从 TribeAuraService 获取光环 buff 选项（替代旧的 choice_config.json buff）
+            if (_tribeAuraService != null)
             {
-                // 为每个族群生成对应的 buff 选项
-                var allBuffOptions = new List<RecruitmentOption>();
+                var allAuraOptions = new List<RecruitmentOption>();
                 foreach (var tribe in playerData.tribes)
                 {
-                    foreach (var archetype in buffArchetypes)
+                    // 获取该种族的兵种专属 buff（随机选一个 tier）
+                    var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+                    if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
                     {
-                        if (archetype.category != "buff") continue;
-                        allBuffOptions.Add(CreateBuffOptionFromArchetype(tribe, archetype));
+                        int tierIdx = Random.Range(0, config.unitTypes.Count);
+                        UnitTier tier = (UnitTier)config.unitTypes[tierIdx].tier;
+                        var tierAuras = _tribeAuraService.GetAvailableAuras(tribe.tribeType, tier);
+                        foreach (var aura in tierAuras)
+                        {
+                            allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
+                        }
+                    }
+
+                    // 获取该种族的通用 buff
+                    var generalAuras = _tribeAuraService.GetAvailableGeneralAuras(tribe.tribeType);
+                    foreach (var aura in generalAuras)
+                    {
+                        allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
                     }
                 }
 
-                // 按权重随机抽取（去重：同一原型只选一次）
-                var selectedBuffOptions = WeightedRandomSelect(allBuffOptions, 2);
-                options.AddRange(selectedBuffOptions);
+                // 随机取 2 个
+                var selectedAuraOptions = WeightedRandomSelect(allAuraOptions, 2);
+                options.AddRange(selectedAuraOptions);
             }
 
             // 3. 随机打乱这 3 个选项的顺序
@@ -233,7 +265,7 @@ namespace TribeSystem
         /// <summary>
         /// 执行增加小猫（不消耗猫粮）
         /// </summary>
-        public int ExecuteAddCats(TribeRecord tribe, long cost)
+        public int ExecuteAddCats(TribeRecord tribe, long cost, UnitTier? tier = null)
         {
             // 不消耗猫粮
             var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
@@ -248,12 +280,15 @@ namespace TribeSystem
             for (int i = 0; i < catsToAdd; i++)
             {
                 var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
+                if (tier.HasValue)
+                    cat.tier = tier.Value;
                 _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
                 tribe.cats.Add(cat);
             }
 
             _dataManager.SavePlayerData();
-            Debug.Log($"[RecruitmentService] Added {catsToAdd} cats to tribe {tribe.tribeType} (free)");
+            string tierLog = tier.HasValue ? $" (tier={tier.Value})" : "";
+            Debug.Log($"[RecruitmentService] Added {catsToAdd} cats to tribe {tribe.tribeType} (free){tierLog}");
 
             return catsToAdd;
         }
@@ -423,6 +458,32 @@ namespace TribeSystem
             };
         }
 
+        private RecruitmentOption CreateAddCatsOptionWithTier(TribeRecord tribe, UnitTier tier)
+        {
+            var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+            int catCount = config != null ? config.initialCatCount : 1;
+            string tierName = GetUnitTierName(tier);
+            // 从 unitTypes 读取单位名
+            string unitName = "";
+            if (config != null)
+            {
+                var unitType = config.GetUnitType(tier);
+                if (unitType != null) unitName = unitType.unitName;
+            }
+            string display = string.IsNullOrEmpty(unitName)
+                ? $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只{tierName}"
+                : $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只{unitName}({tierName})";
+            return new RecruitmentOption
+            {
+                optionType = ChoiceCategory.AddCats,
+                cost = 0,
+                targetTribeType = null,
+                targetTribeId = tribe.tribeId,
+                targetTier = tier,
+                description = display
+            };
+        }
+
         private RecruitmentOption CreateLeaderBoostOption(TribeRecord tribe, int attackBonus, int hpBonus)
         {
             string bonusText = "";
@@ -445,6 +506,44 @@ namespace TribeSystem
             };
         }
 
+        private RecruitmentOption CreateAuraBuffOption(TribeRecord tribe, TribeAuraOption aura)
+        {
+            // 将 TribeAuraOption.effects 转换为 BuffEffectItem 列表
+            var buffEffects = new List<BuffEffectItem>();
+            if (aura.effects != null)
+            {
+                foreach (var eff in aura.effects)
+                {
+                    buffEffects.Add(new BuffEffectItem(
+                        ParseStatType(eff.statType),
+                        eff.isPercent,
+                        eff.value,
+                        eff.gameEffectType));
+                }
+            }
+
+            // 创建 GameChoice
+            var choice = GameChoice.CreateBuff(
+                aura.auraId,
+                aura.auraName,
+                aura.description,
+                ChoiceSource.Recruitment,
+                BuffApplyScope.SingleTribeCat,
+                BuffApplyType.Aura,
+                buffEffects,
+                tribe.tribeType);
+
+            return new RecruitmentOption
+            {
+                optionType = ChoiceCategory.Buff,
+                cost = 0,
+                targetTribeType = null,
+                targetTribeId = tribe.tribeId,
+                description = $"{GetTribeTypeName(tribe.tribeType)}\n{aura.auraName}\n{aura.description}",
+                gameChoice = choice
+            };
+        }
+
         #endregion
 
         #region Helper Methods
@@ -458,6 +557,17 @@ namespace TribeSystem
                 case TribeType.Cow: return "奶牛猫族";
                 case TribeType.Siamese: return "暹罗猫族";
                 default: return type.ToString();
+            }
+        }
+
+        private string GetUnitTierName(UnitTier tier)
+        {
+            switch (tier)
+            {
+                case UnitTier.Tier1: return "一级兵";
+                case UnitTier.Tier2: return "二级兵";
+                case UnitTier.Tier3: return "三级兵";
+                default: return "小猫";
             }
         }
 

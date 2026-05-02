@@ -51,6 +51,26 @@ public static class BattleSpawner
         LoadGroupIdle(playerFighters);
         LoadGroupIdle(enemyFighters);
 
+        // 设置每个战斗单位的 OwnerFighter / Allies / Enemies，供 IBuffEffect 回调使用
+        for (int i = 0; i < playerFighters.Length; i++)
+        {
+            if (playerFighters[i]?.RuntimeAttributes != null)
+            {
+                playerFighters[i].RuntimeAttributes.OwnerFighter = playerFighters[i];
+                playerFighters[i].RuntimeAttributes.Allies = playerFighters;
+                playerFighters[i].RuntimeAttributes.Enemies = enemyFighters;
+            }
+        }
+        for (int i = 0; i < enemyFighters.Length; i++)
+        {
+            if (enemyFighters[i]?.RuntimeAttributes != null)
+            {
+                enemyFighters[i].RuntimeAttributes.OwnerFighter = enemyFighters[i];
+                enemyFighters[i].RuntimeAttributes.Allies = enemyFighters;
+                enemyFighters[i].RuntimeAttributes.Enemies = playerFighters;
+            }
+        }
+
         return new BattleSpawnResult
         {
             PlayerFighters = playerFighters,
@@ -227,7 +247,6 @@ public static class BattleSpawner
         }
         sortBy.BaseOrder = 10;
         sortBy.Multiplier = 100;
-        sortBy.IsLeader = innateBuffs != null && innateBuffs.Count > 0;
 
         AvatarSequencePlayer sequencePlayer = go.GetComponent<AvatarSequencePlayer>();
         if (sequencePlayer == null)
@@ -254,6 +273,33 @@ public static class BattleSpawner
 
         UnitRuntimeAttributes runtimeAttributes = new UnitRuntimeAttributes(staticAttributes);
 
+        // 将天生 TribeBuff 转为 UnifiedBuff 加到 RuntimeAttributes
+        if (innateBuffs != null)
+        {
+            foreach (var innateBuff in innateBuffs)
+            {
+                int gameEffectType = GetInnateGameEffectType(innateBuff.effectType);
+                if (gameEffectType < 0) continue;
+
+                var unifiedBuff = new TribeSystem.UnifiedBuff
+                {
+                    buffId = innateBuff.buffId,
+                    displayName = innateBuff.displayName,
+                    source = TribeSystem.BuffSource.Innate,
+                    sourceId = innateBuff.buffId,
+                    scope = TribeSystem.BuffScope.Leader,
+                    stackRule = TribeSystem.BuffStackRule.None,
+                    currentStacks = 1,
+                    gameEffectType = gameEffectType,
+                    effectParam1 = innateBuff.effectValue,
+                    remainingDuration = -1f,
+                    tickInterval = 0f,
+                    tickTimer = 0f,
+                };
+                runtimeAttributes.ApplyBuff(unifiedBuff);
+            }
+        }
+
         return new BattleFighter
         {
             Name = objectName,
@@ -277,6 +323,24 @@ public static class BattleSpawner
         }
 
         return UnitStaticAttributes.Default;
+    }
+
+    /// <summary>
+    /// 将 InnateEffectType 映射为 gameEffectType
+    /// </summary>
+    private static int GetInnateGameEffectType(TribeSystem.InnateEffectType type)
+    {
+        switch (type)
+        {
+            case TribeSystem.InnateEffectType.KillHealSatiety:       return 300; // 饕餮
+            case TribeSystem.InnateEffectType.AttackPerFriendlyUnit: return 301; // 牧群领袖
+            case TribeSystem.InnateEffectType.MarkTargetDamageAmp:  return 302; // 狩猎印记
+            case TribeSystem.InnateEffectType.DragonBreathOnCast:   return 303; // 龙语回响
+            case TribeSystem.InnateEffectType.DoubleHit:            return 200; // 双倍伤害
+            case TribeSystem.InnateEffectType.DamageReduce:         return 201; // 减伤
+            case TribeSystem.InnateEffectType.SpeedFlat:            return 202; // 速度
+            default: return -1;
+        }
     }
 
     private static void LoadGroupIdle(BattleFighter[] fighters)

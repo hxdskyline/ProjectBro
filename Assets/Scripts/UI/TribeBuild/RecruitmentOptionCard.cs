@@ -33,7 +33,7 @@ namespace TribeSystem.UI
             Index = index;
 
             if (_titleText != null)
-                _titleText.text = GetOptionTypeTitle(option);
+                _titleText.text = GetDisplayTitle(option);
             if (_descText != null)
                 _descText.text = option.description;
             if (_okButton != null)
@@ -89,6 +89,14 @@ namespace TribeSystem.UI
                 case ChoiceCategory.Buff: return "属性";
                 default: return "招募选项";
             }
+        }
+
+        private string GetDisplayTitle(RecruitmentOption option)
+        {
+            // 有 gameChoice 时用 displayName（光环buff的auraName）
+            if (option.gameChoice != null && !string.IsNullOrEmpty(option.gameChoice.displayName))
+                return option.gameChoice.displayName;
+            return GetOptionTypeTitle(option);
         }
     }
 }
