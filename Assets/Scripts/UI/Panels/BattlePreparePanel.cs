@@ -367,30 +367,30 @@ public class BattlePreparePanel : UIPanel
             string breed = GetTribeBreedName(tribe.tribeType);
             if (string.IsNullOrEmpty(breed)) continue;
 
-            string idleAddr = $"avatartemp/{breed}1";
-            string attackAddr = $"avatartemp/{breed}2";
-
             float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
             int clickedTribeId = tribe.tribeId;
 
-            var idleHandle = Addressables.LoadAssetAsync<Sprite>(idleAddr);
-            var attackHandle = Addressables.LoadAssetAsync<Sprite>(attackAddr);
+            // 族长始终用族群默认外观
+            string leaderIdleAddr = $"avatartemp/{breed}1";
+            string leaderAttackAddr = $"avatartemp/{breed}2";
+
+            var idleHandle = Addressables.LoadAssetAsync<Sprite>(leaderIdleAddr);
+            var attackHandle = Addressables.LoadAssetAsync<Sprite>(leaderAttackAddr);
             _avatarHandles.Add(idleHandle);
             _avatarHandles.Add(attackHandle);
 
             int pending = 2;
-            Sprite idleSprite = null;
-            Sprite attackSprite = null;
+            Sprite leaderIdleSprite = null;
+            Sprite leaderAttackSprite = null;
 
-            System.Action onBothLoaded = () =>
+            System.Action onLeaderLoaded = () =>
             {
                 if (_tribesRoot == null) return;
-                Sprite defaultSprite = idleSprite ?? attackSprite;
+                Sprite defaultSprite = leaderIdleSprite ?? leaderAttackSprite;
                 if (defaultSprite == null) return;
 
                 bool tribeIsSelected = (_selectedCatTribeId == clickedTribeId);
                 bool leaderIsSelected = tribeIsSelected && _selectedCatIndex < 0;
-                int selectedCat = tribeIsSelected ? _selectedCatIndex : -1;
 
                 // Leader
                 GameObject leaderGo = new GameObject($"Leader_{tribe.tribeType}", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -404,14 +404,14 @@ public class BattlePreparePanel : UIPanel
                 float leaderScale = Random.Range(160f, 220f);
                 leaderRt.sizeDelta = new Vector2(leaderScale, leaderScale);
                 Image leaderImg = leaderGo.GetComponent<Image>();
-                leaderImg.sprite = leaderIsSelected && attackSprite != null ? attackSprite : defaultSprite;
+                leaderImg.sprite = leaderIsSelected && leaderAttackSprite != null ? leaderAttackSprite : defaultSprite;
                 leaderImg.color = new Color(1f, 1f, 1f, Random.Range(0.85f, 1f));
                 Button leaderBtn = leaderGo.GetComponent<Button>();
                 leaderBtn.transition = Selectable.Transition.None;
                 leaderBtn.onClick.AddListener(() => OnLeaderAvatarClicked(clickedTribeId));
 
-                if (idleSprite != null) _avatarIdleSprites[leaderGo] = idleSprite;
-                if (attackSprite != null) _avatarAttackSprites[leaderGo] = attackSprite;
+                if (leaderIdleSprite != null) _avatarIdleSprites[leaderGo] = leaderIdleSprite;
+                if (leaderAttackSprite != null) _avatarAttackSprites[leaderGo] = leaderAttackSprite;
                 if (leaderIsSelected)
                 {
                     _selectedAvatarGo = leaderGo;
@@ -421,19 +421,39 @@ public class BattlePreparePanel : UIPanel
                 // Buff 指示器（地形+天气加减益）
                 CreateBuffIndicator(leaderGo.transform, tribe.tribeType, new Vector2(66f, -59f));
 
-                // Cats
+                // 为每只猫单独加载外观（根据 fighterId → avatarId）
                 int catCount = tribe.GetCatCount();
-                if (catCount > 0)
+                for (int i = 0; i < catCount; i++)
                 {
-                    for (int i = 0; i < catCount; i++)
+                    var cat = tribe.cats[i];
+                    int fighterId = GetCatFighterIdForAvatar(tribe.tribeType, cat.tier);
+                    GetCatAvatarAddresses(fighterId, breed, out string catIdleAddr, out string catAttackAddr);
+
+                    int catIdx = i;
+                    bool catIsSelected = (tribeIsSelected && i == _selectedCatIndex);
+
+                    var catIdleHandle = Addressables.LoadAssetAsync<Sprite>(catIdleAddr);
+                    var catAttackHandle = Addressables.LoadAssetAsync<Sprite>(catAttackAddr);
+                    _avatarHandles.Add(catIdleHandle);
+                    _avatarHandles.Add(catAttackHandle);
+
+                    int catPending = 2;
+                    Sprite catIdle = null;
+                    Sprite catAttack = null;
+
+                    System.Action onCatLoaded = () =>
                     {
-                        GameObject catGo = new GameObject($"Cat_{tribe.tribeType}_{i}", typeof(RectTransform), typeof(Image), typeof(Button));
+                        if (_tribesRoot == null) return;
+                        Sprite catDefault = catIdle ?? catAttack;
+                        if (catDefault == null) return;
+
+                        GameObject catGo = new GameObject($"Cat_{tribe.tribeType}_{catIdx}", typeof(RectTransform), typeof(Image), typeof(Button));
                         catGo.transform.SetParent(_tribesRoot, false);
                         RectTransform catRt = catGo.GetComponent<RectTransform>();
                         catRt.anchorMin = new Vector2(0.5f, 0.5f);
                         catRt.anchorMax = new Vector2(0.5f, 0.5f);
 
-                        float baseX = tribeCenterX + (i - (catCount - 1) / 2f) * 80f;
+                        float baseX = tribeCenterX + (catIdx - (catCount - 1) / 2f) * 80f;
                         float catX = baseX + Random.Range(-30f, 30f);
                         float catY = Random.Range(-200f, -120f);
                         catRt.anchoredPosition = new Vector2(catX, catY);
@@ -441,17 +461,15 @@ public class BattlePreparePanel : UIPanel
                         float catSize = Random.Range(50f, 80f);
                         catRt.sizeDelta = new Vector2(catSize, catSize);
 
-                        bool catIsSelected = (i == selectedCat);
                         Image catImg = catGo.GetComponent<Image>();
-                        catImg.sprite = catIsSelected && attackSprite != null ? attackSprite : defaultSprite;
+                        catImg.sprite = catIsSelected && catAttack != null ? catAttack : catDefault;
                         catImg.color = new Color(1f, 1f, 1f, Random.Range(0.6f, 0.95f));
                         Button catBtn = catGo.GetComponent<Button>();
                         catBtn.transition = Selectable.Transition.None;
-                        int catIdx = i;
                         catBtn.onClick.AddListener(() => OnCatAvatarClicked(clickedTribeId, catIdx));
 
-                        if (idleSprite != null) _avatarIdleSprites[catGo] = idleSprite;
-                        if (attackSprite != null) _avatarAttackSprites[catGo] = attackSprite;
+                        if (catIdle != null) _avatarIdleSprites[catGo] = catIdle;
+                        if (catAttack != null) _avatarAttackSprites[catGo] = catAttack;
 
                         // 小猫也加 Buff 指示器
                         CreateBuffIndicator(catGo.transform, tribe.tribeType, new Vector2(26f, -11f));
@@ -461,19 +479,31 @@ public class BattlePreparePanel : UIPanel
                             _selectedAvatarGo = catGo;
                             PositionIndicatorAbove(catRt);
                         }
-                    }
+                    };
+
+                    int capturedCatPending = catPending;
+                    catIdleHandle.Completed += (op) =>
+                    {
+                        if (op.Status == AsyncOperationStatus.Succeeded) catIdle = op.Result;
+                        if (--capturedCatPending == 0) onCatLoaded();
+                    };
+                    catAttackHandle.Completed += (op) =>
+                    {
+                        if (op.Status == AsyncOperationStatus.Succeeded) catAttack = op.Result;
+                        if (--capturedCatPending == 0) onCatLoaded();
+                    };
                 }
             };
 
             idleHandle.Completed += (op) =>
             {
-                if (op.Status == AsyncOperationStatus.Succeeded) idleSprite = op.Result;
-                if (--pending == 0) onBothLoaded();
+                if (op.Status == AsyncOperationStatus.Succeeded) leaderIdleSprite = op.Result;
+                if (--pending == 0) onLeaderLoaded();
             };
             attackHandle.Completed += (op) =>
             {
-                if (op.Status == AsyncOperationStatus.Succeeded) attackSprite = op.Result;
-                if (--pending == 0) onBothLoaded();
+                if (op.Status == AsyncOperationStatus.Succeeded) leaderAttackSprite = op.Result;
+                if (--pending == 0) onLeaderLoaded();
             };
         }
     }
@@ -559,6 +589,34 @@ public class BattlePreparePanel : UIPanel
             case TribeType.Siamese: return "xianluo";
             default: return null;
         }
+    }
+
+    private int GetCatFighterIdForAvatar(TribeType tribeType, UnitTier tier)
+    {
+        var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+        if (tribeConfig != null)
+        {
+            var unitType = tribeConfig.GetUnitType(tier);
+            if (unitType != null && unitType.fighterId > 0)
+                return unitType.fighterId;
+        }
+        return 0;
+    }
+
+    private void GetCatAvatarAddresses(int fighterId, string defaultBreed, out string idleAddr, out string attackAddr)
+    {
+        if (fighterId > 0)
+        {
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
+            if (fighterConfig != null && !string.IsNullOrEmpty(fighterConfig.avatarId))
+            {
+                idleAddr = $"avatartemp/{fighterConfig.avatarId}1";
+                attackAddr = $"avatartemp/{fighterConfig.avatarId}2";
+                return;
+            }
+        }
+        idleAddr = $"avatartemp/{defaultBreed}1";
+        attackAddr = $"avatartemp/{defaultBreed}2";
     }
 
     private void CreateBuffIndicator(Transform parent, TribeType tribeType, Vector2 position)

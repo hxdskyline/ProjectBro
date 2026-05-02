@@ -193,7 +193,7 @@ namespace TribeSystem
                 case ShopItemType.Cat:
                     if (item.catTribeType.HasValue && item.catQuality.HasValue)
                     {
-                        AddCatToPlayer(item.catTribeType.Value, item.catQuality.Value);
+                        AddCatToPlayer(item.catTribeType.Value, item.catQuality.Value, item.catTier);
                     }
                     break;
             }
@@ -370,8 +370,30 @@ namespace TribeSystem
             // 随机选择品质
             CatQuality quality = TribeStatsCalculator.RandomCatQuality();
 
-            // 计算价格
+            // 随机选择等级：T1 60%, T2 40%（T3 暂不开放）
+            UnitTier tier = Random.value < 0.6f ? UnitTier.Tier1 : UnitTier.Tier2;
+
+            // 获取单位名称
+            string unitName = "";
+            int catCount = TribeConfigLoader.Instance.GetTribeConfig(tribeType)?.initialCatCount ?? 1;
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(
+                GetFighterIdForTier(tribeType, tier));
+            if (fighterConfig != null)
+            {
+                unitName = fighterConfig.fighterName;
+                if (fighterConfig.recruitCount > 0)
+                    catCount = fighterConfig.recruitCount;
+            }
+
+            // 计算价格（T2 贵 50%）
             int basePrice = CalculateCatPrice(config, tribeType, quality);
+            if (tier == UnitTier.Tier2)
+                basePrice = Mathf.RoundToInt(basePrice * 1.5f);
+
+            string tierName = tier == UnitTier.Tier2 ? "·二级" : "";
+            string displayName = string.IsNullOrEmpty(unitName)
+                ? $"{GetTribeTypeName(tribeType)}{tierName}({GetQualityName(quality)})"
+                : $"{unitName}{tierName}({GetQualityName(quality)})";
 
             return new ShopItem
             {
@@ -379,11 +401,24 @@ namespace TribeSystem
                 itemType = ShopItemType.Cat,
                 catTribeType = tribeType,
                 catQuality = quality,
+                catTier = tier,
                 basePrice = basePrice,
-                name = $"{GetTribeTypeName(tribeType)}({GetQualityName(quality)})",
-                description = $"{TribeConfigLoader.Instance.GetTribeConfig(tribeType)?.initialCatCount ?? 1}只{GetQualityName(quality)}品质的小猫",
+                name = displayName,
+                description = $"{catCount}只{GetQualityName(quality)}品质的{unitName}",
                 iconAddress = GetTribeIcon(tribeType, config)
             };
+        }
+
+        private int GetFighterIdForTier(TribeType tribeType, UnitTier tier)
+        {
+            var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            if (tribeConfig != null)
+            {
+                var unitType = tribeConfig.GetUnitType(tier);
+                if (unitType != null && unitType.fighterId > 0)
+                    return unitType.fighterId;
+            }
+            return 0;
         }
 
         /// <summary>
@@ -420,7 +455,7 @@ namespace TribeSystem
             return Mathf.RoundToInt(basePrice * qualityMultiplier);
         }
 
-        private void AddCatToPlayer(TribeType tribeType, CatQuality quality)
+        private void AddCatToPlayer(TribeType tribeType, CatQuality quality, UnitTier? tier = null)
         {
             var playerData = _dataManager.PlayerData;
 
@@ -437,11 +472,28 @@ namespace TribeSystem
 
             if (targetTribe != null)
             {
-                var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
-                int catsToAdd = config != null ? config.initialCatCount : 1;
+                // 获取招募数量（T2 单位有自己的 recruitCount）
+                int catsToAdd = 1;
+                if (tier.HasValue)
+                {
+                    var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(GetFighterIdForTier(tribeType, tier.Value));
+                    if (fighterConfig != null && fighterConfig.recruitCount > 0)
+                        catsToAdd = fighterConfig.recruitCount;
+                    else
+                    {
+                        var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+                        catsToAdd = tribeConfig != null ? tribeConfig.initialCatCount : 1;
+                    }
+                }
+                else
+                {
+                    var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+                    catsToAdd = config != null ? config.initialCatCount : 1;
+                }
+
                 for (int i = 0; i < catsToAdd; i++)
                 {
-                    var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType);
+                    var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType, tier);
                     _auraService?.ApplyAurasToNewCat(cat, targetTribe.tribeType);
                     targetTribe.cats.Add(cat);
                 }

@@ -821,6 +821,7 @@ namespace TribeSystem
         public ShopItemType itemType;
         public TribeType? catTribeType; // 猫的族群类型
         public CatQuality? catQuality;  // 猫的品质
+        public UnitTier? catTier;       // 猫的等级（T1/T2/T3）
         public ConsumableEffectType? consumableEffectType; // 消耗品效果类型
         public ArtifactEffectType? artifactEffectType; // 奇物效果类型
         public int basePrice;
@@ -835,6 +836,7 @@ namespace TribeSystem
             itemType = ShopItemType.Consumable;
             catTribeType = null;
             catQuality = null;
+            catTier = null;
             basePrice = 0;
             name = "";
             description = "";
