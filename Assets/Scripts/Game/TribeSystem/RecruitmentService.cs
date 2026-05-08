@@ -446,10 +446,8 @@ namespace TribeSystem
                 baseDefense = leaderConfig?.defense ?? 0,
                 baseHp = leaderConfig?.hp ?? 0,
                 baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
-                command = leaderConfig?.command ?? 0,
                 skillIds = new List<int>(),
-                permanentBuffs = buffs,
-                temporaryBuff = null
+                permanentBuffs = buffs
             };
         }
 
@@ -483,11 +481,9 @@ namespace TribeSystem
                 {
                     var fighterConfig = TribeConfigLoader.Instance.GetFighterConfig(unitType.fighterId);
                     if (fighterConfig != null)
-                    {
                         unitName = fighterConfig.fighterName;
-                        if (fighterConfig.recruitCount > 0)
-                            catCount = fighterConfig.recruitCount;
-                    }
+                    if (unitType.recruitCount > 0)
+                        catCount = unitType.recruitCount;
                 }
             }
             string display = string.IsNullOrEmpty(unitName)

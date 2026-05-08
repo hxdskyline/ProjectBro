@@ -98,6 +98,33 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 获取族长的 avatarId（从 tribe_config.json → fighter_config.json 链式查找）
+        /// </summary>
+        public string GetLeaderAvatarId(TribeType tribeType)
+        {
+            var tribeConfig = GetTribeConfig(tribeType);
+            if (tribeConfig == null || tribeConfig.leaderFighterId <= 0) return null;
+            var fighterConfig = GetFighterConfig(tribeConfig.leaderFighterId);
+            return fighterConfig?.avatarId;
+        }
+
+        /// <summary>
+        /// 获取族长的 Addressable 精灵路径，如 "avatartemp/youxia1"
+        /// </summary>
+        public string GetLeaderAvatarAddress(TribeType tribeType, int variant = 1)
+        {
+            string avatarId = GetLeaderAvatarId(tribeType);
+            if (string.IsNullOrEmpty(avatarId))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] GetLeaderAvatarAddress: avatarId is null for {tribeType}");
+                return null;
+            }
+            string addr = $"avatartemp/{avatarId}{variant}";
+            Debug.Log($"[TribeConfigLoader] GetLeaderAvatarAddress: {tribeType} → {addr}");
+            return addr;
+        }
+
+        /// <summary>
         /// 获取所有族群配置
         /// </summary>
         public List<TribeConfig> GetAllTribeConfigs()
@@ -713,10 +740,9 @@ namespace TribeSystem
         public float moveSpeed;
         public float attackSpeed;
         public float attackRange;
-        public int command;           // 族长统帅值（非族长为0）
-        public int recruitCount;      // 招募数量（0=使用族群的initialCatCount）
         public List<int> innateBuffIds;
         public string avatarId;       // 外观 ID（空=使用族群默认外观）
+        public List<string> tags;     // 设计标签（如 glass_cannon、tank、summoner）
     }
 
     [System.Serializable]

@@ -30,7 +30,6 @@ namespace TribeSystem
         public string description;
         public int initialCatCount;
         public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
-        public string avatarDefinitionAddress; // 战斗 avatar 模型地址
         public int leaderFighterId;           // fighter_config.json 中的族长 fighterId
         public List<UnitTypeData> unitTypes;   // 单位类型列表（Tier1/2/3）
 
@@ -41,7 +40,6 @@ namespace TribeSystem
             description = "";
             initialCatCount = 3;
             deployCostPerCat = 10;
-            avatarDefinitionAddress = "";
             leaderFighterId = 0;
             unitTypes = new List<UnitTypeData>();
         }

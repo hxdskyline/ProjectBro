@@ -97,7 +97,6 @@ namespace TribeSystem.UI
                     baseDefense = leaderConfig?.defense ?? 0,
                     baseHp = leaderConfig?.hp ?? 0,
                     baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
-                    command = leaderConfig?.command ?? 0,
                     skillIds = new List<int>(),
                     permanentBuffs = new PermanentBuffs()
                 },

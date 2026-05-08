@@ -310,8 +310,6 @@ public class BattlePreparePanel : UIPanel
 
     private static int GetCommandLimit(TribeRecord tribe)
     {
-        if (tribe.leader != null && tribe.leader.command > 0)
-            return tribe.leader.command;
         return tribe.GetCatCount();
     }
 
@@ -370,9 +368,9 @@ public class BattlePreparePanel : UIPanel
             float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
             int clickedTribeId = tribe.tribeId;
 
-            // 族长始终用族群默认外观
-            string leaderIdleAddr = $"avatartemp/{breed}1";
-            string leaderAttackAddr = $"avatartemp/{breed}2";
+            // 族长使用 fighter_config.json 中的 avatarId
+            string leaderIdleAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 1) ?? $"avatartemp/{breed}1";
+            string leaderAttackAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 2) ?? $"avatartemp/{breed}2";
 
             var idleHandle = Addressables.LoadAssetAsync<Sprite>(leaderIdleAddr);
             var attackHandle = Addressables.LoadAssetAsync<Sprite>(leaderAttackAddr);

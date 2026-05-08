@@ -23,7 +23,40 @@ namespace TribeSystem
             if (choice == null) return;
             _dataManager.PlayerData.runChoices.Add(choice);
             var scopeFilter = choice.GetScopeFilter();
-            ApplyToExistingUnits(scopeFilter, choice.buffApplyType, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
+            ApplyToExistingUnits(scopeFilter, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
+            _dataManager.SavePlayerData();
+        }
+
+        /// <summary>
+        /// 直接给所有匹配单位添加回合制临时 buff（不存入 runChoices）
+        /// </summary>
+        public void ApplyRoundBasedBuffToAll(BuffScopeFilter scopeFilter, List<BuffEffectItem> effects,
+            int rounds, string displayName, string buffIdPrefix, string description = null)
+        {
+            if (effects == null || effects.Count == 0) return;
+            var playerData = _dataManager.PlayerData;
+            if (playerData.tribes == null) return;
+
+            foreach (var tribe in playerData.tribes)
+            {
+                if (tribe == null || !tribe.isActive) continue;
+
+                if (tribe.leader != null && scopeFilter.Matches(true, tribe.tribeType, null))
+                {
+                    ApplyRoundBasedEffects(tribe.leader, effects, rounds, displayName, buffIdPrefix, description);
+                }
+
+                if (tribe.cats != null)
+                {
+                    foreach (var cat in tribe.cats)
+                    {
+                        if (scopeFilter.Matches(false, tribe.tribeType, cat.tier))
+                        {
+                            ApplyRoundBasedEffects(cat, effects, rounds, displayName, buffIdPrefix, description);
+                        }
+                    }
+                }
+            }
             _dataManager.SavePlayerData();
         }
 
@@ -35,7 +68,7 @@ namespace TribeSystem
             if (equip == null) return;
             _dataManager.PlayerData.runEquipments.Add(equip);
             var scopeFilter = equip.GetScopeFilter();
-            ApplyToExistingUnits(scopeFilter, equip.buffApplyType, equip.effects, equip.displayName, equip.equipmentId, equip.description);
+            ApplyToExistingUnits(scopeFilter, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
             _dataManager.SavePlayerData();
         }
 
@@ -51,8 +84,7 @@ namespace TribeSystem
             bool removed = playerData.runChoices.RemoveAll(c => c.choiceId == choiceId) > 0;
 
             // 回退已应用的 buff
-            var buffService = new BuffService();
-            buffService.RemoveChoiceBuffs(choiceId);
+            BuffService.RemoveChoiceBuffs(choiceId);
 
             if (removed)
             {
@@ -72,8 +104,7 @@ namespace TribeSystem
 
             bool removed = playerData.runEquipments.RemoveAll(e => e.equipmentId == equipmentId) > 0;
 
-            var buffService = new BuffService();
-            buffService.RemoveEquipmentBuffs(equipmentId);
+            BuffService.RemoveEquipmentBuffs(equipmentId);
 
             if (removed)
             {
@@ -99,7 +130,7 @@ namespace TribeSystem
                 var filter = choice.GetScopeFilter();
                 if (!filter.Matches(true, tribeType, null)) continue;
 
-                ApplyEffectsToLeader(leader, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
+                ApplyEffects(leader, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
             }
 
             foreach (var equip in playerData.runEquipments)
@@ -108,7 +139,7 @@ namespace TribeSystem
                 var filter = equip.GetScopeFilter();
                 if (!filter.Matches(true, tribeType, null)) continue;
 
-                ApplyEffectsToLeader(leader, equip.effects, equip.displayName, equip.equipmentId, equip.description);
+                ApplyEffects(leader, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
             }
         }
 
@@ -128,7 +159,7 @@ namespace TribeSystem
                 var filter = choice.GetScopeFilter();
                 if (!filter.Matches(false, tribeType, null)) continue;
 
-                ApplyEffectsToCat(cat, choice.buffEffects, choice.displayName, choice.choiceId, choice.description);
+                ApplyEffects(cat, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
             }
 
             foreach (var equip in playerData.runEquipments)
@@ -137,7 +168,7 @@ namespace TribeSystem
                 var filter = equip.GetScopeFilter();
                 if (!filter.Matches(false, tribeType, null)) continue;
 
-                ApplyEffectsToCat(cat, equip.effects, equip.displayName, equip.equipmentId, equip.description);
+                ApplyEffects(cat, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
             }
         }
 
@@ -146,8 +177,8 @@ namespace TribeSystem
         /// <summary>
         /// 按 scopeFilter 分发 buff 到当前已有的 leader/cat
         /// </summary>
-        private void ApplyToExistingUnits(BuffScopeFilter scopeFilter, BuffApplyType applyType,
-            List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+        private void ApplyToExistingUnits(BuffScopeFilter scopeFilter,
+            List<BuffEffectItem> effects, string displayName, string uniqueId, string description, BuffSource source)
         {
             if (effects == null || effects.Count == 0) return;
 
@@ -158,54 +189,56 @@ namespace TribeSystem
             {
                 if (tribe == null || !tribe.isActive) continue;
 
-                // 检查族长是否匹配
                 if (tribe.leader != null && scopeFilter.Matches(true, tribe.tribeType, null))
                 {
-                    ApplyEffectsToLeader(tribe.leader, effects, displayName, uniqueId, description);
+                    ApplyEffects(tribe.leader, effects, displayName, uniqueId, description, source);
                 }
 
-                // 检查每个小猫是否匹配
                 if (tribe.cats != null)
                 {
                     foreach (var cat in tribe.cats)
                     {
                         if (scopeFilter.Matches(false, tribe.tribeType, cat.tier))
                         {
-                            ApplyEffectsToCat(cat, effects, displayName, uniqueId, description);
+                            ApplyEffects(cat, effects, displayName, uniqueId, description, source);
                         }
                     }
                 }
             }
         }
 
-        private void ApplyEffectsToLeader(LeaderData leader, List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+        /// <summary>
+        /// 给单个单位应用永久属性 buff
+        /// </summary>
+        private static void ApplyEffects(IHasBuffs unit, List<BuffEffectItem> effects,
+            string displayName, string uniqueId, string description, BuffSource source)
         {
-            if (leader.permanentBuffs == null)
-                leader.permanentBuffs = new PermanentBuffs();
-
             foreach (var eff in effects)
             {
-                var unifiedBuff = UnifiedBuff.CreateStatBuff(
+                var buff = UnifiedBuff.CreateStatBuff(
                     $"aura_{uniqueId}_{eff.statType}", displayName,
-                    BuffSource.Equipment, uniqueId,
+                    source, uniqueId,
                     eff.statType, eff.isPercent, eff.value,
                     gameEffectType: eff.gameEffectType,
                     description: description);
-                leader.AddUnifiedBuff(unifiedBuff);
+                unit.AddUnifiedBuff(buff);
             }
         }
 
-        private void ApplyEffectsToCat(CatData cat, List<BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+        /// <summary>
+        /// 给单个单位应用回合制 buff
+        /// </summary>
+        private static void ApplyRoundBasedEffects(IHasBuffs unit, List<BuffEffectItem> effects,
+            int rounds, string displayName, string buffIdPrefix, string description)
         {
             foreach (var eff in effects)
             {
-                var unifiedBuff = UnifiedBuff.CreateStatBuff(
-                    $"aura_{uniqueId}_{eff.statType}", displayName,
-                    BuffSource.Equipment, uniqueId,
+                var buff = UnifiedBuff.CreateRoundBasedBuff(
+                    $"{buffIdPrefix}_{eff.statType}", displayName,
+                    BuffSource.Ritual, buffIdPrefix,
                     eff.statType, eff.isPercent, eff.value,
-                    gameEffectType: eff.gameEffectType,
-                    description: description);
-                cat.AddUnifiedBuff(unifiedBuff);
+                    rounds, description);
+                unit.AddUnifiedBuff(buff);
             }
         }
     }

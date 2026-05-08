@@ -376,13 +376,15 @@ namespace TribeSystem
             // 获取单位名称
             string unitName = "";
             int catCount = TribeConfigLoader.Instance.GetTribeConfig(tribeType)?.initialCatCount ?? 1;
-            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(
-                GetFighterIdForTier(tribeType, tier));
-            if (fighterConfig != null)
+            var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            var unitType = tribeConfig?.GetUnitType(tier);
+            if (unitType != null && unitType.fighterId > 0)
             {
-                unitName = fighterConfig.fighterName;
-                if (fighterConfig.recruitCount > 0)
-                    catCount = fighterConfig.recruitCount;
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitType.fighterId);
+                if (fighterConfig != null)
+                    unitName = fighterConfig.fighterName;
+                if (unitType.recruitCount > 0)
+                    catCount = unitType.recruitCount;
             }
 
             // 计算价格（T2 贵 50%）
@@ -472,18 +474,16 @@ namespace TribeSystem
 
             if (targetTribe != null)
             {
-                // 获取招募数量（T2 单位有自己的 recruitCount）
+                // 获取招募数量（优先从 tribe_config 的 UnitTypeData 读取）
                 int catsToAdd = 1;
                 if (tier.HasValue)
                 {
-                    var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(GetFighterIdForTier(tribeType, tier.Value));
-                    if (fighterConfig != null && fighterConfig.recruitCount > 0)
-                        catsToAdd = fighterConfig.recruitCount;
+                    var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+                    var unitType = tribeConfig?.GetUnitType(tier.Value);
+                    if (unitType != null && unitType.recruitCount > 0)
+                        catsToAdd = unitType.recruitCount;
                     else
-                    {
-                        var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
                         catsToAdd = tribeConfig != null ? tribeConfig.initialCatCount : 1;
-                    }
                 }
                 else
                 {

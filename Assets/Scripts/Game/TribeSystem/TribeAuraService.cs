@@ -336,7 +336,7 @@ namespace TribeSystem
         public string auraName;
         public string description;
         public string scope;            // 影响范围：Tabby | T1 | Soldier 等
-        public string requiredUnitName; // 依赖的兵种名（为空则始终可用），如 "丛林弓箭手"
+        public string requiredUnitName; // 依赖的兵种名（为空则始终可用），如 "矛猫"
         public List<TribeAuraEffect> effects;
     }
 

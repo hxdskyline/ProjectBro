@@ -14,6 +14,14 @@ namespace TribeSystem
         Tier3 = 3
     }
 
+    /// <summary>
+    /// 拥有 buff 列表的单位接口
+    /// </summary>
+    public interface IHasBuffs
+    {
+        bool AddUnifiedBuff(UnifiedBuff buff);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  玩家状态 — 族群实例、族长、小猫
     // ═══════════════════════════════════════════════════════════
@@ -62,7 +70,7 @@ namespace TribeSystem
     /// 族长数据
     /// </summary>
     [Serializable]
-    public class LeaderData
+    public class LeaderData : IHasBuffs
     {
         public int leaderId;
         public string name;
@@ -70,10 +78,8 @@ namespace TribeSystem
         public int baseDefense;
         public int baseHp;
         public float baseMoveSpeed;
-        public int command;
         public List<int> skillIds;
         public PermanentBuffs permanentBuffs;
-        public TemporaryBuff temporaryBuff;
         public int restTurns;
 
         // ── 统一 buff 运行时列表（不序列化，加载存档时从 buffEntries 转换） ──
@@ -95,10 +101,8 @@ namespace TribeSystem
             baseDefense = 80;
             baseHp = 1000;
             baseMoveSpeed = 1.0f;
-            command = 10;
             skillIds = new List<int>();
             permanentBuffs = new PermanentBuffs();
-            temporaryBuff = null;
             restTurns = 0;
         }
 
@@ -190,7 +194,7 @@ namespace TribeSystem
     /// 小猫数据
     /// </summary>
     [Serializable]
-    public class CatData
+    public class CatData : IHasBuffs
     {
         public long catId;
         public CatQuality quality;
@@ -597,16 +601,14 @@ namespace TribeSystem
         public int hp;
         public float moveSpeed;
         public float attackSpeed;
-        public int command;
 
-        public LeaderStats(int atk, int def, int hp, float moveSpd, float atkSpd, int cmd)
+        public LeaderStats(int atk, int def, int hp, float moveSpd, float atkSpd)
         {
             attack = atk;
             defense = def;
             this.hp = hp;
             moveSpeed = moveSpd;
             attackSpeed = atkSpd;
-            command = cmd;
         }
     }
 

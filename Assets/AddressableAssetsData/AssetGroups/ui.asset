@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 9cf772fd8553d7a46a75d94ae6ca6d62
+  m_GUID: 37386fc361b550645b515b098ea4a27e
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
@@ -239,6 +239,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6b704c702c3d0ff478a22a8d79f88685
     m_Address: ui/sprite/shop/shangren_img_zhuangshimao
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6db065c65acde9f458b34ebe0d67b9bb
+    m_Address: "ui/\u5FAE\u4FE1\u56FE\u7247_20260505230015_1141_850"
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

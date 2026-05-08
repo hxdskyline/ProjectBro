@@ -18,6 +18,50 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 从 buff 列表中累加属性修正值
+        /// </summary>
+        private struct StatAccumulator
+        {
+            public float atkFlat, atkPct;
+            public float defFlat, defPct;
+            public float hpFlat, hpPct;
+            public float spdFlat, spdPct;
+            public float atkSpdFlat, atkSpdPct;
+
+            public void Accumulate(UnifiedBuff buff)
+            {
+                float totalVal = buff.value * buff.currentStacks;
+                switch (buff.statType)
+                {
+                    case StatType.Attack:
+                        if (buff.isPercent) atkPct += totalVal; else atkFlat += totalVal;
+                        break;
+                    case StatType.Defense:
+                        if (buff.isPercent) defPct += totalVal; else defFlat += totalVal;
+                        break;
+                    case StatType.Hp:
+                        if (buff.isPercent) hpPct += totalVal; else hpFlat += totalVal;
+                        break;
+                    case StatType.MoveSpeed:
+                        if (buff.isPercent) spdPct += totalVal; else spdFlat += totalVal;
+                        break;
+                    case StatType.AttackSpeed:
+                        if (buff.isPercent) atkSpdPct += totalVal; else atkSpdFlat += totalVal;
+                        break;
+                }
+            }
+
+            public void ApplyTo(ref float atk, ref float def, ref float hp, ref float moveSpd, ref float atkSpd)
+            {
+                atk = ApplyModifiers(atk, atkPct, atkFlat);
+                def = ApplyModifiers(def, defPct, defFlat);
+                hp = ApplyModifiers(hp, hpPct, hpFlat);
+                moveSpd = ApplyModifiers(moveSpd, spdPct, spdFlat);
+                atkSpd = ApplyModifiers(atkSpd, atkSpdPct, atkSpdFlat);
+            }
+        }
+
+        /// <summary>
         /// 计算族长的最终属性（包含所有加成）
         /// </summary>
         /// <param name="excludePersistent">为 true 时跳过 Persistent buff（用于战斗初始化，避免与 RestorePersistentBuffsToRuntime 重复叠加）</param>
@@ -25,7 +69,7 @@ namespace TribeSystem
         {
             if (leader == null)
             {
-                return new LeaderStats(0, 0, 0, 1.0f, 0.5f, 0);
+                return new LeaderStats(0, 0, 0, 1.0f, 0.5f);
             }
 
             float atk = leader.baseAttack;
@@ -35,54 +79,15 @@ namespace TribeSystem
             float atkSpd = 0.5f; // 默认攻速，实际值由 BattlePanel 从 fighterConfig 读取
 
             // 从 ActiveBuffs 汇总永久加成
-            if (leader.ActiveBuffs != null)
+            if (leader.ActiveBuffs != null && !excludePersistent)
             {
-                float atkFlat = 0f, atkPct = 0f;
-                float defFlat = 0f, defPct = 0f;
-                float hpFlat = 0f, hpPct = 0f;
-                float spdFlat = 0f, spdPct = 0f;
-                float atkSpdPct = 0f, atkSpdFlat = 0f;
-
+                var acc = new StatAccumulator();
                 foreach (var buff in leader.ActiveBuffs)
                 {
                     if (buff.persistence != BuffPersistence.Persistent) continue;
-                    if (excludePersistent) continue;
-                    float totalVal = buff.value * buff.currentStacks;
-                    switch (buff.statType)
-                    {
-                        case StatType.Attack:
-                            if (buff.isPercent) atkPct += totalVal; else atkFlat += totalVal;
-                            break;
-                        case StatType.Defense:
-                            if (buff.isPercent) defPct += totalVal; else defFlat += totalVal;
-                            break;
-                        case StatType.Hp:
-                            if (buff.isPercent) hpPct += totalVal; else hpFlat += totalVal;
-                            break;
-                        case StatType.MoveSpeed:
-                            if (buff.isPercent) spdPct += totalVal; else spdFlat += totalVal;
-                            break;
-                        case StatType.AttackSpeed:
-                            if (buff.isPercent) atkSpdPct += totalVal; else atkSpdFlat += totalVal;
-                            break;
-                    }
+                    acc.Accumulate(buff);
                 }
-
-                atk = ApplyModifiers(atk, atkPct, atkFlat);
-                def = ApplyModifiers(def, defPct, defFlat);
-                hp = ApplyModifiers(hp, hpPct, hpFlat);
-                moveSpd = ApplyModifiers(moveSpd, spdPct, spdFlat);
-                atkSpd = ApplyModifiers(atkSpd, atkSpdPct, atkSpdFlat);
-            }
-
-            // 应用限时加成（只有百分比）
-            if (leader.temporaryBuff != null && leader.temporaryBuff.IsActive())
-            {
-                var t = leader.temporaryBuff;
-                atk = ApplyModifiers(atk, t.attackPercent, 0f);
-                def = ApplyModifiers(def, t.defensePercent, 0f);
-                hp = ApplyModifiers(hp, t.hpPercent, 0f);
-                moveSpd = ApplyModifiers(moveSpd, t.speedPercent, 0f);
+                acc.ApplyTo(ref atk, ref def, ref hp, ref moveSpd, ref atkSpd);
             }
 
             // 应用心情修正
@@ -100,8 +105,7 @@ namespace TribeSystem
                 Mathf.Max(1, Mathf.RoundToInt(def)),
                 Mathf.Max(1, Mathf.RoundToInt(hp)),
                 Mathf.Max(0.001f, moveSpd),
-                Mathf.Max(0.001f, atkSpd),
-                leader.command
+                Mathf.Max(0.001f, atkSpd)
             );
         }
 
@@ -122,52 +126,22 @@ namespace TribeSystem
             float catMoveSpd = cat.staticMoveSpeed;
             float catAtkSpd = cat.staticAttackSpeed > 0 ? cat.staticAttackSpeed : 0.5f;
 
-            float atkPercentSum = 0f;
-            float defPercentSum = 0f;
-            float hpPercentSum = 0f;
-            float atkSpdPercentSum = 0f;
-            int atkFlatSum = 0;
-            int defFlatSum = 0;
-            int hpFlatSum = 0;
-
             // 应用小猫自身的 buff（攻防血速）
-            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0)
+            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0 && !excludePersistent)
             {
+                var acc = new StatAccumulator();
                 foreach (var buff in cat.ActiveBuffs)
                 {
                     if (buff.persistence != BuffPersistence.Persistent) continue;
-                    if (excludePersistent) continue;
-
-                    switch (buff.statType)
-                    {
-                        case StatType.Attack:
-                            if (buff.isPercent) atkPercentSum += buff.value * buff.currentStacks;
-                            else atkFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
-                            break;
-                        case StatType.Defense:
-                            if (buff.isPercent) defPercentSum += buff.value * buff.currentStacks;
-                            else defFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
-                            break;
-                        case StatType.Hp:
-                            if (buff.isPercent) hpPercentSum += buff.value * buff.currentStacks;
-                            else hpFlatSum += Mathf.RoundToInt(buff.value * buff.currentStacks);
-                            break;
-                        case StatType.AttackSpeed:
-                            if (buff.isPercent) atkSpdPercentSum += buff.value * buff.currentStacks;
-                            break;
-                    }
+                    acc.Accumulate(buff);
                 }
+                acc.ApplyTo(ref catAtk, ref catDef, ref catHp, ref catMoveSpd, ref catAtkSpd);
             }
 
             // 全局奇物加成：直接从 PlayerData 读取，确保所有小猫一致
             var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
             if (globalBonus > 0)
-                atkFlatSum += globalBonus;
-
-            catAtk = ApplyModifiers(catAtk, atkPercentSum, atkFlatSum);
-            catDef = ApplyModifiers(catDef, defPercentSum, defFlatSum);
-            catHp = ApplyModifiers(catHp, hpPercentSum, hpFlatSum);
-            catAtkSpd = ApplyModifiers(catAtkSpd, atkSpdPercentSum, 0f);
+                catAtk += globalBonus;
 
             return new CatStats(
                 Mathf.Max(1, Mathf.RoundToInt(catAtk)),

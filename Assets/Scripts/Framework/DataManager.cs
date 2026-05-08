@@ -738,20 +738,18 @@ public class DataManager : MonoBehaviour
             {
                 var filter = entry.GetScopeFilter();
 
-                // 检查族长是否匹配
                 if (tribe.leader != null && filter.Matches(true, tribe.tribeType, null))
                 {
-                    ApplyAuraEffectsToLeader(tribe.leader, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
+                    ApplyAuraEffectsGeneric(tribe.leader, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
                 }
 
-                // 检查每个小猫是否匹配
                 if (tribe.cats != null)
                 {
                     foreach (var cat in tribe.cats)
                     {
                         if (filter.Matches(false, tribe.tribeType, cat.tier))
                         {
-                            ApplyAuraEffectsToCat(cat, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
+                            ApplyAuraEffectsGeneric(cat, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
                         }
                     }
                 }
@@ -759,33 +757,18 @@ public class DataManager : MonoBehaviour
         }
     }
 
-    private static void ApplyAuraEffectsToLeader(TribeSystem.LeaderData leader, System.Collections.Generic.List<TribeSystem.BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
+    private static void ApplyAuraEffectsGeneric(TribeSystem.IHasBuffs unit, System.Collections.Generic.List<TribeSystem.BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
     {
         if (effects == null) return;
         foreach (var eff in effects)
         {
             var buff = TribeSystem.UnifiedBuff.CreateStatBuff(
                 $"aura_{uniqueId}_{eff.statType}", displayName,
-                TribeSystem.BuffSource.Equipment, displayName,
+                TribeSystem.BuffSource.Equipment, uniqueId,
                 eff.statType, eff.isPercent, eff.value,
                 gameEffectType: eff.gameEffectType,
                 description: description);
-            leader.AddUnifiedBuff(buff);
-        }
-    }
-
-    private static void ApplyAuraEffectsToCat(TribeSystem.CatData cat, System.Collections.Generic.List<TribeSystem.BuffEffectItem> effects, string displayName, string uniqueId, string description = null)
-    {
-        if (effects == null) return;
-        foreach (var eff in effects)
-        {
-            var buff = TribeSystem.UnifiedBuff.CreateStatBuff(
-                $"aura_{uniqueId}_{eff.statType}", displayName,
-                TribeSystem.BuffSource.Equipment, displayName,
-                eff.statType, eff.isPercent, eff.value,
-                gameEffectType: eff.gameEffectType,
-                description: description);
-            cat.AddUnifiedBuff(buff);
+            unit.AddUnifiedBuff(buff);
         }
     }
 

@@ -1134,16 +1134,41 @@ namespace TribeSystem.UI
 
         private void ProcessRoundTransition()
         {
-            // 减少限时buff持续时间
             foreach (var tribe in _tribes)
             {
-                if (tribe.leader?.temporaryBuff != null)
-                {
-                    tribe.leader.temporaryBuff.DecreaseDuration();
-                }
+                // 减少回合制统一 buff 的持续回合
+                DecreaseRoundBasedBuffs(tribe);
             }
 
             _dataManager.SavePlayerData();
+        }
+
+        private void DecreaseRoundBasedBuffs(TribeRecord tribe)
+        {
+            // 族长
+            if (tribe.leader?.ActiveBuffs != null)
+                DecreaseBuffs(tribe.leader.ActiveBuffs);
+
+            // 小猫
+            if (tribe.cats == null) return;
+            foreach (var cat in tribe.cats)
+            {
+                if (cat?.ActiveBuffs != null)
+                    DecreaseBuffs(cat.ActiveBuffs);
+            }
+        }
+
+        private void DecreaseBuffs(System.Collections.Generic.List<UnifiedBuff> buffs)
+        {
+            for (int i = buffs.Count - 1; i >= 0; i--)
+            {
+                if (buffs[i].IsRoundBased)
+                {
+                    buffs[i].remainingRounds--;
+                    if (buffs[i].IsExpired)
+                        buffs.RemoveAt(i);
+                }
+            }
         }
 
         private void ShowInitialTribeSelection()
@@ -1180,10 +1205,8 @@ namespace TribeSystem.UI
                     baseDefense = leaderConfig?.defense ?? 0,
                     baseHp = leaderConfig?.hp ?? 0,
                     baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
-                    command = leaderConfig?.command ?? 0,
                     skillIds = new List<int>(),
                     permanentBuffs = new PermanentBuffs(),
-                    temporaryBuff = null,
                     restTurns = 0
                 },
                 cats = new List<CatData>(),
@@ -1343,9 +1366,9 @@ namespace TribeSystem.UI
                 float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
                 int clickedTribeId = tribe.tribeId;
 
-                // 族长始终用族群默认外观
-                string leaderIdleAddr = $"avatartemp/{breed}1";
-                string leaderAttackAddr = $"avatartemp/{breed}2";
+                // 族长使用 fighter_config.json 中的 avatarId
+                string leaderIdleAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 1) ?? $"avatartemp/{breed}1";
+                string leaderAttackAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 2) ?? $"avatartemp/{breed}2";
 
                 // 并行加载族长 idle 和 attack 两帧
                 var idleHandle = Addressables.LoadAssetAsync<Sprite>(leaderIdleAddr);

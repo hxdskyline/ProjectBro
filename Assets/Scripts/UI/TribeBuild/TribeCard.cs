@@ -128,14 +128,7 @@ namespace TribeSystem.UI
 
         private string GetTribePortraitAddress(TribeType tribeType, int variant)
         {
-            switch (tribeType)
-            {
-                case TribeType.Tabby: return $"avatartemp/lihua{variant}";
-                case TribeType.Orange: return $"avatartemp/daju{variant}";
-                case TribeType.Cow: return $"avatartemp/nainiu{variant}";
-                case TribeType.Siamese: return $"avatartemp/xianluo{variant}";
-                default: return null;
-            }
+            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, variant);
         }
 
         private void UpdateTexts()
@@ -403,11 +396,7 @@ namespace TribeSystem.UI
                     // 1. 永久buff（从 ActiveBuffs 读取）
                     AddUnifiedBuffEntries(leader.ActiveBuffs, font);
 
-                    // 2. 临时buff
-                    if (leader.temporaryBuff != null && leader.temporaryBuff.IsActive())
-                        AddTemporaryBuffEntry(leader.temporaryBuff, font);
-
-                    // 3. 天生特殊buff（specialBuffs 中 visible=true 的条目）
+                    // 2. 天生特殊buff（specialBuffs 中 visible=true 的条目）
                     AddInnateBuffEntries(leader.permanentBuffs, font);
                 }
             }
@@ -526,18 +515,6 @@ namespace TribeSystem.UI
                 CreateBuffEntry($"{sourceName}_icon", displayName, desc,
                     font, statColors[colorIndex], firstStat);
             }
-        }
-
-        private void AddTemporaryBuffEntry(TemporaryBuff tb, Font font)
-        {
-            if (tb == null) return;
-
-            var lines = new List<string>();
-            if (tb.attackPercent != 0f) lines.Add($"攻击 {(tb.attackPercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.attackPercent * 100)}%");
-            if (tb.defensePercent != 0f) lines.Add($"防御 {(tb.defensePercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.defensePercent * 100)}%");
-            if (tb.hpPercent != 0f) lines.Add($"生命 {(tb.hpPercent > 0 ? "+" : "")}{Mathf.RoundToInt(tb.hpPercent * 100)}%");
-            lines.Add($"剩余 {tb.duration} 回合");
-            CreateBuffEntry("temp_icon", "限时加成", string.Join("\n", lines.ToArray()), font, new Color(0.9f, 0.7f, 0.1f, 0.8f), null);
         }
 
         private void AddTerrainWeatherBuffEntry(TerrainWeatherBuff twBuff, Font font)

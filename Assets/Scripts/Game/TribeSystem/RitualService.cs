@@ -533,18 +533,14 @@ namespace TribeSystem
 
         private void ApplyTemporaryStatBoost(TribeRecord tribe, StatType stat, int amount)
         {
-            if (tribe.leader.temporaryBuff == null)
-                tribe.leader.temporaryBuff = new TemporaryBuff();
-            var buff = tribe.leader.temporaryBuff;
             float pct = amount / 100f;
-            switch (stat)
-            {
-                case StatType.Attack: buff.attackPercent += pct; break;
-                case StatType.Defense: buff.defensePercent += pct; break;
-                case StatType.Hp: buff.hpPercent += pct; break;
-                case StatType.MoveSpeed: break; // 祈愿不再提供速度加成
-            }
-            buff.duration = 3;
+            var effects = new List<BuffEffectItem> { new BuffEffectItem(stat, true, pct) };
+            string buffId = $"Ritual_Temp_{tribe.tribeType}_{stat}_{amount}";
+            string displayName = $"祈愿祝福：{GetStatName(stat)} +{amount}%（3回合）";
+            var scopeFilter = new BuffScopeFilter { tribe = tribe.tribeType };
+            _auraService?.ApplyRoundBasedBuffToAll(
+                scopeFilter, effects, 3,
+                displayName, buffId, displayName);
         }
 
         private void ApplyPermanentStatBoost(TribeRecord tribe, StatType stat, int amount)

@@ -19,13 +19,6 @@ public class BattlePanel : UIPanel
     [SerializeField] private AvatarAnimationDefinition _playerAvatarDefinition;
     [SerializeField] private AvatarAnimationDefinition _enemyAvatarDefinition;
 
-    [Header("各品种Avatar定义")]
-    [SerializeField] private AvatarAnimationDefinition _lihuaAvatarDef;
-    [SerializeField] private AvatarAnimationDefinition _dajuAvatarDef;
-    [SerializeField] private AvatarAnimationDefinition _nainiuAvatarDef;
-    [SerializeField] private AvatarAnimationDefinition _xianluoAvatarDef;
-    [SerializeField] private AvatarAnimationDefinition _cangyingAvatarDef;
-
     private BattleFlowController _flowController;
     private int _currentLevel;
     private bool _isPaused;
@@ -52,10 +45,6 @@ public class BattlePanel : UIPanel
         { TribeType.Siamese, "xianluo" },
     };
 
-    // 每个族群类型的运行时 AvatarAnimationDefinition 缓存
-    private readonly Dictionary<TribeType, AvatarAnimationDefinition> _tribeAvatarCache
-        = new Dictionary<TribeType, AvatarAnimationDefinition>();
-
     // avatarId → AvatarDefinition 缓存（数据驱动，从 fighter_config.json 的 avatarId 读取）
     private readonly Dictionary<string, AvatarAnimationDefinition> _avatarIdCache
         = new Dictionary<string, AvatarAnimationDefinition>();
@@ -65,14 +54,8 @@ public class BattlePanel : UIPanel
         if (string.IsNullOrEmpty(avatarId)) return null;
         if (_avatarIdCache.TryGetValue(avatarId, out var cached)) return cached;
 
-        AvatarAnimationDefinition def = null;
-        // 序列化引用匹配
-        if (avatarId == "cangying")
-            def = _cangyingAvatarDef;
-
-        // Fallback: 运行时创建
-        if (def == null)
-            def = AvatarAnimationDefinition.CreateRuntime(avatarId, $"avatartemp/{avatarId}1", $"avatartemp/{avatarId}2");
+        // 运行时创建（从 avatartemp/{avatarId}1 和 {avatarId}2 加载帧）
+        var def = AvatarAnimationDefinition.CreateRuntime(avatarId, $"avatartemp/{avatarId}1", $"avatartemp/{avatarId}2");
 
         _avatarIdCache[avatarId] = def;
         return def;
@@ -86,65 +69,18 @@ public class BattlePanel : UIPanel
             var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
             if (fighterConfig != null && !string.IsNullOrEmpty(fighterConfig.avatarId))
             {
-                var avatarDef = GetAvatarById(fighterConfig.avatarId);
-                if (avatarDef != null) return avatarDef;
+                return GetAvatarById(fighterConfig.avatarId);
             }
         }
 
-        if (_tribeAvatarCache.TryGetValue(tribeType, out var cached))
-            return cached;
-
-        // 优先使用序列化引用的 AvatarAnimDef asset
-        AvatarAnimationDefinition def = GetSerializedAvatarDef(tribeType);
-        if (def != null)
+        // Fallback: 用族群品种名运行时创建
+        if (s_tribeBreedNames.TryGetValue(tribeType, out string breed))
         {
-            _tribeAvatarCache[tribeType] = def;
-            Debug.Log($"[BattlePanel] Avatar {tribeType}: 序列化引用 {def.AvatarId}");
-            return def;
+            return GetAvatarById(breed);
         }
 
-        // 从 tribe_config.json 配置的地址加载
-        TribeConfig tribeConfig = TribeSystem.TribeConfigLoader.Instance.GetTribeConfig(tribeType);
-        if (tribeConfig != null && !string.IsNullOrEmpty(tribeConfig.avatarDefinitionAddress))
-        {
-            var loaded = GameManager.Instance.ResourceManager.LoadResource<AvatarAnimationDefinition>(tribeConfig.avatarDefinitionAddress);
-            if (loaded != null)
-            {
-                _tribeAvatarCache[tribeType] = loaded;
-                Debug.Log($"[BattlePanel] Avatar {tribeType}: tribe_config {tribeConfig.avatarDefinitionAddress} → {loaded.AvatarId}");
-                return loaded;
-            }
-            else
-            {
-                Debug.LogWarning($"[BattlePanel] Avatar {tribeType}: tribe_config 地址加载失败 {tribeConfig.avatarDefinitionAddress}");
-            }
-        }
-
-        // Fallback: 运行时创建
-        if (!s_tribeBreedNames.TryGetValue(tribeType, out string breed))
-        {
-            Debug.LogWarning($"[BattlePanel] 未找到族群 {tribeType} 的品种名，使用默认avatar");
-            return _playerAvatarDefinition;
-        }
-
-        string idleAddr   = $"avatartemp/{breed}1";
-        string attackAddr = $"avatartemp/{breed}2";
-        var definition = AvatarAnimationDefinition.CreateRuntime(breed, idleAddr, attackAddr);
-        _tribeAvatarCache[tribeType] = definition;
-        Debug.Log($"[BattlePanel] Avatar {tribeType}: CreateRuntime fallback {idleAddr}/{attackAddr}");
-        return definition;
-    }
-
-    private AvatarAnimationDefinition GetSerializedAvatarDef(TribeType tribeType)
-    {
-        switch (tribeType)
-        {
-            case TribeType.Tabby:   return _lihuaAvatarDef;
-            case TribeType.Orange:  return _dajuAvatarDef;
-            case TribeType.Cow:     return _nainiuAvatarDef;
-            case TribeType.Siamese: return _xianluoAvatarDef;
-            default: return null;
-        }
+        Debug.LogWarning($"[BattlePanel] 未找到族群 {tribeType} 的外观配置，使用默认avatar");
+        return _playerAvatarDefinition;
     }
 
     public override void Initialize()
@@ -309,8 +245,8 @@ public class BattlePanel : UIPanel
         var leaderFighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(leaderFighterId);
         float leaderBaseAttackSpeed = leaderFighterConfig?.attackSpeed ?? 0.5f;
 
-        // 狸花射程4倍
-        float attackRange = tribe.tribeType == TribeType.Tabby ? 6.0f : 1.5f;
+        // 从 fighter_config 读取族长射程
+        float attackRange = leaderFighterConfig?.attackRange ?? 1.5f;
 
         UnitStaticAttributes staticAttributes = new UnitStaticAttributes
         {
@@ -342,12 +278,12 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 从 tribe_config.json 的 unitTypes 中获取族长的 fighterId
+    /// 从 tribe_config.json 获取族长的 fighterId
     /// </summary>
     private int GetLeaderFighterId(TribeType tribeType)
     {
-        // 族长使用 Tier1 的 fighterId
-        return GetCatFighterId(tribeType, UnitTier.Tier1);
+        var config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+        return config?.leaderFighterId ?? 0;
     }
 
     /// <summary>

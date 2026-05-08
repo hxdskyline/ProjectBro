@@ -8,8 +8,9 @@ namespace TribeSystem
     /// </summary>
     public enum BuffPersistence
     {
-        Persistent,     // 局内成长：跨战斗永久生效（族长技能加点、光环选择、物品）
-        BattleOnly,     // 战斗内成长：仅当前战斗有效，战斗结束清零
+        Persistent,         // 局内成长：跨战斗永久生效（族长技能加点、光环选择、物品）
+        BattleOnly,         // 战斗内成长：仅当前战斗有效，战斗结束清零
+        TemporaryRoundBased, // 回合制临时：持续 N 回合，回合结束时递减
     }
 
     /// <summary>
@@ -53,13 +54,15 @@ namespace TribeSystem
         public float effectParam2;         // 效果参数2（如减速百分比）
 
         // ── 生命周期 ──
-        public float remainingDuration;    // 剉余时间（秒），-1=永久
+        public float remainingDuration;    // 剩余时间（秒），-1=永久
         public float tickInterval;         // 触发间隔（秒），0=不持续触发
         public float tickTimer;            // 当前 tick 计时器
+        public int remainingRounds;        // 剩余回合数（仅 TemporaryRoundBased 使用）
 
         // ── 状态标记 ──
-        public bool IsExpired => !IsPermanent && remainingDuration <= 0;
+        public bool IsExpired => IsRoundBased ? remainingRounds <= 0 : (!IsPermanent && remainingDuration <= 0);
         public bool IsPermanent => remainingDuration < 0;
+        public bool IsRoundBased => persistence == BuffPersistence.TemporaryRoundBased;
         public bool IsStackable => stackRule == BuffStackRule.Stack;
 
         /// <summary>
@@ -68,8 +71,7 @@ namespace TribeSystem
         public static UnifiedBuff CreateStatBuff(
             string buffId, string displayName, BuffSource source, string sourceId,
             StatType statType, bool isPercent, float value,
-            BuffScope scope = BuffScope.Leader, int gameEffectType = -1,
-            string description = null)
+            int gameEffectType = -1, string description = null)
         {
             return new UnifiedBuff
             {
@@ -121,6 +123,35 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 创建一个回合制临时 buff（跨战斗持续 N 回合）
+        /// </summary>
+        public static UnifiedBuff CreateRoundBasedBuff(
+            string buffId, string displayName, BuffSource source, string sourceId,
+            StatType statType, bool isPercent, float value,
+            int rounds, string description = null)
+        {
+            return new UnifiedBuff
+            {
+                buffId = buffId,
+                displayName = displayName,
+                description = description,
+                source = source,
+                sourceId = sourceId,
+                persistence = BuffPersistence.TemporaryRoundBased,
+                stackRule = BuffStackRule.None,
+                maxStacks = 1,
+                currentStacks = 1,
+                statType = statType,
+                isPercent = isPercent,
+                value = value,
+                remainingDuration = -1f,
+                remainingRounds = rounds,
+                tickInterval = 0f,
+                tickTimer = 0f,
+            };
+        }
+
+        /// <summary>
         /// 尝试叠加或刷新 buff。返回 true 表示叠加成功（或刷新），false 表示应创建新实例。
         /// </summary>
         public bool TryStackOrRefresh(UnifiedBuff incoming)
@@ -133,16 +164,19 @@ namespace TribeSystem
                     if (currentStacks < maxStacks)
                         currentStacks = Mathf.Min(currentStacks + incoming.currentStacks, maxStacks);
                     remainingDuration = Mathf.Max(remainingDuration, incoming.remainingDuration);
+                    remainingRounds = Mathf.Max(remainingRounds, incoming.remainingRounds);
                     return true;
 
                 case BuffStackRule.DurationRefresh:
                     remainingDuration = incoming.remainingDuration;
+                    remainingRounds = incoming.remainingRounds;
                     return true;
 
                 case BuffStackRule.None:
                 default:
                     // 刷新持续时间，取较长的
                     remainingDuration = Mathf.Max(remainingDuration, incoming.remainingDuration);
+                    remainingRounds = Mathf.Max(remainingRounds, incoming.remainingRounds);
                     return true;
             }
         }
@@ -171,6 +205,7 @@ namespace TribeSystem
                 effectParam1 = effectParam1,
                 effectParam2 = effectParam2,
                 remainingDuration = remainingDuration,
+                remainingRounds = remainingRounds,
                 tickInterval = tickInterval,
                 tickTimer = tickTimer,
             };

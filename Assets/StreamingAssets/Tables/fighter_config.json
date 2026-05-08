@@ -1,36 +1,94 @@
 {
   "fighters": [
     {
+      "fighterId": 1000,
+      "fighterName": "游侠",
+      "tribeType": 1,
+      "tier": 0,
+      "attack": 34,
+      "defense": 6,
+      "hp": 293,
+      "moveSpeed": 1.0,
+      "attackSpeed": 2.2,
+      "attackRange": 5.0,
+      "innateBuffIds": [],
+      "avatarId": "youxia",
+      "tags": ["ranged", "leader"]
+    },
+    {
+      "fighterId": 2000,
+      "fighterName": "橘猫族长",
+      "tribeType": 2,
+      "tier": 0,
+      "attack": 36,
+      "defense": 5,
+      "hp": 412,
+      "moveSpeed": 1.6,
+      "attackSpeed": 2.4,
+      "attackRange": 1.0,
+      "innateBuffIds": [],
+      "avatarId": "dajuleader",
+      "tags": ["melee", "tank", "leader"]
+    },
+    {
+      "fighterId": 3000,
+      "fighterName": "奶牛猫族长",
+      "tribeType": 3,
+      "tier": 0,
+      "attack": 33,
+      "defense": 6,
+      "hp": 308,
+      "moveSpeed": 1.8,
+      "attackSpeed": 2.4,
+      "attackRange": 1.0,
+      "innateBuffIds": [],
+      "avatarId": "nainiuleader",
+      "tags": ["melee", "swarm", "leader"]
+    },
+    {
+      "fighterId": 4000,
+      "fighterName": "无毛猫族长",
+      "tribeType": 4,
+      "tier": 0,
+      "attack": 42,
+      "defense": 7,
+      "hp": 299,
+      "moveSpeed": 9.999,
+      "attackSpeed": 2.4,
+      "attackRange": 3.0,
+      "innateBuffIds": [],
+      "avatarId": "xianluo",
+      "tags": ["ranged", "mage", "teleport", "leader"]
+    },
+    {
       "fighterId": 1001,
-      "fighterName": "丛林弓箭手",
+      "fighterName": "矛猫",
       "tribeType": 1,
       "tier": 1,
       "attack": 26,
-      "defense": 4,
+      "defense": 0,
       "hp": 225,
       "moveSpeed": 1.1,
       "attackSpeed": 1.75,
       "attackRange": 5.0,
-      "command": 8,
-      "recruitCount": 0,
       "innateBuffIds": [],
-      "avatarId": ""
+      "avatarId": "maomao",
+      "tags": ["ranged", "dps"]
     },
     {
       "fighterId": 1002,
-      "fighterName": "暗影刺客",
+      "fighterName": "猫骑士",
       "tribeType": 1,
       "tier": 2,
-      "attack": 10,
-      "defense": 1,
-      "hp": 20,
-      "moveSpeed": 1.3,
-      "attackSpeed": 1.2,
-      "attackRange": 1.0,
-      "command": 0,
-      "recruitCount": 0,
+      "attack": 22,
+      "defense": 2,
+      "hp": 280,
+      "moveSpeed": 1.45,
+      "attackSpeed": 1.45,
+      "attackRange": 2.0,
       "innateBuffIds": [401],
-      "avatarId": "cangying"
+      "avatarId": "maoqishi",
+      "tags": ["melee", "assassin"]
     },
     {
       "fighterId": 1003,
@@ -43,14 +101,13 @@
       "moveSpeed": 1.1,
       "attackSpeed": 1.3,
       "attackRange": 5.0,
-      "command": 0,
-      "recruitCount": 0,
       "innateBuffIds": [402, 403],
-      "avatarId": ""
+      "avatarId": "lihua",
+      "tags": ["ranged", "glass_cannon"]
     },
     {
       "fighterId": 2001,
-      "fighterName": "吃瓜小猫",
+      "fighterName": "鸡腿勇士",
       "tribeType": 2,
       "tier": 1,
       "attack": 28,
@@ -59,26 +116,24 @@
       "moveSpeed": 1.8,
       "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "command": 12,
-      "recruitCount": 0,
       "innateBuffIds": [],
-      "avatarId": ""
+      "avatarId": "jituiyongshi",
+      "tags": ["melee", "tank"]
     },
     {
       "fighterId": 2002,
       "fighterName": "蝇群",
       "tribeType": 2,
       "tier": 2,
-      "attack": 2,
+      "attack": 22,
       "defense": 0,
-      "hp": 5,
-      "moveSpeed": 1.5,
+      "hp": 90,
+      "moveSpeed": 2.0,
       "attackSpeed": 1.0,
-      "attackRange": 1.0,
-      "command": 0,
-      "recruitCount": 3,
+      "attackRange": 2.2,
       "innateBuffIds": [404],
-      "avatarId": "cangying"
+      "avatarId": "cangying",
+      "tags": ["ranged", "swarm"]
     },
     {
       "fighterId": 2003,
@@ -86,15 +141,14 @@
       "tribeType": 2,
       "tier": 3,
       "attack": 20,
-      "defense": 5,
+      "defense": 10,
       "hp": 80,
       "moveSpeed": 0.5,
       "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "command": 0,
-      "recruitCount": 0,
       "innateBuffIds": [405],
-      "avatarId": ""
+      "avatarId": "daju",
+      "tags": ["melee", "tank", "slow"]
     },
     {
       "fighterId": 3001,
@@ -107,10 +161,9 @@
       "moveSpeed": 2.0,
       "attackSpeed": 2.0,
       "attackRange": 1.0,
-      "command": 11,
-      "recruitCount": 0,
       "innateBuffIds": [],
-      "avatarId": ""
+      "avatarId": "nainiu",
+      "tags": ["melee", "swarm"]
     },
     {
       "fighterId": 3002,
@@ -119,14 +172,13 @@
       "tier": 2,
       "attack": 0,
       "defense": 3,
-      "hp": 40,
+      "hp": 280,
       "moveSpeed": 0.6,
       "attackSpeed": 2.0,
-      "attackRange": 1.0,
-      "command": 0,
-      "recruitCount": 0,
+      "attackRange": 5.0,
       "innateBuffIds": [406],
-      "avatarId": "cangying"
+      "avatarId": "jiaorouche",
+      "tags": ["aoe", "swarm"]
     },
     {
       "fighterId": 4001,
@@ -139,10 +191,9 @@
       "moveSpeed": 9.999,
       "attackSpeed": 2.0,
       "attackRange": 3.0,
-      "command": 9,
-      "recruitCount": 0,
       "innateBuffIds": [],
-      "avatarId": ""
+      "avatarId": "lingnengxuetu",
+      "tags": ["ranged", "mage", "teleport"]
     },
     {
       "fighterId": 4002,
@@ -155,10 +206,9 @@
       "moveSpeed": 1.0,
       "attackSpeed": 1.3,
       "attackRange": 4.0,
-      "command": 0,
-      "recruitCount": 0,
       "innateBuffIds": [407],
-      "avatarId": "cangying"
+      "avatarId": "longyishushi",
+      "tags": ["ranged", "glass_cannon", "mage"]
     },
     {
       "fighterId": 4003,
@@ -171,10 +221,24 @@
       "moveSpeed": 1.1,
       "attackSpeed": 1.5,
       "attackRange": 3.0,
-      "command": 0,
-      "recruitCount": 0,
       "innateBuffIds": [408, 409],
-      "avatarId": ""
+      "avatarId": "xianluo",
+      "tags": ["ranged", "mage", "glass_cannon"]
+    },
+    {
+      "fighterId": 5000,
+      "fighterName": "胖老鼠",
+      "tribeType": 0,
+      "tier": 1,
+      "attack": 15,
+      "defense": 2,
+      "hp": 120,
+      "moveSpeed": 1.2,
+      "attackSpeed": 1.5,
+      "attackRange": 1.5,
+      "innateBuffIds": [],
+      "avatarId": "panglaoshu",
+      "tags": ["melee", "enemy"]
     }
   ]
 }

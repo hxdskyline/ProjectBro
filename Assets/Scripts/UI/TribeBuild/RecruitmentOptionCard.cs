@@ -63,14 +63,7 @@ namespace TribeSystem.UI
 
         private string GetTribePortraitAddress(TribeType tribeType)
         {
-            switch (tribeType)
-            {
-                case TribeType.Tabby: return "avatartemp/lihua1";
-                case TribeType.Orange: return "avatartemp/daju1";
-                case TribeType.Cow: return "avatartemp/nainiu1";
-                case TribeType.Siamese: return "avatartemp/xianluo1";
-                default: return null;
-            }
+            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
         }
 
         private void OnDestroy()

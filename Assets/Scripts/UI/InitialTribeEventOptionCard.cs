@@ -51,27 +51,14 @@ namespace TribeSystem.UI
         {
             if (_iconImage == null) return;
 
-            string breed = GetTribeBreedName(tribeType);
-            if (string.IsNullOrEmpty(breed)) return;
+            string address = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
+            if (string.IsNullOrEmpty(address)) return;
 
-            string address = $"avatartemp/{breed}1";
             _iconHandle = Addressables.LoadAssetAsync<Sprite>(address);
             _iconHandle.Completed += handle =>
             {
                 if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
                     _iconImage.sprite = handle.Result;
-            };
-        }
-
-        private string GetTribeBreedName(TribeType tribeType)
-        {
-            return tribeType switch
-            {
-                TribeType.Tabby => "lihua",
-                TribeType.Orange => "daju",
-                TribeType.Cow => "nainiu",
-                TribeType.Siamese => "xianluo",
-                _ => null
             };
         }
 

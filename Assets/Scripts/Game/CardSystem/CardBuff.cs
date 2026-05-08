@@ -20,16 +20,6 @@ namespace TribeSystem
     }
 
     /// <summary>
-    /// Buff 影响范围
-    /// </summary>
-    public enum BuffScope
-    {
-        Leader,   // 只影响族长
-        Cat,      // 只影响小猫
-        All,      // 影响全体（族长+小猫）
-    }
-
-    /// <summary>
     /// 天生 Buff 效果类型
     /// </summary>
     public enum InnateEffectType
@@ -46,26 +36,6 @@ namespace TribeSystem
         DragonBreathOnCast,    // 龙语回响：施法时对随机敌人造成 value 火伤
     }
 
-    /// <summary>
-    /// 单条 Buff 来源记录
-    /// </summary>
-    [Serializable]
-    public class BuffEntry
-    {
-        public BuffSource source;     // 来源系统
-        public BuffScope scope;       // 影响范围
-        public string choiceId;       // 选择ID（如 "LeaderBoost"、"Artifact_CatAttackFlat"）
-        public StatType statType;     // 影响的属性
-        public bool isPercent;        // true=百分比, false=固定值
-        public float value;           // 数值（百分比存小数如0.1，固定值存整数如6）
-        public string displayName;    // 显示名（如 "招募强化"、"奇物：小猫利爪"）
-
-        public string GetValueString()
-        {
-            if (isPercent) return $"+{Mathf.RoundToInt(value * 100)}%";
-            return $"+{Mathf.RoundToInt(value)}";
-        }
-    }
     /// <summary>
     /// 通用 Buff 条目（用于 UI 显示的特殊 buff）
     /// </summary>
@@ -234,38 +204,6 @@ namespace TribeSystem
                     };
                 default:
                     return null;
-            }
-        }
-    }
-
-    [Serializable]
-    public class TemporaryBuff
-    {
-        public float attackPercent;
-        public float defensePercent;
-        public float hpPercent;
-        public float speedPercent;
-        public int duration; // 剩余回合数
-
-        public TemporaryBuff()
-        {
-            attackPercent = 0f;
-            defensePercent = 0f;
-            hpPercent = 0f;
-            speedPercent = 0f;
-            duration = 0;
-        }
-
-        public bool IsActive()
-        {
-            return duration > 0;
-        }
-
-        public void DecreaseDuration()
-        {
-            if (duration > 0)
-            {
-                duration--;
             }
         }
     }

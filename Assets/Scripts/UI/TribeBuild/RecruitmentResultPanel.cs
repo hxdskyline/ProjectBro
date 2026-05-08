@@ -260,18 +260,17 @@ namespace TribeSystem.UI
             var nameLe = nameGo.AddComponent<LayoutElement>();
             nameLe.preferredHeight = 28f;
 
-            // 5项属性
-            string[] attrNames = { "攻击", "防御", "生命", "速度", "统御" };
-            int[] baseValues = { leader.baseAttack, leader.baseDefense, leader.baseHp, Mathf.RoundToInt(leader.baseMoveSpeed * 1000), leader.command };
+            // 4项属性
+            string[] attrNames = { "攻击", "防御", "生命", "速度" };
+            int[] baseValues = { leader.baseAttack, leader.baseDefense, leader.baseHp, Mathf.RoundToInt(leader.baseMoveSpeed * 1000) };
             float[] buffPcts = {
                 leader.permanentBuffs?.attackPercent ?? 0f,
                 leader.permanentBuffs?.defensePercent ?? 0f,
                 leader.permanentBuffs?.hpPercent ?? 0f,
-                leader.permanentBuffs?.speedPercent ?? 0f,
-                0f
+                leader.permanentBuffs?.speedPercent ?? 0f
             };
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 4; i++)
             {
                 bool isBoosted = boostedStat.HasValue && (int)boostedStat.Value == i;
                 float buffPct = buffPcts[i];
@@ -325,21 +324,20 @@ namespace TribeSystem.UI
             var nameLe = nameGo.AddComponent<LayoutElement>();
             nameLe.preferredHeight = 28f;
 
-            // 属性（攻击、防御、生命、速度、统御）
+            // 属性（攻击、防御、生命）
             var buffs = leader.permanentBuffs;
             int atk = leader.baseAttack + (buffs?.attackBonus ?? 0) + deltaAttack;
             int def = leader.baseDefense + (buffs?.defenseBonus ?? 0);
             int hp = leader.baseHp + (buffs?.hpBonus ?? 0) + deltaHp;
-            int cmd = leader.command;
 
             bool showAtk = highlight ? deltaAttack > 0 : deltaAttack < 0;
             bool showHp = highlight ? deltaHp > 0 : deltaHp < 0;
 
-            string[] names = { "攻击", "防御", "生命", "统御" };
-            int[] vals = { atk, def, hp, cmd };
-            bool[] boosted = { showAtk, false, showHp, false };
+            string[] names = { "攻击", "防御", "生命" };
+            int[] vals = { atk, def, hp };
+            bool[] boosted = { showAtk, false, showHp };
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 3; i++)
             {
                 Color textColor = boosted[i] ? new Color(0.2f, 0.9f, 0.3f) : new Color(0.984f, 0.965f, 0.855f);
                 string prefix = boosted[i] ? "▲ " : "";
@@ -375,14 +373,7 @@ namespace TribeSystem.UI
 
         private string GetTribePortraitAddress(TribeType tribeType)
         {
-            switch (tribeType)
-            {
-                case TribeType.Tabby: return "avatartemp/lihua1";
-                case TribeType.Orange: return "avatartemp/daju1";
-                case TribeType.Cow: return "avatartemp/nainiu1";
-                case TribeType.Siamese: return "avatartemp/xianluo1";
-                default: return null;
-            }
+            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
         }
 
         #endregion

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using TribeSystem;
 using BattleSystem.Fighter;
 using BattleSystem.Avatar;
@@ -118,48 +119,7 @@ namespace BattleSystem
             ApplyAuraBuffs();
 
             // 恢复 Persistent buff（饱食层等）到 RuntimeAttributes
-            RestorePersistentBuffsToRuntime();
-
-            // === 诊断日志：RestorePersistentBuffsToRuntime 后（所有种族 LeaderData） ===
-            {
-                DataManager dm = GameManager.Instance?.DataManager;
-                var allTribes = dm?.PlayerData?.tribes;
-                if (allTribes != null)
-                {
-                    for (int t = 0; t < allTribes.Count; t++)
-                    {
-                        var td = allTribes[t];
-                        if (td?.leader?.ActiveBuffs == null) continue;
-                        var persistentBuffs = new List<TribeSystem.UnifiedBuff>();
-                        foreach (var b in td.leader.ActiveBuffs)
-                        {
-                            if (b.persistence == TribeSystem.BuffPersistence.Persistent)
-                                persistentBuffs.Add(b);
-                        }
-                        if (persistentBuffs.Count > 0)
-                        {
-                            Debug.Log($"[LeaderDataPre] {td.tribeType} persistent buffs={persistentBuffs.Count}");
-                            for (int j = 0; j < persistentBuffs.Count; j++)
-                            {
-                                var b = persistentBuffs[j];
-                                Debug.Log($"  {b.buffId} stacks={b.currentStacks} val={b.value}");
-                            }
-                        }
-                    }
-                }
-            }
-            // === 诊断日志：所有族长最终 ATK ===
-            for (int i = 0; i < _playerFighters.Length; i++)
-            {
-                var f = _playerFighters[i];
-                if (f == null || !f.IsLeader) continue;
-                Debug.Log($"[FinalATK] {f.Name} ({f.TribeType}) ATK={f.RuntimeAttributes.Attack} HP={f.RuntimeAttributes.MaxHp} buffs={f.RuntimeAttributes.ActiveBuffs.Count}");
-                for (int j = 0; j < f.RuntimeAttributes.ActiveBuffs.Count; j++)
-                {
-                    var b = f.RuntimeAttributes.ActiveBuffs[j];
-                    Debug.Log($"  [Buff] {b.buffId} src={b.source} stacks={b.currentStacks} val={b.value} pct={b.isPercent} persist={b.persistence}");
-                }
-            }
+            BattleBuffService.RestorePersistentBuffsToRuntime(_playerFighters);
 
             // 应用天生特殊 buff
             // 初始化战斗模拟
@@ -209,11 +169,10 @@ namespace BattleSystem
             LogBattleSummary(victory);
 
             // 将战斗内 Persistent buff 同步回 LeaderData（饱食层等）
-            SyncPersistentBuffsToLeaderData();
+            BattleBuffService.SyncPersistentBuffsToLeaderData(_playerFighters);
 
             // 清除所有战斗内 buff（BattleOnly 类型）
-            var buffService = new BuffService();
-            buffService.ClearAllBattleBuffs();
+            BuffService.ClearAllBattleBuffs();
 
             // 清理尸体和召唤物
             _simulation?.CorpseManager?.Clear();
@@ -267,6 +226,7 @@ namespace BattleSystem
             }
 
             ClearOldAvatars();
+            SpawnBattleBackground();
 
             BattleSpawnResult result = BattleSpawner.Spawn(
                 transform,
@@ -292,20 +252,6 @@ namespace BattleSystem
 
             _playerFighters = result.PlayerFighters;
             _enemyFighters = result.EnemyFighters;
-
-            // === 诊断日志：Spawn 后橘猫族长状态 ===
-            for (int i = 0; i < _playerFighters.Length; i++)
-            {
-                var f = _playerFighters[i];
-                if (f == null || !f.IsLeader || f.TribeType != TribeType.Orange) continue;
-                Debug.Log($"[AfterSpawn] 橘猫族长 ATK={f.RuntimeAttributes.Attack} buffs={f.RuntimeAttributes.ActiveBuffs.Count}");
-                for (int j = 0; j < f.RuntimeAttributes.ActiveBuffs.Count; j++)
-                {
-                    var b = f.RuntimeAttributes.ActiveBuffs[j];
-                    Debug.Log($"  [Buff] {b.buffId} src={b.source} stacks={b.currentStacks} val={b.value} persist={b.persistence}");
-                }
-                break;
-            }
 
             Debug.Log($"[BattleManager] Demo fighters ready. Player={_playerFighters.Length}, Enemy={_enemyFighters.Length}");
         }
@@ -349,159 +295,24 @@ namespace BattleSystem
             }
         }
 
-        /// <summary>
-        /// 将战斗内 Persistent buff（如饱食层）从 RuntimeAttributes 同步回 LeaderData.ActiveBuffs，
-        /// 以便跨战斗保留。
-        /// </summary>
-        private void SyncPersistentBuffsToLeaderData()
+        private void SpawnBattleBackground()
         {
-            if (_playerFighters == null) return;
+            var go = new GameObject("BattleBackground");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localScale = new Vector3(1.3f, 1.3f, 1f);
 
-            DataManager dataManager = GameManager.Instance?.DataManager;
-            var tribes = dataManager?.PlayerData?.tribes;
-            if (tribes == null) return;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = -100;
 
-            foreach (BattleFighter fighter in _playerFighters)
+            var handle = Addressables.LoadAssetAsync<Sprite>("ui/sprite/addcat/greenbg");
+            handle.Completed += op =>
             {
-                if (fighter == null || !fighter.IsLeader || fighter.RuntimeAttributes == null) continue;
-
-                // 找到对应的 LeaderData
-                TribeSystem.LeaderData leader = null;
-                for (int t = 0; t < tribes.Count; t++)
-                {
-                    if (tribes[t] != null && tribes[t].tribeType == fighter.TribeType && tribes[t].leader != null)
-                    {
-                        leader = tribes[t].leader;
-                        break;
-                    }
-                }
-                if (leader == null) continue;
-
-                // === 诊断日志：同步前 LeaderData 状态 ===
-                if (fighter.TribeType == TribeType.Orange)
-                {
-                    Debug.Log($"[SyncPre] 橘猫 LeaderData buffs={leader.ActiveBuffs.Count}");
-                    for (int j = 0; j < leader.ActiveBuffs.Count; j++)
-                    {
-                        var b = leader.ActiveBuffs[j];
-                        Debug.Log($"  [LeaderBuff] {b.buffId} stacks={b.currentStacks} val={b.value}");
-                    }
-                }
-
-                // 将 RuntimeAttributes 中的 Persistent buff 同步回 LeaderData
-                var runtimeBuffs = fighter.RuntimeAttributes.ActiveBuffs;
-                var leaderBuffs = leader.ActiveBuffs;
-
-                for (int i = runtimeBuffs.Count - 1; i >= 0; i--)
-                {
-                    var runtimeBuff = runtimeBuffs[i];
-                    if (runtimeBuff.persistence != TribeSystem.BuffPersistence.Persistent) continue;
-
-                    // 查找 LeaderData 中是否已有同 buffId 的 buff
-                    bool found = false;
-                    for (int j = 0; j < leaderBuffs.Count; j++)
-                    {
-                        if (leaderBuffs[j].buffId == runtimeBuff.buffId)
-                        {
-                            // 直接设置层数（而非叠加），因为 runtime 已有正确的总层数
-                            leaderBuffs[j].currentStacks = runtimeBuff.currentStacks;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found)
-                    {
-                        leader.AddUnifiedBuff(runtimeBuff.Clone());
-                    }
-                }
-
-            }
-
-            // === 诊断日志：同步后，列出所有种族 LeaderData 的 persistent buff ===
-            Debug.Log($"[SyncEnd] === 所有种族 LeaderData persistent buffs ===");
-            for (int t = 0; t < tribes.Count; t++)
-            {
-                var td = tribes[t];
-                if (td?.leader?.ActiveBuffs == null) continue;
-                var persistentBuffs = new List<TribeSystem.UnifiedBuff>();
-                foreach (var b in td.leader.ActiveBuffs)
-                {
-                    if (b.persistence == TribeSystem.BuffPersistence.Persistent)
-                        persistentBuffs.Add(b);
-                }
-                if (persistentBuffs.Count > 0)
-                {
-                    Debug.Log($"[SyncEnd] {td.tribeType} persistent buffs={persistentBuffs.Count}");
-                    for (int j = 0; j < persistentBuffs.Count; j++)
-                    {
-                        var b = persistentBuffs[j];
-                        Debug.Log($"  {b.buffId} stacks={b.currentStacks} val={b.value} src={b.source}");
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 战斗开始时，将 LeaderData 中的 Persistent buff（饱食层等）恢复到 RuntimeAttributes，
-        /// 确保跨战斗的层数不丢失。
-        /// </summary>
-        private void RestorePersistentBuffsToRuntime()
-        {
-            if (_playerFighters == null) return;
-
-            DataManager dataManager = GameManager.Instance?.DataManager;
-            var tribes = dataManager?.PlayerData?.tribes;
-            if (tribes == null) return;
-
-            foreach (BattleFighter fighter in _playerFighters)
-            {
-                if (fighter == null || !fighter.IsLeader || fighter.RuntimeAttributes == null) continue;
-
-                TribeSystem.LeaderData leader = null;
-                for (int t = 0; t < tribes.Count; t++)
-                {
-                    if (tribes[t] != null && tribes[t].tribeType == fighter.TribeType && tribes[t].leader != null)
-                    {
-                        leader = tribes[t].leader;
-                        break;
-                    }
-                }
-                if (leader == null || leader.ActiveBuffs == null) continue;
-
-                // === 诊断日志：Restore 前 LeaderData 状态 ===
-                if (fighter.TribeType == TribeType.Orange)
-                {
-                    Debug.Log($"[RestorePre] 橘猫 LeaderData buffs={leader.ActiveBuffs.Count}");
-                    for (int j = 0; j < leader.ActiveBuffs.Count; j++)
-                    {
-                        var b = leader.ActiveBuffs[j];
-                        Debug.Log($"  [LeaderBuff] {b.buffId} stacks={b.currentStacks} val={b.value} persist={b.persistence}");
-                    }
-                }
-
-                foreach (var buff in leader.ActiveBuffs)
-                {
-                    if (buff.persistence != TribeSystem.BuffPersistence.Persistent) continue;
-                    if (buff.currentStacks <= 0) continue;
-
-                    // 克隆 buff 并应用到 RuntimeAttributes
-                    var clone = buff.Clone();
-                    fighter.RuntimeAttributes.ApplyBuff(clone);
-                }
-
-                fighter.RuntimeAttributes.Recalculate();
-
-                // === 诊断日志：Restore 后 RuntimeAttributes 状态 ===
-                if (fighter.TribeType == TribeType.Orange)
-                {
-                    Debug.Log($"[RestorePost] 橘猫 ATK={fighter.RuntimeAttributes.Attack} buffs={fighter.RuntimeAttributes.ActiveBuffs.Count}");
-                    for (int j = 0; j < fighter.RuntimeAttributes.ActiveBuffs.Count; j++)
-                    {
-                        var b = fighter.RuntimeAttributes.ActiveBuffs[j];
-                        Debug.Log($"  [Buff] {b.buffId} src={b.source} stacks={b.currentStacks} val={b.value} persist={b.persistence}");
-                    }
-                }
-            }
+                if (op.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)
+                    sr.sprite = op.Result;
+                else
+                    Debug.LogWarning("[BattleManager] Failed to load battle background sprite");
+            };
         }
 
         private void ClearBattlefield()
@@ -768,9 +579,6 @@ namespace BattleSystem
             }
             if (orangeLeader == null) return;
 
-            // === 诊断日志：记录本次调用前后的攻击力 ===
-            int atkBefore = orangeLeader.RuntimeAttributes.Attack;
-
             // 应用饱食层（Persistent buff，自动叠加）
             for (int k = 0; k < newKills; k++)
             {
@@ -779,24 +587,6 @@ namespace BattleSystem
                 orangeLeader.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessAtkStack(4f));
                 orangeLeader.RuntimeAttributes.Recalculate();
                 orangeLeader.RuntimeAttributes.CurrentHp += orangeLeader.RuntimeAttributes.MaxHp - prevMaxHp;
-            }
-
-            if (newKills > 0)
-            {
-                int atkAfter = orangeLeader.RuntimeAttributes.Attack;
-                int totalStacks = 0;
-                var hpBuff = orangeLeader.RuntimeAttributes.GetBuff("fullness_stack");
-                if (hpBuff != null) totalStacks = hpBuff.currentStacks;
-                Debug.Log($"[BattleGrowth] {orangeLeader.Name} 获得 {newKills} 层饱食！(总层数: {totalStacks}, ATK: {atkBefore}→{atkAfter}, +{atkAfter - atkBefore})");
-
-                // 列出所有攻击相关 buff
-                var allBuffs = orangeLeader.RuntimeAttributes.ActiveBuffs;
-                for (int i = 0; i < allBuffs.Count; i++)
-                {
-                    var b = allBuffs[i];
-                    if (b.statType == StatType.Attack)
-                        Debug.Log($"  [Buff] {b.buffId} stacks={b.currentStacks} val={b.value} pct={b.isPercent} total={b.value * b.currentStacks}");
-                }
             }
         }
 

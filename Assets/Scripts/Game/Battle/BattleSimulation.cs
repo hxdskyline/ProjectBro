@@ -26,6 +26,8 @@ namespace BattleSystem
     {
         public static event Action<BulletData> OnBulletFired;
 
+        private static readonly Color SlowTint = new Color(0.6f, 0.9f, 1f, 1f); // #99E6FF
+
         private readonly BattleFighter[] _playerFighters;
         private readonly BattleFighter[] _enemyFighters;
         private readonly BattleSimulationConfig _config;
@@ -248,6 +250,23 @@ namespace BattleSystem
             }
         }
 
+        private void UpdateVisualEffects(BattleFighter[] fighters)
+        {
+            if (fighters == null) return;
+            for (int i = 0; i < fighters.Length; i++)
+            {
+                var f = fighters[i];
+                if (f == null || !f.IsAlive || f.Transform == null) continue;
+
+                bool slowed = f.FreezeTimer > 0f
+                    || (f.RuntimeAttributes != null && f.RuntimeAttributes.SpeedPercentDebuff > 0f);
+
+                var sr = f.Transform.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                    sr.color = slowed ? SlowTint : Color.white;
+            }
+        }
+
         public bool Tick(float deltaTime, out bool playerVictory)
         {
             playerVictory = false;
@@ -255,6 +274,8 @@ namespace BattleSystem
 
             UpdateTimers(deltaTime);
             TickAllBuffs(deltaTime);
+            UpdateVisualEffects(_playerFighters);
+            UpdateVisualEffects(_enemyFighters);
             _corpseManager?.Tick(deltaTime);
             _summonManager?.Tick(deltaTime);
             UpdatePendingHits(_playerFighters, deltaTime);

@@ -245,7 +245,7 @@ namespace BattleSystem.Fighter
                 renderer = go.AddComponent<SpriteRenderer>();
             }
 
-            renderer.color = tint;
+            renderer.color = Color.white;
             SortByY sortBy = go.GetComponent<SortByY>();
             if (sortBy == null)
             {
@@ -314,12 +314,14 @@ namespace BattleSystem.Fighter
             }
 
             // 应用光环 buff（从 LeaderData/CatData 传入）
-            // 注意：Persistent buff（如饱食层）由 RestorePersistentBuffsToRuntime 单独处理，这里跳过以避免重复叠加
+            // 注意：Persistent buff 由 RestorePersistentBuffsToRuntime 单独处理（仅族长），这里跳过以避免重复叠加
+            // TemporaryRoundBased 同理，族长由 restore 处理，小猫在此直接应用
             if (auraBuffs != null)
             {
                 foreach (var buff in auraBuffs)
                 {
                     if (buff.persistence == BuffPersistence.Persistent) continue;
+                    if (isLeader && buff.persistence == BuffPersistence.TemporaryRoundBased) continue;
                     var clone = buff.Clone();
                     runtimeAttributes.ApplyBuff(clone);
                 }
