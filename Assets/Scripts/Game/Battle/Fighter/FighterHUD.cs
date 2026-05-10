@@ -83,6 +83,13 @@ namespace BattleSystem.Fighter
             UpdateBar();
         }
 
+        public void SetMaxHp(int maxHp)
+        {
+            _maxHp = Mathf.Max(1, maxHp);
+            _currentHp = Mathf.Clamp(_currentHp, 0, _maxHp);
+            UpdateBar();
+        }
+
         private void UpdateBar()
         {
             if (_fgQuad == null || _bgQuad == null) return;

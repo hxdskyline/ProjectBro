@@ -40,7 +40,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostTemporary: return "族长临时强化";
                 case RitualRewardType.LeaderStatBoostPermanent: return "族长永久强化";
                 case RitualRewardType.LeaderStatBoostPercent:   return "族长百分比强化";
-                case RitualRewardType.Cats:      return "获得小猫";
                 case RitualRewardType.CatFood:   return "获得猫粮";
                 case RitualRewardType.Consumable:return "获得道具";
                 case RitualRewardType.Accessory: return "获得饰品";

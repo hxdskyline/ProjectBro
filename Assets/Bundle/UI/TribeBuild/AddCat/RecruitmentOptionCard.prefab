@@ -67,6 +67,7 @@ MonoBehaviour:
   _backgroundImage: {fileID: 1140000000000000001}
   _portraitImage: {fileID: 2858255695668536784}
   _titleText: {fileID: 8677833839836855910}
+  _typeText: {fileID: 1140000000000000003}
   _descText: {fileID: 1140000000000000007}
   _okButton: {fileID: 7654436209721017516}
 --- !u!114 &1140000000000000001

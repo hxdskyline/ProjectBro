@@ -14,8 +14,8 @@
     { "id": "accessory_12", "name": "猫神之眼",   "description": "全属性+5%",   "effects": [{"type": 4, "value": 0.05}] },
     { "id": "accessory_13", "name": "疾风之靴",   "description": "族长速度+300", "effects": [{"type": 14, "value": 300}] },
     { "id": "accessory_14", "name": "亡猫之力",   "description": "每死一只小猫，族长攻击+6", "effects": [{"type": 15, "value": 6}] },
-    { "id": "Artifact_LeaderHpFlat",  "name": "猫爬架", "description": "族长生命值+500", "effects": [{"type": 12, "value": 500}] },
-    { "id": "Artifact_CatAttackFlat", "name": "苍蝇拍", "description": "小猫攻击力+20",  "effects": [{"type": 10, "value": 20}] }
+    { "id": "Artifact_LeaderHpFlat",  "name": "猫爬架", "description": "全体生命值+500", "effects": [{"type": 12, "value": 500}] },
+    { "id": "Artifact_CatAttackFlat", "name": "苍蝇拍", "description": "全体攻击力+20",  "effects": [{"type": 10, "value": 20}] }
   ],
   "dropPools": {
     "battle_normal":    { "accessoryIds": ["accessory_1", "accessory_2", "accessory_3", "accessory_4"], "dropRate": 0.1 },

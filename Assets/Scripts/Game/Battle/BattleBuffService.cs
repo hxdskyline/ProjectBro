@@ -10,39 +10,6 @@ namespace TribeSystem
     public static class BattleBuffService
     {
         /// <summary>
-        /// 战斗开始时，将 LeaderData 中的 Persistent / TemporaryRoundBased buff 恢复到 RuntimeAttributes，
-        /// 确保跨战斗的层数不丢失。
-        /// </summary>
-        public static void RestorePersistentBuffsToRuntime(BattleFighter[] playerFighters)
-        {
-            if (playerFighters == null) return;
-
-            DataManager dataManager = GameManager.Instance?.DataManager;
-            var tribes = dataManager?.PlayerData?.tribes;
-            if (tribes == null) return;
-
-            foreach (BattleFighter fighter in playerFighters)
-            {
-                if (fighter == null || !fighter.IsLeader || fighter.RuntimeAttributes == null) continue;
-
-                LeaderData leader = FindLeaderData(tribes, fighter.TribeType);
-                if (leader == null || leader.ActiveBuffs == null) continue;
-
-                foreach (var buff in leader.ActiveBuffs)
-                {
-                    if (buff.persistence != BuffPersistence.Persistent
-                        && buff.persistence != BuffPersistence.TemporaryRoundBased) continue;
-                    if (buff.currentStacks <= 0) continue;
-
-                    var clone = buff.Clone();
-                    fighter.RuntimeAttributes.ApplyBuff(clone);
-                }
-
-                fighter.RuntimeAttributes.Recalculate();
-            }
-        }
-
-        /// <summary>
         /// 战斗结束时，将战斗内 Persistent buff（如饱食层）从 RuntimeAttributes 同步回 LeaderData.ActiveBuffs，
         /// 以便跨战斗保留。
         /// </summary>

@@ -29,6 +29,8 @@ namespace TribeSystem
         public string tribeName;
         public string description;
         public int initialCatCount;
+        public int recruitCountA;             // 获得新种族时的猫咪数量
+        public int recruitCountB;             // 已有种族猫咪增加数量
         public int deployCostPerCat;          // 每只小猫的出战消耗（猫粮）
         public int leaderFighterId;           // fighter_config.json 中的族长 fighterId
         public List<UnitTypeData> unitTypes;   // 单位类型列表（Tier1/2/3）
@@ -39,6 +41,8 @@ namespace TribeSystem
             tribeName = "";
             description = "";
             initialCatCount = 3;
+            recruitCountA = 1;
+            recruitCountB = 1;
             deployCostPerCat = 10;
             leaderFighterId = 0;
             unitTypes = new List<UnitTypeData>();

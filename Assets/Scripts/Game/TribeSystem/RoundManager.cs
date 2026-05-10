@@ -12,7 +12,7 @@ namespace TribeSystem
         Recruitment,    // 每回强制：招募&练兵
         Ritual,         // 每3回强制：祭祀
         Shop,           // 每5回可选：商店
-        BossBattle      // 第20回：Boss战
+        BossBattle      // Boss战
     }
 
     /// <summary>
@@ -22,13 +22,17 @@ namespace TribeSystem
     /// </summary>
     public class RoundManager
     {
-        public const int MAX_ROUNDS = 10;
-
         private int _currentRound = 1;
 
         public int CurrentRound => _currentRound;
-        public bool IsFinalRound => _currentRound == MAX_ROUNDS;
-        public bool IsGameOver => _currentRound > MAX_ROUNDS;
+
+        /// <summary>
+        /// 获取总关卡数（从配置中读取）
+        /// </summary>
+        public int MaxRounds => Campaign?.MaxBattleCount ?? 20;
+
+        public bool IsFinalRound => _currentRound >= MaxRounds;
+        public bool IsGameOver => _currentRound > MaxRounds;
 
         /// <summary>
         /// 开始新回合
@@ -56,7 +60,7 @@ namespace TribeSystem
             else
             {
                 _currentRound++;
-                Debug.Log($"[RoundManager] 游戏结束！共完成 {MAX_ROUNDS} 回合");
+                Debug.Log($"[RoundManager] 游戏结束！共完成 {MaxRounds} 回合");
             }
         }
 
@@ -96,7 +100,7 @@ namespace TribeSystem
         /// </summary>
         public string GetRoundDescription()
         {
-            string desc = $"第 {_currentRound}/{MAX_ROUNDS} 关";
+            string desc = $"第 {_currentRound}/{MaxRounds} 关";
 
             if (IsFinalRound)                          desc += " [最终战]";
             else if (CanDoRitual() && CanOpenShop())   desc += " [祭祀+商店]";
@@ -130,7 +134,7 @@ namespace TribeSystem
         /// </summary>
         public void SetRound(int round)
         {
-            _currentRound = Mathf.Clamp(round, 1, MAX_ROUNDS + 1);
+            _currentRound = Mathf.Clamp(round, 1, MaxRounds + 1);
             Debug.Log($"[RoundManager] 设置当前回合为 {_currentRound}");
         }
 
@@ -141,13 +145,13 @@ namespace TribeSystem
         {
             if (IsGameOver) return "游戏已结束";
 
-            int next = Mathf.Min(_currentRound + 1, MAX_ROUNDS);
+            int next = Mathf.Min(_currentRound + 1, MaxRounds);
             string preview = $"下一关预告: 第{next}关";
 
             var c = Campaign;
             if (c?.HasRitualForBattle(next) == true)  preview += " 有祭祀";
             if (c?.HasShopForBattle(next) == true)    preview += " 有商店";
-            if (next == MAX_ROUNDS)                   preview += " [最终战！]";
+            if (next == MaxRounds)                   preview += " [最终战！]";
 
             return preview;
         }

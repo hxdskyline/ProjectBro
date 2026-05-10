@@ -102,8 +102,10 @@ public class BattlePreparePanel : UIPanel
         _battleChoices.Clear();
         BattleCampaignRuntime campaign = GameManager.Instance.BattleCampaignRuntime;
 
-        bool isBossLevel = (levelId == 5 || levelId == 10);
-        bool hasExtremeChallenge = (levelId == 3 || levelId == 6 || levelId == 9);
+        // 从配置中获取关卡类型，不再硬编码
+        LevelType levelType = campaign != null ? campaign.GetLevelType(_currentLevel) : LevelType.Normal;
+        bool isBossLevel = (levelType == LevelType.Boss);
+        bool isEliteLevel = (levelType == LevelType.Elite);
 
         if (isBossLevel)
         {
@@ -142,8 +144,8 @@ public class BattlePreparePanel : UIPanel
                 _battleChoices.Add(choice);
             }
 
-            // 第三六九关额外增加一个极难选项
-            if (hasExtremeChallenge)
+            // 精英关额外增加一个极难选项
+            if (isEliteLevel)
             {
                 // 只有2种地形，随机选一个
                 TerrainType terrain3 = (TerrainType)Random.Range(0, 2);
@@ -362,15 +364,14 @@ public class BattlePreparePanel : UIPanel
         for (int t = 0; t < tribeCount; t++)
         {
             var tribe = _deployedTribes[t];
-            string breed = GetTribeBreedName(tribe.tribeType);
-            if (string.IsNullOrEmpty(breed)) continue;
 
             float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
             int clickedTribeId = tribe.tribeId;
 
-            // 族长使用 fighter_config.json 中的 avatarId
-            string leaderIdleAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 1) ?? $"avatartemp/{breed}1";
-            string leaderAttackAddr = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribe.tribeType, 2) ?? $"avatartemp/{breed}2";
+            // 使用 fighterId 加载对应兵种的头像
+            string leaderIdleAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(tribe.fighterId, 1);
+            string leaderAttackAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(tribe.fighterId, 2);
+            if (string.IsNullOrEmpty(leaderIdleAddr) && string.IsNullOrEmpty(leaderAttackAddr)) continue;
 
             var idleHandle = Addressables.LoadAssetAsync<Sprite>(leaderIdleAddr);
             var attackHandle = Addressables.LoadAssetAsync<Sprite>(leaderAttackAddr);
@@ -425,7 +426,8 @@ public class BattlePreparePanel : UIPanel
                 {
                     var cat = tribe.cats[i];
                     int fighterId = GetCatFighterIdForAvatar(tribe.tribeType, cat.tier);
-                    GetCatAvatarAddresses(fighterId, breed, out string catIdleAddr, out string catAttackAddr);
+                    GetCatAvatarAddresses(fighterId, out string catIdleAddr, out string catAttackAddr);
+                    if (string.IsNullOrEmpty(catIdleAddr) && string.IsNullOrEmpty(catAttackAddr)) continue;
 
                     int catIdx = i;
                     bool catIsSelected = (tribeIsSelected && i == _selectedCatIndex);
@@ -577,18 +579,6 @@ public class BattlePreparePanel : UIPanel
         return _tribesRoot?.Find(name)?.gameObject;
     }
 
-    private string GetTribeBreedName(TribeType tribeType)
-    {
-        switch (tribeType)
-        {
-            case TribeType.Tabby: return "lihua";
-            case TribeType.Orange: return "daju";
-            case TribeType.Cow: return "nainiu";
-            case TribeType.Siamese: return "xianluo";
-            default: return null;
-        }
-    }
-
     private int GetCatFighterIdForAvatar(TribeType tribeType, UnitTier tier)
     {
         var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
@@ -601,7 +591,7 @@ public class BattlePreparePanel : UIPanel
         return 0;
     }
 
-    private void GetCatAvatarAddresses(int fighterId, string defaultBreed, out string idleAddr, out string attackAddr)
+    private void GetCatAvatarAddresses(int fighterId, out string idleAddr, out string attackAddr)
     {
         if (fighterId > 0)
         {
@@ -613,8 +603,8 @@ public class BattlePreparePanel : UIPanel
                 return;
             }
         }
-        idleAddr = $"avatartemp/{defaultBreed}1";
-        attackAddr = $"avatartemp/{defaultBreed}2";
+        idleAddr = null;
+        attackAddr = null;
     }
 
     private void CreateBuffIndicator(Transform parent, TribeType tribeType, Vector2 position)
@@ -725,6 +715,7 @@ public class BattlePreparePanel : UIPanel
             var copy = new TribeRecord
             {
                 tribeId = tribe.tribeId,
+                fighterId = tribe.fighterId,
                 tribeType = tribe.tribeType,
                 leader = tribe.leader,
                 moodId = tribe.moodId,

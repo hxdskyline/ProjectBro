@@ -29,7 +29,7 @@ namespace TribeSystem.UI
 
             if (_titleText != null)
             {
-                _titleText.text = GetTribeName(option.tribeType);
+                _titleText.text = GetFighterName(option.fighterId);
             }
             if (_descText != null)
             {
@@ -42,12 +42,12 @@ namespace TribeSystem.UI
             }
         }
 
-        private string GetTribeName(TribeType tribeType)
+        private string GetFighterName(int fighterId)
         {
-            var config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-            if (config != null && !string.IsNullOrEmpty(config.tribeName))
-                return config.tribeName;
-            return tribeType.ToString();
+            var config = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
+            if (config != null && !string.IsNullOrEmpty(config.fighterName))
+                return config.fighterName;
+            return $"兵种{fighterId}";
         }
     }
 }

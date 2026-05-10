@@ -439,6 +439,8 @@ namespace TribeSystem
                             break;
                     }
                 }
+                if (abHpPct != 0 || abHpFlat != 0 || abAtkPct != 0 || abAtkFlat != 0)
+                    Debug.Log($"[Recalculate] buffs={_activeBuffs.Count} abHpPct={abHpPct} abHpFlat={abHpFlat} abAtkPct={abAtkPct} abAtkFlat={abAtkFlat}");
             }
 
             // 最终修正 = ActiveBuffs + 外部字段（地形/天气/装备等直接修改） - debuff

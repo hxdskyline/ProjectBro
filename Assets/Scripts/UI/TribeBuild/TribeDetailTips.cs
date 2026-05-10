@@ -70,10 +70,11 @@ namespace TribeSystem.UI
         {
             if (_tribe == null) return;
 
-            // 族群名称
+            // 兵种名称（从 fighter 表获取）
             if (_tribeNameText != null)
             {
-                _tribeNameText.text = GetTribeTypeName(_tribe.tribeType) + "族";
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(_tribe.fighterId);
+                _tribeNameText.text = fighterConfig?.fighterName ?? $"兵种{_tribe.fighterId}";
             }
 
             // 族长信息
@@ -204,18 +205,6 @@ namespace TribeSystem.UI
                 var cardGo = Instantiate(_littleCatCardPrefab, content, false);
                 var card = cardGo.GetComponent<LittleCatCard>();
                 card.Setup(cat, _tribe);
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                default: return type.ToString();
             }
         }
     }

@@ -113,7 +113,10 @@ public class BattleHUDPanel : MonoBehaviour
             {
                 if (fighterIndex >= fighters.Length) break;
 
-                BarGroup group = CreateBarGroup(_playerRoot, GetTribeTypeName(tribe.tribeType),
+                // 使用 fighter 表中的名称
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+                string groupName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+                BarGroup group = CreateBarGroup(_playerRoot, groupName,
                     GetTribeColor(tribe.tribeType));
 
                 // Leader
@@ -356,18 +359,6 @@ public class BattleHUDPanel : MonoBehaviour
     }
 
     // --- Helpers ---
-
-    private static string GetTribeTypeName(TribeType type)
-    {
-        switch (type)
-        {
-            case TribeType.Tabby: return "狸花";
-            case TribeType.Orange: return "大橘";
-            case TribeType.Cow: return "奶牛";
-            case TribeType.Siamese: return "暹罗";
-            default: return type.ToString();
-        }
-    }
 
     private static Color GetTribeColor(TribeType type)
     {

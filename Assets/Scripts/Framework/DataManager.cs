@@ -65,6 +65,7 @@ public class DataManager : MonoBehaviour
 
         try
         {
+            _playerData.lastSaveTime = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string filePath = Path.Combine(_savePath, "playerdata.json");
             string json = JsonUtility.ToJson(_playerData, true);
             File.WriteAllText(filePath, json);
@@ -86,8 +87,6 @@ public class DataManager : MonoBehaviour
         _playerData.playerName = "Player";
         _playerData.level = 1;
         _playerData.currentLevel = 1;
-        _playerData.gold = 0;
-        _playerData.diamond = 0;
         _playerData.currencies = new System.Collections.Generic.List<CurrencyData>();
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Gold), 0, false);
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond), 0, false);
@@ -195,8 +194,6 @@ public class DataManager : MonoBehaviour
                 amount = amount
             });
         }
-
-        SyncLegacyCurrencyFields();
 
         if (saveImmediately)
         {
@@ -560,6 +557,19 @@ public class DataManager : MonoBehaviour
         if (saveImmediately) SavePlayerData();
     }
 
+    public bool IsRandomEventCompletedForRound(int round)
+    {
+        if (_playerData == null) return false;
+        return _playerData.randomEventCompletedRound == round;
+    }
+
+    public void SetRandomEventCompletedForRound(int round, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        _playerData.randomEventCompletedRound = round;
+        if (saveImmediately) SavePlayerData();
+    }
+
     public int GetLastStandCount()
     {
         if (_playerData == null) return 0;
@@ -609,6 +619,10 @@ public class DataManager : MonoBehaviour
         if (_playerData.tribes == null)
         {
             _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
+        }
+        if (_playerData.ownedAffixes == null)
+        {
+            _playerData.ownedAffixes = new System.Collections.Generic.List<string>();
         }
 
         // 修复旧存档：确保每个族群的cats列表不为null，并确保族长拥有天生buff
@@ -684,10 +698,6 @@ public class DataManager : MonoBehaviour
         {
             _playerData.shopSession = new ShopSessionRecord();
         }
-
-        MigrateLegacyCurrencyField(CurrencyManager.GetCurrencyKey(CurrencyType.Gold), _playerData.gold);
-        MigrateLegacyCurrencyField(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond), _playerData.diamond);
-        SyncLegacyCurrencyFields();
     }
 
     /// <summary>
@@ -698,14 +708,19 @@ public class DataManager : MonoBehaviour
     {
         if (_playerData.tribes == null) return;
 
-        // 收集所有需要应用的 aura buff（runChoices + runEquipments 中 BuffApplyType.Aura 的条目）
+        Debug.Log($"[RebuildAuraBuffs] runChoices={_playerData.runChoices?.Count ?? 0}, runEquipments={_playerData.runEquipments?.Count ?? 0}, tribes={_playerData.tribes.Count}");
+
+        // 收集所有需要应用的 aura buff（runChoices + runEquipments 中 BuffApplyType.Aura/CurrentUnit 的条目）
         var auraEntries = new System.Collections.Generic.List<TribeSystem.GameChoice>();
         if (_playerData.runChoices != null)
         {
             foreach (var choice in _playerData.runChoices)
             {
                 if (choice.category != TribeSystem.ChoiceCategory.Buff) continue;
-                if (choice.buffApplyType != TribeSystem.BuffApplyType.Aura) continue;
+                // 重建 Aura 和 CurrentUnit 类型的 buff（CurrentUnit 也需持久化，否则存档加载后丢失）
+                if (choice.buffApplyType != TribeSystem.BuffApplyType.Aura
+                    && choice.buffApplyType != TribeSystem.BuffApplyType.CurrentUnit) continue;
+                Debug.Log($"[RebuildAuraBuffs] runChoice: id={choice.choiceId}, name={choice.displayName}, type={choice.buffApplyType}, effects={choice.buffEffects?.Count ?? 0}");
                 auraEntries.Add(choice);
             }
         }
@@ -714,6 +729,7 @@ public class DataManager : MonoBehaviour
             foreach (var equip in _playerData.runEquipments)
             {
                 if (equip.buffApplyType != TribeSystem.BuffApplyType.Aura) continue;
+                Debug.Log($"[RebuildAuraBuffs] runEquipment: id={equip.equipmentId}, name={equip.displayName}, type={equip.buffApplyType}, effects={equip.effects?.Count ?? 0}");
                 auraEntries.Add(new TribeSystem.GameChoice
                 {
                     choiceId = equip.equipmentId,
@@ -728,11 +744,16 @@ public class DataManager : MonoBehaviour
             }
         }
 
+        Debug.Log($"[RebuildAuraBuffs] auraEntries count={auraEntries.Count}");
         if (auraEntries.Count == 0) return;
 
         foreach (var tribe in _playerData.tribes)
         {
             if (tribe == null || !tribe.isActive) continue;
+
+            int leaderBuffCountBefore = tribe.leader?.ActiveBuffs?.Count ?? 0;
+            int catBuffCountBefore = 0;
+            if (tribe.cats != null) foreach (var c in tribe.cats) catBuffCountBefore += c.ActiveBuffs?.Count ?? 0;
 
             foreach (var entry in auraEntries)
             {
@@ -754,6 +775,11 @@ public class DataManager : MonoBehaviour
                     }
                 }
             }
+
+            int leaderBuffCountAfter = tribe.leader?.ActiveBuffs?.Count ?? 0;
+            int catBuffCountAfter = 0;
+            if (tribe.cats != null) foreach (var c in tribe.cats) catBuffCountAfter += c.ActiveBuffs?.Count ?? 0;
+            Debug.Log($"[RebuildAuraBuffs] Tribe {tribe.tribeType}: leader buffs {leaderBuffCountBefore}->{leaderBuffCountAfter}, cat buffs {catBuffCountBefore}->{catBuffCountAfter}");
         }
     }
 
@@ -768,39 +794,11 @@ public class DataManager : MonoBehaviour
                 eff.statType, eff.isPercent, eff.value,
                 gameEffectType: eff.gameEffectType,
                 description: description);
+            Debug.Log($"[RebuildAuraBuffs] Applying buff to {(unit is TribeSystem.LeaderData ? "leader" : "cat")}: id={buff.buffId}, stat={eff.statType}, isPercent={eff.isPercent}, value={eff.value}, persistence={buff.persistence}");
             unit.AddUnifiedBuff(buff);
         }
     }
 
-    private void MigrateLegacyCurrencyField(string currencyId, long legacyAmount)
-    {
-        bool exists = false;
-        for (int i = 0; i < _playerData.currencies.Count; i++)
-        {
-            CurrencyData currency = _playerData.currencies[i];
-            if (currency != null && currency.currencyId == currencyId)
-            {
-                exists = true;
-                break;
-            }
-        }
-
-        if (!exists)
-        {
-            _playerData.currencies.Add(new CurrencyData
-            {
-                currencyId = currencyId,
-                amount = legacyAmount
-            });
-        }
-    }
-
-    private void SyncLegacyCurrencyFields()
-    {
-        _playerData.gold = GetCurrencyAmountInternal(CurrencyManager.GetCurrencyKey(CurrencyType.Gold));
-        _playerData.diamond = GetCurrencyAmountInternal(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond));
-        _playerData.lastSaveTime = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-    }
 }
 
 /// <summary>
@@ -813,8 +811,6 @@ public class PlayerData
     public string playerName;
     public int level;
     public int currentLevel;
-    public long gold;
-    public long diamond;
     public long lastSaveTime;
     public System.Collections.Generic.List<CurrencyData> currencies;
 
@@ -838,6 +834,13 @@ public class PlayerData
     public int recruitmentCompletedRound;
     public int ritualCompletedRound;
     public int newTribeEventCompletedRound;
+    public int randomEventCompletedRound;
+
+    // 撸铁系统：已拥有的词缀ID列表
+    public System.Collections.Generic.List<string> ownedAffixes;
+
+    // 上一关的难度（用于判断是否触发双倍撸铁）
+    public int lastBattleDifficulty;
 
     // Legacy Cat system persistent fields (kept for compatibility, marked obsolete)
     [System.Obsolete("Use TribeSystem instead")]

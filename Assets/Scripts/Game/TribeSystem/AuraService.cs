@@ -20,8 +20,10 @@ namespace TribeSystem
         /// </summary>
         public void RegisterChoice(GameChoice choice)
         {
-            if (choice == null) return;
+            if (choice == null) { Debug.LogWarning("[AuraService] RegisterChoice: choice is null"); return; }
+            Debug.Log($"[AuraService] RegisterChoice: id={choice.choiceId}, name={choice.displayName}, effects={choice.buffEffects?.Count ?? 0}, scope={choice.GetScopeDisplayString()}");
             _dataManager.PlayerData.runChoices.Add(choice);
+            Debug.Log($"[AuraService] runChoices count now = {_dataManager.PlayerData.runChoices.Count}");
             var scopeFilter = choice.GetScopeFilter();
             ApplyToExistingUnits(scopeFilter, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
             _dataManager.SavePlayerData();

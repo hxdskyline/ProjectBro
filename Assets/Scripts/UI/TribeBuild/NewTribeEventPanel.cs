@@ -6,14 +6,14 @@ using System.Collections.Generic;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 新部族事件面板 - 强制二选一弹窗
-    /// 每4回合判定，部族数≤4时触发，在招募+祭祀之后弹出
+    /// 新部族事件面板 - 强制选择弹窗（支持2选1或3选1）
+    /// 用于摇人系统：开局选择种族、第10关选择第3种族
     /// 点击卡片的"就它了"按钮直接选择，无需确认
     /// </summary>
     public class NewTribeEventPanel : MonoBehaviour
     {
-        private const string PanelName = "新部族事件";
-        private const string HintForce = "选择一个新部族加入你的阵营";
+        private const string PanelName = "摇人";
+        private const string HintForce = "选择一个种族加入你的阵营";
 
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;

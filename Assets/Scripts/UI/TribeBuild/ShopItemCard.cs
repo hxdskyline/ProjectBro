@@ -66,7 +66,7 @@ namespace TribeSystem.UI
             {
                 case ShopItemType.Artifact: return "奇物";
                 case ShopItemType.Consumable: return "消耗品";
-                case ShopItemType.Cat: return "小猫";
+                case ShopItemType.Cat: return "兵种";
                 default: return "未知";
             }
         }

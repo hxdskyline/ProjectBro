@@ -237,11 +237,11 @@ public class BattlePanel : UIPanel
         if (tribe.leader == null)
             return false;
 
-        // 计算族长基础属性（排除 Persistent buff，避免与 RestorePersistentBuffsToRuntime 重复叠加）
-        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId, excludePersistent: true);
+        // 计算族长基础属性
+        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId);
 
         // 从 fighter_config.json 读取族长基础攻速
-        int leaderFighterId = GetLeaderFighterId(tribe.tribeType);
+        int leaderFighterId = tribe.fighterId;
         var leaderFighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(leaderFighterId);
         float leaderBaseAttackSpeed = leaderFighterConfig?.attackSpeed ?? 0.5f;
 
@@ -261,7 +261,9 @@ public class BattlePanel : UIPanel
         // BUFF 预览文本（实际 BUFF 在 BattleManager 中通过运行时修正生效）
         TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
         string buffTag = buff.IsNeutral ? "" : $" [{buff.GetDescription()}]";
-        string leaderName = $"[族长] {GetTribeTypeName(tribe.tribeType)}{buffTag}";
+
+        // 使用 fighter 表中的名称
+        string leaderName = leaderFighterConfig != null ? $"{leaderFighterConfig.fighterName}{buffTag}" : $"族长{buffTag}";
 
         // 从 fighter_config.json 查找族长 fighterId（tribeType*1000 + tier1）
         definition = new BattleFighterSpawnDefinition(
@@ -273,6 +275,13 @@ public class BattlePanel : UIPanel
             leaderFighterId);
         definition.AuraBuffs = tribe.leader.ActiveBuffs;
         definition.IsLeader = true;
+
+        Debug.Log($"[BattlePanel] Leader {tribe.tribeType} auraBuffs count={tribe.leader.ActiveBuffs?.Count ?? 0}");
+        if (tribe.leader.ActiveBuffs != null)
+        {
+            foreach (var b in tribe.leader.ActiveBuffs)
+                Debug.Log($"  [BattlePanel] Leader buff: id={b.buffId}, stat={b.statType}, isPercent={b.isPercent}, value={b.value}, persistence={b.persistence}");
+        }
 
         return true;
     }
@@ -339,13 +348,13 @@ public class BattlePanel : UIPanel
                 AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(fighterConfig.attackSpeed * 1000)),
                 AttackRange = Mathf.Max(0.1f, fighterConfig.attackRange)
             };
-            unitName = $"[{fighterConfig.fighterName}] {GetTribeTypeName(tribe.tribeType)}";
+            unitName = fighterConfig.fighterName;
             scaleMultiplier = cat.tier == UnitTier.Tier3 ? 0.85f : cat.tier == UnitTier.Tier2 ? 0.75f : 0.65f;
         }
         else
         {
             // 回退：使用品质计算的属性
-            CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat, excludePersistent: true);
+            CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat);
             float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
 
             staticAttributes = new UnitStaticAttributes
@@ -357,7 +366,10 @@ public class BattlePanel : UIPanel
                 AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.attackSpeed * 1000)),
                 AttackRange = Mathf.Max(0.1f, catAttackRange)
             };
-            unitName = $"[{GetQualityName(cat.quality)}] {GetTribeTypeName(tribe.tribeType)}";
+
+            // 使用 fighter 表中的名称
+            var fallbackFighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(catFighterId);
+            unitName = fallbackFighterConfig?.fighterName ?? $"兵种{catFighterId}";
         }
 
         definition = new BattleFighterSpawnDefinition(
@@ -368,6 +380,13 @@ public class BattlePanel : UIPanel
             tribe.tribeType,
             catFighterId);
         definition.AuraBuffs = cat.ActiveBuffs;
+
+        Debug.Log($"[BattlePanel] Cat {tribe.tribeType} catId={cat.catId} auraBuffs count={cat.ActiveBuffs?.Count ?? 0}");
+        if (cat.ActiveBuffs != null)
+        {
+            foreach (var b in cat.ActiveBuffs)
+                Debug.Log($"  [BattlePanel] Cat buff: id={b.buffId}, stat={b.statType}, isPercent={b.isPercent}, value={b.value}, persistence={b.persistence}");
+        }
 
         return true;
     }
@@ -393,18 +412,6 @@ public class BattlePanel : UIPanel
 
         _playerAvatarDefinitionsByAddress[address] = loadedDefinition;
         return loadedDefinition;
-    }
-
-    private string GetTribeTypeName(TribeType type)
-    {
-        switch (type)
-        {
-            case TribeType.Tabby: return "狸花";
-            case TribeType.Orange: return "大橘";
-            case TribeType.Cow: return "奶牛";
-            case TribeType.Siamese: return "暹罗";
-            default: return type.ToString();
-        }
     }
 
     private string GetQualityName(CatQuality quality)

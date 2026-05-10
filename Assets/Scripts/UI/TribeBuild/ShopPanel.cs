@@ -7,11 +7,11 @@ namespace TribeSystem.UI
 {
     /// <summary>
     /// 商店面板 - 可选操作面板
-    /// 每5回合开放一次，可买进卖出
+    /// 用于猫市系统：第3、6、9、12、15、18关出现
     /// </summary>
     public class ShopPanel : MonoBehaviour
     {
-        private const string PanelName = "神秘商店";
+        private const string PanelName = "猫市";
 
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;
@@ -505,7 +505,7 @@ namespace TribeSystem.UI
             {
                 case ShopItemType.Artifact: return "奇物";
                 case ShopItemType.Consumable: return "道具";
-                case ShopItemType.Cat: return "小猫";
+                case ShopItemType.Cat: return "兵种";
                 default: return "未知";
             }
         }
@@ -672,7 +672,10 @@ namespace TribeSystem.UI
                 hlText.fontSize = 14;
                 hlText.alignment = TextAnchor.MiddleLeft;
                 hlText.color = new Color(1f, 0.85f, 0.4f, 1f);
-                hlText.text = $"  {GetTribeTypeName(tribe.tribeType)}族 ({tribe.cats.Count}只)";
+                // 使用 fighter 表中的名称
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+                string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+                hlText.text = $"  {fighterName} ({tribe.cats.Count}只)";
 
                 for (int i = 0; i < tribe.cats.Count; i++)
                 {
@@ -781,18 +784,6 @@ namespace TribeSystem.UI
                 case CatQuality.Purple: return "精英";
                 case CatQuality.Gold: return "大师";
                 default: return quality.ToString();
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                default: return type.ToString();
             }
         }
 

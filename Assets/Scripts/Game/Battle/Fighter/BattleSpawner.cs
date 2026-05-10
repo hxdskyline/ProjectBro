@@ -314,14 +314,13 @@ namespace BattleSystem.Fighter
             }
 
             // 应用光环 buff（从 LeaderData/CatData 传入）
-            // 注意：Persistent buff 由 RestorePersistentBuffsToRuntime 单独处理（仅族长），这里跳过以避免重复叠加
-            // TemporaryRoundBased 同理，族长由 restore 处理，小猫在此直接应用
+            // 所有类型的 buff（Persistent / TemporaryRoundBased / BattleOnly）统一在此应用
+            Debug.Log($"[CreateFighter] {objectName} ({(isLeader ? "leader" : "cat")}) tribe={tribeType}, auraBuffs count={auraBuffs?.Count ?? 0}");
             if (auraBuffs != null)
             {
                 foreach (var buff in auraBuffs)
                 {
-                    if (buff.persistence == BuffPersistence.Persistent) continue;
-                    if (isLeader && buff.persistence == BuffPersistence.TemporaryRoundBased) continue;
+                    Debug.Log($"[CreateFighter] {objectName} applying aura buff: id={buff.buffId}, stat={buff.statType}, isPercent={buff.isPercent}, value={buff.value}, persistence={buff.persistence}, stacks={buff.currentStacks}");
                     var clone = buff.Clone();
                     runtimeAttributes.ApplyBuff(clone);
                 }
@@ -331,14 +330,11 @@ namespace BattleSystem.Fighter
             runtimeAttributes.Recalculate();
 
             // === 诊断日志：CreateFighter 完成后 ===
-            if (isLeader && tribeType == TribeSystem.TribeType.Orange)
+            Debug.Log($"[CreateFighter] {objectName} final stats: ATK={runtimeAttributes.Attack}, DEF={runtimeAttributes.Defense}, HP={runtimeAttributes.MaxHp}, SPD={runtimeAttributes.MoveSpeed}, totalBuffs={runtimeAttributes.ActiveBuffs.Count}");
+            for (int bi = 0; bi < runtimeAttributes.ActiveBuffs.Count; bi++)
             {
-                Debug.Log($"[CreateFighter] {objectName} ATK={runtimeAttributes.Attack} buffs={runtimeAttributes.ActiveBuffs.Count}");
-                for (int bi = 0; bi < runtimeAttributes.ActiveBuffs.Count; bi++)
-                {
-                    var bb = runtimeAttributes.ActiveBuffs[bi];
-                    Debug.Log($"  [Buff] {bb.buffId} src={bb.source} stacks={bb.currentStacks} val={bb.value}");
-                }
+                var bb = runtimeAttributes.ActiveBuffs[bi];
+                Debug.Log($"  [Buff] {bb.buffId} src={bb.source} stat={bb.statType} isPercent={bb.isPercent} val={bb.value} persistence={bb.persistence} stacks={bb.currentStacks}");
             }
 
             return new BattleFighter

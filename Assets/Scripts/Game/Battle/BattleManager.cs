@@ -109,17 +109,20 @@ namespace BattleSystem
 
             BuildDemoFighters();
 
+            // 初始化奇物动态效果（亡猫之力等）— 从 runEquipments 读取
+            InitArtifactEffects();
+
             // 应用地形/天气 BUFF 到玩家单位（通过运行时修正体系）
             ApplyTerrainWeatherBuffs();
 
-            // 应用饰品属性加成
-            ApplyAccessoryBuffs();
+            // 应用词缀 buff（从 ownedAffixes 读取并应用到所有友方单位）
+            ApplyAffixBuffs();
 
             // 应用光环 buff（从 leader/cat 的 ActiveBuffs 传播到 RuntimeAttributes）
             ApplyAuraBuffs();
 
-            // 恢复 Persistent buff（饱食层等）到 RuntimeAttributes
-            BattleBuffService.RestorePersistentBuffsToRuntime(_playerFighters);
+            // 同步所有 fighter 的 HUD 最大生命值（buff 可能改变了 MaxHp）
+            SyncFighterHudMaxHp(_playerFighters);
 
             // 应用天生特殊 buff
             // 初始化战斗模拟
@@ -361,9 +364,9 @@ namespace BattleSystem
         }
 
         /// <summary>
-        /// 将 EquipmentRecord 中的饰品属性加成应用到所有玩家单位
+        /// 初始化奇物动态效果（亡猫之力等）— 从 runEquipments 读取特殊效果类型
         /// </summary>
-        private void ApplyAccessoryBuffs()
+        private void InitArtifactEffects()
         {
             if (_playerFighters == null || _playerFighters.Length == 0)
                 return;
@@ -375,46 +378,121 @@ namespace BattleSystem
             if (equipments == null || equipments.Count == 0)
                 return;
 
-            // 汇总所有装备的效果
-            float atkBonus = 0f, defBonus = 0f, hpBonus = 0f, spdBonus = 0f;
-            int leaderSpdFlatBonus = 0;
-
             foreach (var equip in equipments)
             {
                 if (equip.effects == null) continue;
                 foreach (var eff in equip.effects)
                 {
-                    // 使用 gameEffectType 区分特殊效果
-                    if (eff.gameEffectType >= 0)
+                    if (eff.gameEffectType < 0) continue;
+                    switch ((TribeSystem.GameEffect)eff.gameEffectType)
                     {
-                        switch ((TribeSystem.GameEffect)eff.gameEffectType)
+                        case TribeSystem.GameEffect.LeaderAttackPerDeadCat:
+                            _artifactAtkPerDeadCat += Mathf.RoundToInt(eff.value);
+                            break;
+                    }
+                }
+            }
+
+            // 找到族长 fighter 引用（用于亡猫之力动态加成）
+            if (_artifactAtkPerDeadCat > 0)
+            {
+                for (int i = 0; i < _playerFighters.Length; i++)
+                {
+                    if (_playerFighters[i] != null && _playerFighters[i].IsLeader)
+                    {
+                        _artifactLeaderFighter = _playerFighters[i];
+                        break;
+                    }
+                }
+            }
+
+            if (_artifactAtkPerDeadCat > 0)
+                Debug.Log($"[BattleManager] InitArtifactEffects: 亡猫之力 atkPerDeadCat={_artifactAtkPerDeadCat}");
+        }
+
+        /// <summary>
+        /// 应用光环 buff — 从 leader/cat 的 ActiveBuffs 传播到 RuntimeAttributes
+        /// 注意：主要的 buff 传递已在 BattleSpawner.CreateFighter 中通过 AuraBuffs 参数完成。
+        /// 此方法处理额外的非标准修正（如地形/天气等外部字段）。
+        /// </summary>
+        private void ApplyAuraBuffs()
+        {
+            // 光环 buff 已在 BattleSpawner.CreateFighter 中通过 AuraBuffs 参数应用到 RuntimeAttributes
+            // 此方法保留用于未来的扩展需求
+        }
+
+        /// <summary>
+        /// 应用词缀 buff — 从 playerData.ownedAffixes 读取词缀，应用到所有友方单位
+        /// </summary>
+        private void ApplyAffixBuffs()
+        {
+            if (_playerFighters == null || _playerFighters.Length == 0)
+                return;
+
+            DataManager dataManager = GameManager.Instance?.DataManager;
+            if (dataManager == null) return;
+
+            var ownedAffixes = dataManager.PlayerData?.ownedAffixes;
+            if (ownedAffixes == null || ownedAffixes.Count == 0)
+            {
+                Debug.Log("[BattleManager] ApplyAffixBuffs: ownedAffixes is null or empty, skipping");
+                return;
+            }
+
+            Debug.Log($"[BattleManager] ApplyAffixBuffs: ownedAffixes count={ownedAffixes.Count}, ids=[{string.Join(",", ownedAffixes)}]");
+
+            // 加载词缀数据
+            var allAffixes = LoadAllAffixes();
+            if (allAffixes == null || allAffixes.Count == 0)
+            {
+                Debug.LogWarning("[BattleManager] ApplyAffixBuffs: failed to load affix config");
+                return;
+            }
+
+            Debug.Log($"[BattleManager] ApplyAffixBuffs: loaded {allAffixes.Count} affixes from config");
+
+            // 汇总所有词缀的效果（只应用 fighterId=0 的通用词缀）
+            float atkFlatBonus = 0f, defFlatBonus = 0f, hpFlatBonus = 0f;
+            float atkPercentBonus = 0f, defPercentBonus = 0f, hpPercentBonus = 0f, spdPercentBonus = 0f;
+
+            foreach (var affixId in ownedAffixes)
+            {
+                if (!allAffixes.TryGetValue(affixId, out var affix))
+                {
+                    Debug.LogWarning($"[BattleManager] ApplyAffixBuffs: affix '{affixId}' not found in config");
+                    continue;
+                }
+
+                // 只应用通用词缀（fighterId=0），兵种词缀需要在创建 fighter 时单独处理
+                if (affix.fighterId != 0)
+                {
+                    Debug.Log($"[BattleManager] ApplyAffixBuffs: skipping tribe-specific affix '{affixId}' (fighterId={affix.fighterId})");
+                    continue;
+                }
+
+                Debug.Log($"[BattleManager] ApplyAffixBuffs: applying affix '{affixId}' ({affix.displayName}), effects={affix.effects?.Count ?? 0}");
+
+                if (affix.effects == null) continue;
+
+                foreach (var eff in affix.effects)
+                {
+                    if (eff.isPercent)
+                    {
+                        switch (eff.statType)
                         {
-                            case TribeSystem.GameEffect.AttackPercent:  atkBonus += eff.value; break;
-                            case TribeSystem.GameEffect.DefensePercent: defBonus += eff.value; break;
-                            case TribeSystem.GameEffect.HpPercent:      hpBonus += eff.value; break;
-                            case TribeSystem.GameEffect.SpeedPercent:   spdBonus += eff.value; break;
-                            case TribeSystem.GameEffect.LeaderSpeedFlat: leaderSpdFlatBonus += Mathf.RoundToInt(eff.value); break;
-                            case TribeSystem.GameEffect.LeaderAttackPerDeadCat: _artifactAtkPerDeadCat += Mathf.RoundToInt(eff.value); break;
-                            case TribeSystem.GameEffect.AllPercent:
-                                atkBonus += eff.value;
-                                defBonus += eff.value;
-                                hpBonus += eff.value;
-                                spdBonus += eff.value;
-                                break;
+                            case TribeSystem.StatType.Attack: atkPercentBonus += eff.value; break;
+                            case TribeSystem.StatType.Defense: defPercentBonus += eff.value; break;
+                            case TribeSystem.StatType.Hp: hpPercentBonus += eff.value; break;
+                            case TribeSystem.StatType.MoveSpeed: spdPercentBonus += eff.value; break;
                         }
                     }
                     else
                     {
-                        // 兼容没有 gameEffectType 的旧数据，按 StatType 映射
-                        if (eff.isPercent)
+                        switch (eff.statType)
                         {
-                            switch (eff.statType)
-                            {
-                                case TribeSystem.StatType.Attack:  atkBonus += eff.value; break;
-                                case TribeSystem.StatType.Defense: defBonus += eff.value; break;
-                                case TribeSystem.StatType.Hp:      hpBonus += eff.value; break;
-                                case TribeSystem.StatType.MoveSpeed: spdBonus += eff.value; break;
-                            }
+                            case TribeSystem.StatType.Attack: atkFlatBonus += eff.value; break;
+                            case TribeSystem.StatType.Defense: defFlatBonus += eff.value; break;
+                            case TribeSystem.StatType.Hp: hpFlatBonus += eff.value; break;
                         }
                     }
                 }
@@ -428,39 +506,139 @@ namespace BattleSystem
                     continue;
 
                 UnitRuntimeAttributes attrs = fighter.RuntimeAttributes;
-                attrs.AttackPercentBuff  += atkBonus;
-                attrs.DefensePercentBuff += defBonus;
-                attrs.HpPercentBuff      += hpBonus;
-                attrs.SpeedPercentBuff   += spdBonus;
-
-                // 族长速度固定值加成
-                if (fighter.IsLeader)
-                {
-                    if (leaderSpdFlatBonus != 0)
-                        attrs.SpeedFlatBuff += leaderSpdFlatBonus;
-                    // 记录族长引用（用于奇物动态加成）
-                    if (_artifactAtkPerDeadCat > 0 && _artifactLeaderFighter == null)
-                        _artifactLeaderFighter = fighter;
-                }
+                attrs.AttackFlatBuff += (int)atkFlatBonus;
+                attrs.DefenseFlatBuff += (int)defFlatBonus;
+                attrs.HpFlatBuff += (int)hpFlatBonus;
+                attrs.AttackPercentBuff += atkPercentBonus;
+                attrs.DefensePercentBuff += defPercentBonus;
+                attrs.HpPercentBuff += hpPercentBonus;
+                attrs.SpeedPercentBuff += spdPercentBonus;
 
                 attrs.Recalculate();
             }
 
-            if (atkBonus != 0 || defBonus != 0 || hpBonus != 0 || spdBonus != 0 || leaderSpdFlatBonus != 0)
+            if (atkFlatBonus != 0 || defFlatBonus != 0 || hpFlatBonus != 0 ||
+                atkPercentBonus != 0 || defPercentBonus != 0 || hpPercentBonus != 0 || spdPercentBonus != 0)
             {
-                Debug.Log($"[BattleManager] Applied accessory BUFFs from runEquipments: ATK+{atkBonus:P0} DEF+{defBonus:P0} HP+{hpBonus:P0} SPD+{spdBonus:P0} LeaderSpd+{leaderSpdFlatBonus}");
+                Debug.Log($"[BattleManager] Applied affix BUFFs: ATK+{atkFlatBonus}({atkPercentBonus:P0}) DEF+{defFlatBonus}({defPercentBonus:P0}) HP+{hpFlatBonus}({hpPercentBonus:P0}) SPD+{spdPercentBonus:P0}");
             }
         }
 
         /// <summary>
-        /// 应用光环 buff — 从 leader/cat 的 ActiveBuffs 传播到 RuntimeAttributes
-        /// 注意：主要的 buff 传递已在 BattleSpawner.CreateFighter 中通过 AuraBuffs 参数完成。
-        /// 此方法处理额外的非标准修正（如地形/天气等外部字段）。
+        /// 同步所有 fighter 的 HUD 最大生命值（buff 可能改变了 MaxHp）
         /// </summary>
-        private void ApplyAuraBuffs()
+        private void SyncFighterHudMaxHp(BattleFighter[] fighters)
         {
-            // 光环 buff 已在 BattleSpawner.CreateFighter 中通过 AuraBuffs 参数应用到 RuntimeAttributes
-            // 此方法保留用于未来的扩展需求
+            if (fighters == null) return;
+            for (int i = 0; i < fighters.Length; i++)
+            {
+                var f = fighters[i];
+                if (f == null || f.Transform == null || f.RuntimeAttributes == null) continue;
+                var hud = f.Transform.GetComponent<FighterHUD>();
+                if (hud != null)
+                {
+                    hud.SetMaxHp(f.RuntimeAttributes.MaxHp);
+                    hud.UpdateHp(f.RuntimeAttributes.CurrentHp);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 从 affix_config.json 加载所有词缀数据
+        /// </summary>
+        private Dictionary<string, TribeSystem.AffixData> LoadAllAffixes()
+        {
+            var allAffixes = new Dictionary<string, TribeSystem.AffixData>();
+            try
+            {
+                string configPath = System.IO.Path.Combine(Application.streamingAssetsPath, "Tables/affix_config.json");
+                if (!System.IO.File.Exists(configPath))
+                {
+                    Debug.LogError($"[BattleManager] 词缀配置文件不存在: {configPath}");
+                    return allAffixes;
+                }
+
+                string json = System.IO.File.ReadAllText(configPath);
+                var root = LitJson.JsonMapper.ToObject(json);
+
+                if (root != null && root.Keys.Contains("affixes"))
+                {
+                    var affixesJson = root["affixes"];
+                    for (int i = 0; i < affixesJson.Count; i++)
+                    {
+                        var item = affixesJson[i];
+                        var affix = new TribeSystem.AffixData
+                        {
+                            affixId = ReadString(item, "affixId", ""),
+                            displayName = ReadString(item, "displayName", ""),
+                            description = ReadString(item, "description", ""),
+                            fighterId = ReadInt(item, "fighterId", 0),
+                            effects = new List<TribeSystem.BuffEffectItem>()
+                        };
+
+                        // 解析 effects
+                        if (item.Keys.Contains("effects") && item["effects"].IsArray)
+                        {
+                            var effectsJson = item["effects"];
+                            for (int e = 0; e < effectsJson.Count; e++)
+                            {
+                                var effJson = effectsJson[e];
+                                affix.effects.Add(new TribeSystem.BuffEffectItem(
+                                    ParseStatType(ReadString(effJson, "statType", "Attack")),
+                                    ReadBool(effJson, "isPercent"),
+                                    ReadFloat(effJson, "value", 0f)
+                                ));
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(affix.affixId))
+                        {
+                            allAffixes[affix.affixId] = affix;
+                        }
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[BattleManager] 加载词缀数据失败: {e.Message}");
+            }
+
+            return allAffixes;
+        }
+
+        private static string ReadString(LitJson.JsonData json, string key, string defaultValue)
+        {
+            return json.Keys.Contains(key) ? json[key].ToString() : defaultValue;
+        }
+
+        private static int ReadInt(LitJson.JsonData json, string key, int defaultValue)
+        {
+            return json.Keys.Contains(key) && int.TryParse(json[key].ToString(), out int v) ? v : defaultValue;
+        }
+
+        private static float ReadFloat(LitJson.JsonData json, string key, float defaultValue)
+        {
+            return json.Keys.Contains(key) && float.TryParse(json[key].ToString(), out float v) ? v : defaultValue;
+        }
+
+        private static bool ReadBool(LitJson.JsonData json, string key)
+        {
+            return json.Keys.Contains(key)
+                && bool.TryParse(json[key].ToString(), out bool v)
+                && v;
+        }
+
+        private static TribeSystem.StatType ParseStatType(string s)
+        {
+            switch (s)
+            {
+                case "Attack": return TribeSystem.StatType.Attack;
+                case "Defense": return TribeSystem.StatType.Defense;
+                case "Hp": return TribeSystem.StatType.Hp;
+                case "MoveSpeed": return TribeSystem.StatType.MoveSpeed;
+                case "AttackSpeed": return TribeSystem.StatType.AttackSpeed;
+                default: return TribeSystem.StatType.Attack;
+            }
         }
 
         /// <summary>

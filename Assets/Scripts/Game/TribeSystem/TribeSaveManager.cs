@@ -104,8 +104,10 @@ namespace TribeSystem
                 return false;
             }
 
-            // 检查回合数
-            if (playerData.currentRound < 1 || playerData.currentRound > RoundManager.MAX_ROUNDS + 1)
+            // 检查回合数（从配置中获取最大关卡数）
+            var roundManager = new RoundManager();
+            int maxRounds = roundManager.MaxRounds;
+            if (playerData.currentRound < 1 || playerData.currentRound > maxRounds + 1)
             {
                 Debug.LogError($"[TribeSaveManager] 存档数据无效: 回合数{playerData.currentRound}超出范围");
                 return false;
@@ -162,7 +164,8 @@ namespace TribeSystem
                 }
             }
 
-            return $"回合{round}/{RoundManager.MAX_ROUNDS} | 猫粮{catFood} | 族群{tribeCount} | 小猫{totalCats}";
+            var roundManager = new RoundManager();
+            return $"回合{round}/{roundManager.MaxRounds} | 猫粮{catFood} | 族群{tribeCount} | 小猫{totalCats}";
         }
 
         /// <summary>

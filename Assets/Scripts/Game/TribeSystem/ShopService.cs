@@ -211,10 +211,8 @@ namespace TribeSystem
             string artifactName = effectType == ArtifactEffectType.LeaderHpFlat ? "猫爬架" : "苍蝇拍";
             StatType stat = effectType == ArtifactEffectType.LeaderHpFlat ? StatType.Hp : StatType.Attack;
 
-            // 确定影响范围：族长加血→全体族长，小猫加攻→全体小猫
-            var scopeFilter = effectType == ArtifactEffectType.LeaderHpFlat
-                ? new BuffScopeFilter { role = ScopeRoleFilter.Leader }
-                : new BuffScopeFilter { role = ScopeRoleFilter.Soldier };
+            // 确定影响范围：全部生效
+            var scopeFilter = new BuffScopeFilter { role = ScopeRoleFilter.Any };
 
             // 小猫攻击力奇物：累计全局值，新小猫自动继承
             if (effectType == ArtifactEffectType.CatAttackFlat)
@@ -228,18 +226,15 @@ namespace TribeSystem
                 equipmentId = $"Artifact_{effectType}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
                 configId = $"Artifact_{effectType}",
                 displayName = artifactName,
-                description = effectType == ArtifactEffectType.LeaderHpFlat ? $"族长生命值+{value}" : $"小猫攻击力+{value}",
+                description = effectType == ArtifactEffectType.LeaderHpFlat ? $"全体生命值+{value}" : $"全体攻击力+{value}",
                 buffScopeFilter = scopeFilter,
                 buffScopeText = scopeFilter.GetDisplayString(),
                 buffApplyType = BuffApplyType.Aura,
                 acquiredRound = _dataManager.GetCurrentRound(),
-                effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, value) }
+                effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, value, (int)(effectType == ArtifactEffectType.LeaderHpFlat ? GameEffect.HpFlat : GameEffect.AttackFlat)) }
             };
 
             _auraService?.RegisterEquipment(equip);
-
-            // 同时记录到旧的 unlockedAccessories 保持兼容
-            _dataManager.UnlockAccessory($"Artifact_{effectType}");
         }
 
         private int GetArtifactEffectValue(ArtifactEffectType effectType, ShopConfig config)
@@ -375,7 +370,6 @@ namespace TribeSystem
 
             // 获取单位名称
             string unitName = "";
-            int catCount = TribeConfigLoader.Instance.GetTribeConfig(tribeType)?.initialCatCount ?? 1;
             var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
             var unitType = tribeConfig?.GetUnitType(tier);
             if (unitType != null && unitType.fighterId > 0)
@@ -383,8 +377,6 @@ namespace TribeSystem
                 var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitType.fighterId);
                 if (fighterConfig != null)
                     unitName = fighterConfig.fighterName;
-                if (unitType.recruitCount > 0)
-                    catCount = unitType.recruitCount;
             }
 
             // 计算价格（T2 贵 50%）
@@ -393,8 +385,9 @@ namespace TribeSystem
                 basePrice = Mathf.RoundToInt(basePrice * 1.5f);
 
             string tierName = tier == UnitTier.Tier2 ? "·二级" : "";
+            // 使用 fighterName 而不是 tribeName
             string displayName = string.IsNullOrEmpty(unitName)
-                ? $"{GetTribeTypeName(tribeType)}{tierName}({GetQualityName(quality)})"
+                ? $"兵种{GetFighterIdForTier(tribeType, tier)}{tierName}({GetQualityName(quality)})"
                 : $"{unitName}{tierName}({GetQualityName(quality)})";
 
             return new ShopItem
@@ -406,7 +399,7 @@ namespace TribeSystem
                 catTier = tier,
                 basePrice = basePrice,
                 name = displayName,
-                description = $"{catCount}只{GetQualityName(quality)}品质的{unitName}",
+                description = $"1只{GetQualityName(quality)}品质的{unitName}",
                 iconAddress = GetTribeIcon(tribeType, config)
             };
         }
@@ -474,30 +467,11 @@ namespace TribeSystem
 
             if (targetTribe != null)
             {
-                // 获取招募数量（优先从 tribe_config 的 UnitTypeData 读取）
-                int catsToAdd = 1;
-                if (tier.HasValue)
-                {
-                    var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-                    var unitType = tribeConfig?.GetUnitType(tier.Value);
-                    if (unitType != null && unitType.recruitCount > 0)
-                        catsToAdd = unitType.recruitCount;
-                    else
-                        catsToAdd = tribeConfig != null ? tribeConfig.initialCatCount : 1;
-                }
-                else
-                {
-                    var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
-                    catsToAdd = config != null ? config.initialCatCount : 1;
-                }
-
-                for (int i = 0; i < catsToAdd; i++)
-                {
-                    var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType, tier);
-                    _auraService?.ApplyAurasToNewCat(cat, targetTribe.tribeType);
-                    targetTribe.cats.Add(cat);
-                }
-                Debug.Log($"[ShopService] Added {catsToAdd} {quality} cats to tribe {tribeType}");
+                // 每次只增加一只兵种
+                var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType, tier);
+                _auraService?.ApplyAurasToNewCat(cat, targetTribe.tribeType);
+                targetTribe.cats.Add(cat);
+                Debug.Log($"[ShopService] Added 1 {quality} cat to tribe {tribeType}");
             }
             else
             {
@@ -547,18 +521,6 @@ namespace TribeSystem
                 case ConsumableEffectType.AttackBuff: return "己方攻击力+30%，持续15秒";
                 case ConsumableEffectType.DefenseBuff: return "己方防御力+30%，持续15秒";
                 default: return "消耗品";
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                default: return type.ToString();
             }
         }
 

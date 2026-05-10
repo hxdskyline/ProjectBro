@@ -61,11 +61,11 @@ namespace TribeSystem.UI
         {
             switch (quality)
             {
-                case CatQuality.White:  return "白色小猫";
-                case CatQuality.Blue:   return "蓝色小猫";
-                case CatQuality.Purple: return "紫色小猫";
-                case CatQuality.Gold:   return "金色小猫";
-                default: return "小猫";
+                case CatQuality.White:  return "白色兵种";
+                case CatQuality.Blue:   return "蓝色兵种";
+                case CatQuality.Purple: return "紫色兵种";
+                case CatQuality.Gold:   return "金色兵种";
+                default: return "兵种";
             }
         }
 

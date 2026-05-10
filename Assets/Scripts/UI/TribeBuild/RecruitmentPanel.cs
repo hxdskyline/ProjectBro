@@ -7,12 +7,12 @@ namespace TribeSystem.UI
 {
     /// <summary>
     /// 招募面板 - 强制三选一弹窗
-    /// 每回合必须选择一个招募选项
+    /// 用于撸铁系统：词缀选择
     /// </summary>
     public class RecruitmentPanel : MonoBehaviour
     {
-        private const string PanelName = "招募&练兵";
-        private const string HintForce = "强制选择：请选择一项招募方案（此操作不可跳过）";
+        private const string PanelName = "撸铁";
+        private const string HintForce = "选择一个词缀强化你的猫咪";
 
         [Header("UI 组件（预制体绑定）")]
         [SerializeField] private Text _titleText;
@@ -196,8 +196,6 @@ namespace TribeSystem.UI
                             Hide();
                             onSelected?.Invoke(selectedOption);
                         });
-                        if (resolveTribeType != null)
-                            cardComponent.SetPortrait(resolveTribeType(option));
                     }
 
                     Image cardImg = cardGo.GetComponent<Image>();
@@ -290,6 +288,8 @@ namespace TribeSystem.UI
                     return new Color(0.5f, 0.3f, 0.6f, 1f);
                 case ChoiceCategory.Buff:
                     return new Color(0.6f, 0.4f, 0.2f, 1f);
+                case ChoiceCategory.Affix:
+                    return new Color(0.6f, 0.2f, 0.4f, 1f); // 紫红色
                 default:
                     return new Color(0.5f, 0.5f, 0.5f, 1f);
             }
@@ -307,6 +307,8 @@ namespace TribeSystem.UI
                     return "品质进化";
                 case ChoiceCategory.Buff:
                     return "族长强化";
+                case ChoiceCategory.Affix:
+                    return "词缀";
                 default:
                     return "招募选项";
             }

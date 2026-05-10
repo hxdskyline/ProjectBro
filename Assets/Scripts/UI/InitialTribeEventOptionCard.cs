@@ -8,7 +8,7 @@ using TribeSystem;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 初始族群选择卡片组件
+    /// 初始兵种选择卡片组件
     /// </summary>
     public class InitialTribeEventOptionCard : MonoBehaviour
     {
@@ -20,40 +20,42 @@ namespace TribeSystem.UI
         [SerializeField] private Button _okButton;
 
         private AsyncOperationHandle<Sprite> _iconHandle;
+        public int FighterId { get; private set; }
         public TribeType TribeType { get; private set; }
 
-        public void Setup(TribeType tribeType, Action<TribeType> onSelected)
+        /// <summary>
+        /// 按 FighterConfig 设置卡片（新版本）
+        /// </summary>
+        public void SetupByFighter(FighterConfig fighter, Action<int> onSelected)
         {
-            TribeType = tribeType;
-
-            var config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            FighterId = fighter.fighterId;
+            TribeType = (TribeType)fighter.tribeType;
 
             if (_titleText != null)
-                _titleText.text = config != null ? config.tribeName : tribeType.ToString();
+                _titleText.text = fighter.fighterName;
 
             if (_descText != null)
-                _descText.text = config != null && !string.IsNullOrEmpty(config.description)
-                    ? config.description : "???";
+                _descText.text = $"攻击:{fighter.attack} 防御:{fighter.defense} 血量:{fighter.hp}";
 
             if (_countText != null)
-                _countText.text = config != null ? $"小猫:{config.initialCatCount}只" : "";
+                _countText.text = "";
 
             if (_okButton != null)
             {
                 _okButton.onClick.RemoveAllListeners();
-                _okButton.onClick.AddListener(() => onSelected?.Invoke(tribeType));
+                _okButton.onClick.AddListener(() => onSelected?.Invoke(fighter.fighterId));
             }
 
-            LoadIcon(tribeType);
+            LoadFighterIcon(fighter);
         }
 
-        private void LoadIcon(TribeType tribeType)
+        private void LoadFighterIcon(FighterConfig fighter)
         {
             if (_iconImage == null) return;
 
-            string address = TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
-            if (string.IsNullOrEmpty(address)) return;
+            if (string.IsNullOrEmpty(fighter.avatarId)) return;
 
+            string address = $"avatartemp/{fighter.avatarId}1";
             _iconHandle = Addressables.LoadAssetAsync<Sprite>(address);
             _iconHandle.Completed += handle =>
             {

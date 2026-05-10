@@ -53,6 +53,7 @@ namespace BattleSystem
         private readonly bool[] _hasRitualByBattle;
         private readonly bool[] _hasShopByBattle;
         private readonly bool[] _hasNewTribeEventByBattle;
+        private readonly bool[] _hasRandomEventByBattle;
         private readonly int[] _catFoodRewardByBattle;
 
         // Enemy type names (loaded from enemyTypes in config)
@@ -77,6 +78,7 @@ namespace BattleSystem
                 out _hasRitualByBattle,
                 out _hasShopByBattle,
                 out _hasNewTribeEventByBattle,
+                out _hasRandomEventByBattle,
                 out _catFoodRewardByBattle,
                 out _enemyStatsByBattle);
             ResetProgress();
@@ -141,11 +143,6 @@ namespace BattleSystem
             return GetCatFoodReward(battleNumber, DifficultyLevel.Normal);
         }
 
-        public UnitStaticAttributes GetEnemyStatsForBattle(int battleNumber)
-        {
-            return GetEnemyStats(battleNumber, DifficultyLevel.Normal);
-        }
-
         public bool HasRecruitmentForBattle(int battleNumber)
         {
             if (_hasRecruitmentByBattle == null || _hasRecruitmentByBattle.Length == 0) return false;
@@ -174,6 +171,13 @@ namespace BattleSystem
             return _hasNewTribeEventByBattle[index];
         }
 
+        public bool HasRandomEventForBattle(int battleNumber)
+        {
+            if (_hasRandomEventByBattle == null || _hasRandomEventByBattle.Length == 0) return false;
+            int index = Mathf.Clamp(battleNumber - 1, 0, _hasRandomEventByBattle.Length - 1);
+            return _hasRandomEventByBattle[index];
+        }
+
         public int GetPopupPriority(string eventType)
         {
             if (_popupPriorities.TryGetValue(eventType, out int priority))
@@ -191,6 +195,8 @@ namespace BattleSystem
                 events.Add(new System.Tuple<string, int>("recruitment", GetPopupPriority("recruitment")));
             if (HasRitualForBattle(battleNumber))
                 events.Add(new System.Tuple<string, int>("ritual", GetPopupPriority("ritual")));
+            if (HasRandomEventForBattle(battleNumber))
+                events.Add(new System.Tuple<string, int>("randomEvent", GetPopupPriority("randomEvent")));
             if (HasShopForBattle(battleNumber))
                 events.Add(new System.Tuple<string, int>("shop", GetPopupPriority("shop")));
 
@@ -319,6 +325,7 @@ namespace BattleSystem
             out bool[] hasRitualByBattle,
             out bool[] hasShopByBattle,
             out bool[] hasNewTribeEventByBattle,
+            out bool[] hasRandomEventByBattle,
             out int[] catFoodRewardByBattle,
             out UnitStaticAttributes[] enemyStatsByBattle)
         {
@@ -331,6 +338,7 @@ namespace BattleSystem
                     out hasRitualByBattle,
                     out hasShopByBattle,
                     out hasNewTribeEventByBattle,
+                    out hasRandomEventByBattle,
                     out catFoodRewardByBattle,
                     out enemyStatsByBattle);
             }
@@ -377,6 +385,7 @@ namespace BattleSystem
                         out hasRitualByBattle,
                         out hasShopByBattle,
                         out hasNewTribeEventByBattle,
+                        out hasRandomEventByBattle,
                         out catFoodRewardByBattle,
                         out enemyStatsByBattle);
                 }
@@ -387,6 +396,7 @@ namespace BattleSystem
                 hasRitualByBattle = new bool[count];
                 hasShopByBattle = new bool[count];
                 hasNewTribeEventByBattle = new bool[count];
+                hasRandomEventByBattle = new bool[count];
                 catFoodRewardByBattle = new int[count];
                 enemyStatsByBattle = new UnitStaticAttributes[count];
 
@@ -431,6 +441,7 @@ namespace BattleSystem
                     hasRitualByBattle[i] = ReadBool(levelJson, "hasRitual");
                     hasShopByBattle[i] = ReadBool(levelJson, "hasShop");
                     hasNewTribeEventByBattle[i] = ReadBool(levelJson, "hasNewTribeEvent");
+                    hasRandomEventByBattle[i] = ReadBool(levelJson, "hasRandomEvent");
 
                     // Parse enemyStats: could be legacy (object with attack/defense/hp) or new (object with difficulty keys)
                     if (levelJson.Keys.Contains("enemyStats"))
@@ -548,6 +559,7 @@ namespace BattleSystem
                     out hasRitualByBattle,
                     out hasShopByBattle,
                     out hasNewTribeEventByBattle,
+                    out hasRandomEventByBattle,
                     out catFoodRewardByBattle,
                     out enemyStatsByBattle);
             }
@@ -558,6 +570,7 @@ namespace BattleSystem
             out bool[] hasRitualByBattle,
             out bool[] hasShopByBattle,
             out bool[] hasNewTribeEventByBattle,
+            out bool[] hasRandomEventByBattle,
             out int[] catFoodRewardByBattle,
             out UnitStaticAttributes[] enemyStatsByBattle)
         {
@@ -565,6 +578,7 @@ namespace BattleSystem
             hasRitualByBattle = new[] { false };
             hasShopByBattle = new[] { false };
             hasNewTribeEventByBattle = new[] { false };
+            hasRandomEventByBattle = new[] { false };
             catFoodRewardByBattle = new[] { 0 };
             enemyStatsByBattle = new[] { UnitStaticAttributes.Default };
             return new[] { new[] { 1 } };

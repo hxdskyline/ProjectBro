@@ -64,8 +64,7 @@ namespace TribeSystem
         /// <summary>
         /// 计算族长的最终属性（包含所有加成）
         /// </summary>
-        /// <param name="excludePersistent">为 true 时跳过 Persistent buff（用于战斗初始化，避免与 RestorePersistentBuffsToRuntime 重复叠加）</param>
-        public static LeaderStats CalculateLeaderStats(LeaderData leader, string moodId = null, bool excludePersistent = false)
+        public static LeaderStats CalculateLeaderStats(LeaderData leader, string moodId = null)
         {
             if (leader == null)
             {
@@ -79,7 +78,7 @@ namespace TribeSystem
             float atkSpd = 0.5f; // 默认攻速，实际值由 BattlePanel 从 fighterConfig 读取
 
             // 从 ActiveBuffs 汇总永久加成
-            if (leader.ActiveBuffs != null && !excludePersistent)
+            if (leader.ActiveBuffs != null)
             {
                 var acc = new StatAccumulator();
                 foreach (var buff in leader.ActiveBuffs)
@@ -112,8 +111,7 @@ namespace TribeSystem
         /// <summary>
         /// 计算小猫的实际属性（基于小猫基础属性和品质乘数）
         /// </summary>
-        /// <param name="excludePersistent">为 true 时跳过 Persistent buff（用于战斗初始化）</param>
-        public static CatStats CalculateCatStats(CatData cat, bool excludePersistent = false)
+        public static CatStats CalculateCatStats(CatData cat)
         {
             if (cat == null)
             {
@@ -127,7 +125,7 @@ namespace TribeSystem
             float catAtkSpd = cat.staticAttackSpeed > 0 ? cat.staticAttackSpeed : 0.5f;
 
             // 应用小猫自身的 buff（攻防血速）
-            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0 && !excludePersistent)
+            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0)
             {
                 var acc = new StatAccumulator();
                 foreach (var buff in cat.ActiveBuffs)

@@ -125,6 +125,22 @@ namespace TribeSystem
         }
 
         /// <summary>
+        /// 获取指定兵种的 Addressable 精灵路径
+        /// </summary>
+        public string GetFighterAvatarAddress(int fighterId, int variant = 1)
+        {
+            var fighterConfig = GetFighterConfig(fighterId);
+            if (fighterConfig == null || string.IsNullOrEmpty(fighterConfig.avatarId))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] GetFighterAvatarAddress: avatarId is null for fighterId={fighterId}");
+                return null;
+            }
+            string addr = $"avatartemp/{fighterConfig.avatarId}{variant}";
+            Debug.Log($"[TribeConfigLoader] GetFighterAvatarAddress: fighterId={fighterId} → {addr}");
+            return addr;
+        }
+
+        /// <summary>
         /// 获取所有族群配置
         /// </summary>
         public List<TribeConfig> GetAllTribeConfigs()
@@ -223,6 +239,15 @@ namespace TribeSystem
         {
             EnsureLoaded();
             return _fighterConfigs?.Find(f => f.fighterId == fighterId);
+        }
+
+        /// <summary>
+        /// 获取所有 fighter 配置（排除敌人 tribeType==0）
+        /// </summary>
+        public List<FighterConfig> GetAllFighterConfigs()
+        {
+            EnsureLoaded();
+            return _fighterConfigs?.FindAll(f => f.tribeType != 0) ?? new List<FighterConfig>();
         }
 
         /// <summary>

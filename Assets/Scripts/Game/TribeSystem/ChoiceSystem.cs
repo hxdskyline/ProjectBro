@@ -12,7 +12,8 @@ namespace TribeSystem
         Reinforcement,   // 增援（加小猫、新部族、猫粮等）
         Buff,            // 加 buff（属性修改）
         AddCats,         // 增加小猫
-        QualityEvolution // 品质进化
+        QualityEvolution, // 品质进化
+        Affix            // 词缀（撸铁系统）
     }
 
     /// <summary>
@@ -36,20 +37,6 @@ namespace TribeSystem
         NewTribe,         // 新增一个族群
         QualityEvolution, // 品质进化
         CatFood           // 获得猫粮
-    }
-
-    /// <summary>
-    /// Buff 影响范围（旧枚举，保留用于存档兼容）
-    /// </summary>
-    [Obsolete("Use BuffScopeFilter instead")]
-    public enum BuffApplyScope
-    {
-        All,
-        AllLeaders,
-        AllCats,
-        SingleTribeLeader,
-        SingleTribeCat,
-        SingleTribeAll
     }
 
     /// <summary>
@@ -87,18 +74,18 @@ namespace TribeSystem
     {
         public ScopeRoleFilter role;
         public ScopeTierFilter tier;
-        public TribeType? tribe;
+        public TribeType tribe;
 
         public static readonly BuffScopeFilter All = new BuffScopeFilter
         {
             role = ScopeRoleFilter.Any,
             tier = ScopeTierFilter.Any,
-            tribe = null
+            tribe = TribeType.None
         };
 
         public bool IsDefault => role == ScopeRoleFilter.Any
                               && tier == ScopeTierFilter.Any
-                              && !tribe.HasValue;
+                              && tribe == TribeType.None;
 
         /// <summary>
         /// 检查此过滤器是否匹配指定单位
@@ -108,7 +95,7 @@ namespace TribeSystem
             if (role == ScopeRoleFilter.Leader && !isLeader) return false;
             if (role == ScopeRoleFilter.Soldier && isLeader) return false;
 
-            if (tribe.HasValue && tribe.Value != unitTribe) return false;
+            if (tribe != TribeType.None && tribe != unitTribe) return false;
 
             if (tier != ScopeTierFilter.Any && unitTier.HasValue)
             {
@@ -125,17 +112,6 @@ namespace TribeSystem
         {
             if (string.IsNullOrEmpty(scopeStr))
                 return All;
-
-            // 兼容旧枚举值
-            switch (scopeStr)
-            {
-                case "All": return All;
-                case "AllLeaders": return new BuffScopeFilter { role = ScopeRoleFilter.Leader };
-                case "AllCats": return new BuffScopeFilter { role = ScopeRoleFilter.Soldier };
-                case "SingleTribeLeader": return new BuffScopeFilter { role = ScopeRoleFilter.Leader };
-                case "SingleTribeCat": return new BuffScopeFilter { role = ScopeRoleFilter.Soldier };
-                case "SingleTribeAll": return new BuffScopeFilter();
-            }
 
             var result = new BuffScopeFilter();
             string[] tags = scopeStr.Split('|');
@@ -166,37 +142,15 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 从旧枚举迁移
-        /// </summary>
-        public static BuffScopeFilter FromLegacy(BuffApplyScope legacy, TribeType? targetTribe)
-        {
-            switch (legacy)
-            {
-                case BuffApplyScope.All: return All;
-                case BuffApplyScope.AllLeaders:
-                    return new BuffScopeFilter { role = ScopeRoleFilter.Leader };
-                case BuffApplyScope.AllCats:
-                    return new BuffScopeFilter { role = ScopeRoleFilter.Soldier };
-                case BuffApplyScope.SingleTribeLeader:
-                    return new BuffScopeFilter { role = ScopeRoleFilter.Leader, tribe = targetTribe };
-                case BuffApplyScope.SingleTribeCat:
-                    return new BuffScopeFilter { role = ScopeRoleFilter.Soldier, tribe = targetTribe };
-                case BuffApplyScope.SingleTribeAll:
-                    return new BuffScopeFilter { tribe = targetTribe };
-                default: return All;
-            }
-        }
-
-        /// <summary>
         /// 中文描述
         /// </summary>
         public string GetDisplayString()
         {
             var parts = new List<string>();
 
-            if (tribe.HasValue)
+            if (tribe != TribeType.None)
             {
-                switch (tribe.Value)
+                switch (tribe)
                 {
                     case TribeType.Tabby: parts.Add("狸花猫族"); break;
                     case TribeType.Orange: parts.Add("大橘猫族"); break;
@@ -207,8 +161,8 @@ namespace TribeSystem
 
             switch (role)
             {
-                case ScopeRoleFilter.Leader: parts.Add("族长"); break;
-                case ScopeRoleFilter.Soldier: parts.Add("小猫"); break;
+                case ScopeRoleFilter.Leader: parts.Add("兵种"); break;
+                case ScopeRoleFilter.Soldier: parts.Add("兵种"); break;
             }
 
             switch (tier)
@@ -266,12 +220,11 @@ namespace TribeSystem
         // 增援属性
         public ReinforcementType reinforcementType;
         public int reinforcementValue;
-        public TribeType? targetTribeType;
+        public TribeType targetTribeType;
         public int targetTribeId;
 
         // Buff 属性
-        public BuffApplyScope buffScope;          // 旧字段，存档兼容
-        public BuffScopeFilter buffScopeFilter;   // 新字段（LitJson 可能丢失 nullable enum）
+        public BuffScopeFilter buffScopeFilter;   // scope 过滤器
         public string buffScopeText;              // scope 文本备份（如 "Orange | T1 | Soldier"），确保跨存档可靠
         public BuffApplyType buffApplyType;
         public List<BuffEffectItem> buffEffects;
@@ -285,9 +238,8 @@ namespace TribeSystem
             source = ChoiceSource.Recruitment;
             reinforcementType = ReinforcementType.None;
             reinforcementValue = 0;
-            targetTribeType = null;
+            targetTribeType = TribeType.None;
             targetTribeId = -1;
-            buffScope = BuffApplyScope.All;
             buffScopeFilter = BuffScopeFilter.All;
             buffScopeText = "";
             buffApplyType = BuffApplyType.CurrentUnit;
@@ -295,7 +247,7 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 获取 scope filter，自动从旧字段迁移。优先级：buffScopeFilter > buffScopeText > buffScope > All
+        /// 获取 scope filter。优先级：buffScopeFilter > buffScopeText > targetTribeType > All
         /// </summary>
         public BuffScopeFilter GetScopeFilter()
         {
@@ -309,17 +261,10 @@ namespace TribeSystem
                 return buffScopeFilter;
             }
 
-            // 从旧枚举迁移
-            if (buffScope != BuffApplyScope.All)
-            {
-                buffScopeFilter = BuffScopeFilter.FromLegacy(buffScope, targetTribeType);
-                return buffScopeFilter;
-            }
-
             // 用 targetTribeType 构造（最后一个 fallback）
-            if (targetTribeType.HasValue)
+            if (targetTribeType != TribeType.None)
             {
-                buffScopeFilter = new BuffScopeFilter { tribe = targetTribeType.Value };
+                buffScopeFilter = new BuffScopeFilter { tribe = targetTribeType };
                 return buffScopeFilter;
             }
 
@@ -334,7 +279,7 @@ namespace TribeSystem
             ChoiceSource src,
             BuffScopeFilter scopeFilter, BuffApplyType applyType,
             List<BuffEffectItem> effects,
-            TribeType? tribe = null)
+            TribeType tribe = TribeType.None)
         {
             return new GameChoice
             {
@@ -348,7 +293,7 @@ namespace TribeSystem
                 buffApplyType = applyType,
                 buffEffects = effects ?? new List<BuffEffectItem>(),
                 targetTribeType = tribe,
-                targetTribeId = tribe.HasValue ? (int)tribe.Value : -1
+                targetTribeId = tribe != TribeType.None ? (int)tribe : -1
             };
         }
 
@@ -359,7 +304,7 @@ namespace TribeSystem
             string id, string name, string desc,
             ChoiceSource src,
             ReinforcementType rType, int value,
-            TribeType? tribe = null)
+            TribeType tribe = TribeType.None)
         {
             return new GameChoice
             {
@@ -371,7 +316,7 @@ namespace TribeSystem
                 reinforcementType = rType,
                 reinforcementValue = value,
                 targetTribeType = tribe,
-                targetTribeId = tribe.HasValue ? (int)tribe.Value : -1
+                targetTribeId = tribe != TribeType.None ? (int)tribe : -1
             };
         }
 
@@ -396,8 +341,7 @@ namespace TribeSystem
         public string configId;
         public string displayName;
         public string description;
-        public BuffApplyScope buffScope;          // 旧字段
-        public BuffScopeFilter buffScopeFilter;   // 新字段（LitJson 可能丢失 nullable enum）
+        public BuffScopeFilter buffScopeFilter;   // scope 过滤器
         public string buffScopeText;              // scope 文本备份，确保跨存档可靠
         public BuffApplyType buffApplyType;
         public List<BuffEffectItem> effects;
@@ -409,7 +353,6 @@ namespace TribeSystem
             configId = "";
             displayName = "";
             description = "";
-            buffScope = BuffApplyScope.All;
             buffScopeFilter = BuffScopeFilter.All;
             buffScopeText = "";
             buffApplyType = BuffApplyType.Aura;
@@ -428,8 +371,7 @@ namespace TribeSystem
                 return buffScopeFilter;
             }
 
-            buffScopeFilter = BuffScopeFilter.FromLegacy(buffScope, null);
-            return buffScopeFilter;
+            return BuffScopeFilter.All;
         }
 
         public string GetScopeDisplayString()

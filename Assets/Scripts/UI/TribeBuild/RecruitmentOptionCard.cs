@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using TribeSystem;
 
 namespace TribeSystem.UI
 {
@@ -14,6 +15,7 @@ namespace TribeSystem.UI
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Image _portraitImage;
         [SerializeField] private Text _titleText;
+        [SerializeField] private Text _typeText;
         [SerializeField] private Text _descText;
         [SerializeField] private Button _okButton;
 
@@ -32,10 +34,15 @@ namespace TribeSystem.UI
             Option = option;
             Index = index;
 
-            if (_titleText != null)
-                _titleText.text = GetDisplayTitle(option);
-            if (_descText != null)
-                _descText.text = option.description;
+            if (option.optionType == ChoiceCategory.Affix && option.affixData != null)
+            {
+                SetupAffixDisplay(option.affixData);
+            }
+            else
+            {
+                SetupDefaultDisplay(option);
+            }
+
             if (_okButton != null)
             {
                 _okButton.onClick.RemoveAllListeners();
@@ -43,13 +50,72 @@ namespace TribeSystem.UI
             }
         }
 
-        public void SetPortrait(TribeType tribeType)
+        private void SetupAffixDisplay(AffixData affix)
+        {
+            // Name: 显示词缀名称
+            if (_titleText != null)
+                _titleText.text = affix.displayName;
+
+            // Type: 显示影响对象
+            if (_typeText != null)
+                _typeText.text = GetAffixScopeText(affix);
+
+            // Description: 显示词缀效果
+            if (_descText != null)
+                _descText.text = affix.description;
+
+            // 加载对应图片
+            LoadAffixPortrait(affix);
+        }
+
+        private void SetupDefaultDisplay(RecruitmentOption option)
+        {
+            if (_titleText != null)
+                _titleText.text = GetDisplayTitle(option);
+            if (_typeText != null)
+                _typeText.text = GetOptionTypeTitle(option);
+            if (_descText != null)
+                _descText.text = option.description;
+        }
+
+        private string GetAffixScopeText(AffixData affix)
+        {
+            if (affix.fighterId == 0)
+            {
+                return "所有猫咪";
+            }
+
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(affix.fighterId);
+            if (fighterConfig != null)
+            {
+                return fighterConfig.fighterName;
+            }
+
+            return $"兵种{affix.fighterId}";
+        }
+
+        private void LoadAffixPortrait(AffixData affix)
         {
             if (_portraitImage == null) return;
 
-            string address = GetTribePortraitAddress(tribeType);
-            if (string.IsNullOrEmpty(address)) return;
+            if (affix.fighterId == 0)
+            {
+                // 所有猫咪 → 使用通用猫神图片
+                LoadSpriteByAddress("ui/sprite/buildcard/zhujiemian_img_maoshen");
+            }
+            else
+            {
+                // 特定兵种 → 使用该兵种的头像
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(affix.fighterId);
+                if (fighterConfig != null && !string.IsNullOrEmpty(fighterConfig.avatarId))
+                {
+                    LoadSpriteByAddress($"avatartemp/{fighterConfig.avatarId}1");
+                }
+            }
+        }
 
+        private void LoadSpriteByAddress(string address)
+        {
             if (_portraitHandle.IsValid())
                 Addressables.Release(_portraitHandle);
 
@@ -59,11 +125,6 @@ namespace TribeSystem.UI
                 if (op.Status == AsyncOperationStatus.Succeeded && _portraitImage != null)
                     _portraitImage.sprite = op.Result;
             };
-        }
-
-        private string GetTribePortraitAddress(TribeType tribeType)
-        {
-            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
         }
 
         private void OnDestroy()
@@ -80,6 +141,7 @@ namespace TribeSystem.UI
                 case ChoiceCategory.AddCats: return "繁育";
                 case ChoiceCategory.QualityEvolution: return "品质";
                 case ChoiceCategory.Buff: return "属性";
+                case ChoiceCategory.Affix: return "词缀";
                 default: return "招募选项";
             }
         }

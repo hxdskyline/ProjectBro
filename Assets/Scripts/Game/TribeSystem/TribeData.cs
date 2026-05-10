@@ -33,6 +33,7 @@ namespace TribeSystem
     public class TribeRecord
     {
         public int tribeId;
+        public int fighterId;          // 关联的兵种ID
         public TribeType tribeType;
         public LeaderData leader;
         public List<CatData> cats;
@@ -42,6 +43,7 @@ namespace TribeSystem
         public TribeRecord()
         {
             tribeId = -1;
+            fighterId = 0;
             tribeType = TribeType.Tabby;
             leader = new LeaderData();
             cats = new List<CatData>();
@@ -96,7 +98,7 @@ namespace TribeSystem
         public LeaderData()
         {
             leaderId = -1;
-            name = "族长";
+            name = "兵种";
             baseAttack = 100;
             baseDefense = 80;
             baseHp = 1000;
@@ -657,6 +659,9 @@ namespace TribeSystem
         [System.NonSerialized]
         public GameChoice gameChoice;      // 关联的 GameChoice（从 choice_config 生成时附带）
 
+        [System.NonSerialized]
+        public AffixData affixData;        // 词缀数据（撸铁系统使用）
+
         public RecruitmentOption()
         {
             optionType = ChoiceCategory.Reinforcement;
@@ -669,6 +674,7 @@ namespace TribeSystem
             description = "";
             targetTier = null;
             gameChoice = null;
+            affixData = null;
         }
     }
 
@@ -684,7 +690,6 @@ namespace TribeSystem
         LeaderStatBoostTemporary,   // 族长属性临时提升
         LeaderStatBoostPermanent,   // 族长属性永久提升
         LeaderStatBoostPercent,     // 族长属性百分比提升
-        Cats,                       // 小猫
         Consumable,                 // 一次性道具
         CatFood,                    // 猫粮
         Accessory,                  // 饰品
@@ -871,6 +876,7 @@ namespace TribeSystem
     public enum NewTribeEventOptionType
     {
         NewTribe,         // 选择一个新部族
+        AddCats,          // 增加已有族群猫咪数量
     }
 
     /// <summary>
@@ -881,12 +887,18 @@ namespace TribeSystem
     {
         public NewTribeEventOptionType optionType;
         public TribeType tribeType;
+        public int tribeId;
+        public int fighterId;
+        public int catCount;
         public string description;
 
         public NewTribeEventOption()
         {
             optionType = NewTribeEventOptionType.NewTribe;
             tribeType = TribeType.None;
+            tribeId = 0;
+            fighterId = 0;
+            catCount = 0;
             description = "";
         }
     }

@@ -103,7 +103,10 @@
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('runEquipments',[]\\), indent=2, ensure_ascii=False\\)\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('runChoices',[]\\), indent=2, ensure_ascii=False\\)\\)\")",
-      "Bash(grep -v '.meta$')"
+      "Bash(grep -v '.meta$')",
+      "Bash(python -c \"import json; json.load\\(open\\('Assets/StreamingAssets/Tables/levels_config.json', 'r', encoding='utf-8'\\)\\); print\\('JSON is valid'\\)\")",
+      "Bash(python -c \"import json; f=open\\('Assets/StreamingAssets/Tables/levels_config.json', 'r'\\); json.load\\(f\\); print\\('JSON is valid'\\)\")",
+      "Bash(find Assets/Scripts -name \"*.cs\" -exec grep -l \"CS1519\\\\|CS7036\\\\|CS0177\" {} \\\\;)"
     ]
   }
 }

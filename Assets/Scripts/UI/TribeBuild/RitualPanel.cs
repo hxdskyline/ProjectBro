@@ -6,7 +6,8 @@ using System.Collections.Generic;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 祭祀面板 - 两步选择弹窗
+    /// 祈祀面板 - 两步选择弹窗
+    /// 用于命运系统：第4、8、12、16、20关出现
     /// Step1：选择祭祀档次（免费/普通/盛大）
     /// Step2：从该档次池中抽取若干祝福，玩家选一条
     /// </summary>
@@ -502,7 +503,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostTemporary:
                 case RitualRewardType.LeaderStatBoostPermanent:
                 case RitualRewardType.LeaderStatBoostPercent: return new Color(0.3f, 0.4f, 0.6f);
-                case RitualRewardType.Cats:     return new Color(0.3f, 0.55f, 0.3f);
                 case RitualRewardType.CatFood:  return new Color(0.5f, 0.4f, 0.2f);
                 case RitualRewardType.Accessory:return new Color(0.55f, 0.3f, 0.5f);
                 default:                        return new Color(0.45f, 0.45f, 0.45f);
@@ -516,7 +516,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostTemporary: return "族长临时强化";
                 case RitualRewardType.LeaderStatBoostPermanent: return "族长永久强化";
                 case RitualRewardType.LeaderStatBoostPercent:   return "族长百分比强化";
-                case RitualRewardType.Cats:      return "获得小猫";
                 case RitualRewardType.CatFood:   return "获得猫粮";
                 case RitualRewardType.Consumable:return "获得道具";
                 case RitualRewardType.Accessory: return "获得饰品";

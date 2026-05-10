@@ -45,7 +45,7 @@ namespace TribeSystem.UI
             Show();
         }
 
-        public void ShowLeaderBoostResult(string tribeName, LeaderData leader, int bonusAttack, int bonusHp, TribeType tribeType, Action onConfirmed)
+        public void ShowLeaderBoostResult(string tribeName, LeaderData leader, int bonusAttack, int bonusHp, int fighterId, Action onConfirmed)
         {
             EnsureUI();
             ClearContent();
@@ -62,7 +62,7 @@ namespace TribeSystem.UI
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
             // 旧值面板：减去本次加成
-            BuildLeaderCardFlat(_contentArea, leader, tribeType,
+            BuildLeaderCardFlat(_contentArea, leader, fighterId,
                 -(bonusAttack), -(bonusHp), false);
 
             // 箭头
@@ -71,7 +71,7 @@ namespace TribeSystem.UI
             arrowRect.sizeDelta = new Vector2(40f, 300f);
 
             // 新值面板：当前值，标记提升属性
-            BuildLeaderCardFlat(_contentArea, leader, tribeType,
+            BuildLeaderCardFlat(_contentArea, leader, fighterId,
                 bonusAttack, bonusHp, true);
 
             WireConfirmButton(onConfirmed);
@@ -226,7 +226,7 @@ namespace TribeSystem.UI
 
         #region Leader Card
 
-        private void BuildLeaderCard(RectTransform parent, LeaderData leader, TribeType tribeType,
+        private void BuildLeaderCard(RectTransform parent, LeaderData leader, int fighterId,
             StatType? boostedStat, float? buffOverrideForBoosted, bool highlight)
         {
             var cardGo = new GameObject("LeaderCard", typeof(RectTransform), typeof(Image));
@@ -253,10 +253,12 @@ namespace TribeSystem.UI
             portraitRt.sizeDelta = new Vector2(80, 80);
             var portraitLe = portraitGo.AddComponent<LayoutElement>();
             portraitLe.preferredHeight = 80f;
-            LoadPortrait(portraitGo.GetComponent<Image>(), tribeType, boostedStat.HasValue);
+            LoadPortrait(portraitGo.GetComponent<Image>(), fighterId, boostedStat.HasValue);
 
-            // 种族名称
-            var nameGo = CreateText("TribeName", cardRt, GetTribeTypeName(tribeType), 22, new Color(1f, 0.85f, 0.4f));
+            // 兵种名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{fighterId}";
+            var nameGo = CreateText("FighterName", cardRt, fighterName, 22, new Color(1f, 0.85f, 0.4f));
             var nameLe = nameGo.AddComponent<LayoutElement>();
             nameLe.preferredHeight = 28f;
 
@@ -290,7 +292,7 @@ namespace TribeSystem.UI
             }
         }
 
-        private void BuildLeaderCardFlat(RectTransform parent, LeaderData leader, TribeType tribeType,
+        private void BuildLeaderCardFlat(RectTransform parent, LeaderData leader, int fighterId,
             int deltaAttack, int deltaHp, bool highlight)
         {
             var cardGo = new GameObject("LeaderCard", typeof(RectTransform), typeof(Image));
@@ -317,10 +319,12 @@ namespace TribeSystem.UI
             portraitRt.sizeDelta = new Vector2(80, 80);
             var portraitLe = portraitGo.AddComponent<LayoutElement>();
             portraitLe.preferredHeight = 80f;
-            LoadPortrait(portraitGo.GetComponent<Image>(), tribeType, highlight);
+            LoadPortrait(portraitGo.GetComponent<Image>(), fighterId, highlight);
 
-            // 种族名称
-            var nameGo = CreateText("TribeName", cardRt, GetTribeTypeName(tribeType), 22, new Color(1f, 0.85f, 0.4f));
+            // 兵种名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{fighterId}";
+            var nameGo = CreateText("FighterName", cardRt, fighterName, 22, new Color(1f, 0.85f, 0.4f));
             var nameLe = nameGo.AddComponent<LayoutElement>();
             nameLe.preferredHeight = 28f;
 
@@ -347,9 +351,9 @@ namespace TribeSystem.UI
             }
         }
 
-        private void LoadPortrait(Image portraitImage, TribeType tribeType, bool isAfter)
+        private void LoadPortrait(Image portraitImage, int fighterId, bool isAfter)
         {
-            string address = GetTribePortraitAddress(tribeType);
+            string address = GetTribePortraitAddress(fighterId);
             if (string.IsNullOrEmpty(address)) return;
 
             var handle = Addressables.LoadAssetAsync<Sprite>(address);
@@ -371,9 +375,9 @@ namespace TribeSystem.UI
             }
         }
 
-        private string GetTribePortraitAddress(TribeType tribeType)
+        private string GetTribePortraitAddress(int fighterId)
         {
-            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, 1);
+            return TribeConfigLoader.Instance?.GetFighterAvatarAddress(fighterId, 1);
         }
 
         #endregion
@@ -565,18 +569,6 @@ namespace TribeSystem.UI
                 case CatQuality.Purple: return new Color(0.28f, 0.15f, 0.42f);
                 case CatQuality.Gold: return new Color(0.42f, 0.3f, 0.08f);
                 default: return new Color(0.2f, 0.2f, 0.2f);
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                default: return type.ToString();
             }
         }
 

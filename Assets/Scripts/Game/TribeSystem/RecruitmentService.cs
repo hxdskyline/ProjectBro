@@ -28,101 +28,71 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 生成招募选项（1个增加小猫 + 2个buff选项，从choice_config.json读取）
+        /// 生成撸铁选项（3个词缀选项，3选1）
         /// </summary>
         public List<RecruitmentOption> GenerateOptions()
         {
             var options = new List<RecruitmentOption>();
             var playerData = _dataManager?.PlayerData;
 
-            if (playerData == null)
+            if (playerData == null || playerData.tribes == null || playerData.tribes.Count == 0)
             {
-                Debug.LogError("[RecruitmentService] PlayerData is null");
+                Debug.LogError("[RecruitmentService] PlayerData is null or no tribes");
                 return options;
             }
 
-            int currentTribeCount = playerData.tribes?.Count ?? 0;
-            if (currentTribeCount == 0)
-                return options;
-
-            // 1. 从所有种族的所有可用等级中生成加小猫选项
-            var addCatsOptions = new List<RecruitmentOption>();
+            // 收集所有拥有的猫的 fighterId
+            var allFighterIds = new List<int>();
             foreach (var tribe in playerData.tribes)
             {
-                var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-                if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
-                {
-                    // 有单位类型定义 → 每个等级生成选项（T3 临时屏蔽）
-                    foreach (var ut in config.unitTypes)
-                    {
-                        if (ut.tier == 3) continue; // 三级兵暂不开放招募
-                        addCatsOptions.Add(CreateAddCatsOptionWithTier(tribe, (UnitTier)ut.tier));
-                    }
-                }
-                else
-                {
-                    // 无单位类型定义 → 旧逻辑
-                    addCatsOptions.Add(CreateAddCatsOption(tribe));
-                }
-            }
-            if (addCatsOptions.Count > 0)
-            {
-                // 权重随机选 2 个加猫选项（包含各等级兵种）
-                var selected = WeightedRandomSelect(addCatsOptions, Mathf.Min(2, addCatsOptions.Count));
-                options.AddRange(selected);
-            }
+                // 族长的 fighterId 直接从 TribeRecord 获取
+                if (tribe.fighterId > 0)
+                    allFighterIds.Add(tribe.fighterId);
 
-            // 2. 从 TribeAuraService 获取光环 buff 选项（替代旧的 choice_config.json buff）
-            if (_tribeAuraService != null)
-            {
-                var allAuraOptions = new List<RecruitmentOption>();
-                foreach (var tribe in playerData.tribes)
+                // 小猫的 fighterId 从 unitType 配置获取
+                if (tribe.cats != null)
                 {
-                    // 获取该种族的兵种专属 buff（随机选一个玩家拥有的 tier）
-                    var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-                    if (config != null && config.unitTypes != null && config.unitTypes.Count > 0)
+                    foreach (var cat in tribe.cats)
                     {
-                        // 只筛选玩家已拥有对应 tier 单位的 aura
-                        var ownedTiers = new HashSet<UnitTier>();
-                        if (tribe.cats != null)
+                        var tribeConfig = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
+                        if (tribeConfig != null)
                         {
-                            foreach (var cat in tribe.cats)
-                                ownedTiers.Add(cat.tier);
-                        }
-
-                        var validUnitTypes = config.unitTypes.FindAll(u => ownedTiers.Contains((UnitTier)u.tier));
-                        if (validUnitTypes.Count > 0)
-                        {
-                            int tierIdx = Random.Range(0, validUnitTypes.Count);
-                            UnitTier tier = (UnitTier)validUnitTypes[tierIdx].tier;
-                            var tierAuras = _tribeAuraService.GetAvailableAuras(tribe.tribeType, tier);
-                            foreach (var aura in tierAuras)
-                            {
-                                allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
-                            }
+                            var unitType = tribeConfig.GetUnitType(cat.tier);
+                            if (unitType != null && unitType.fighterId > 0)
+                                allFighterIds.Add(unitType.fighterId);
                         }
                     }
-
-                    // 获取该种族的通用 buff
-                    var generalAuras = _tribeAuraService.GetAvailableGeneralAuras(tribe.tribeType, tribe.cats);
-                    foreach (var aura in generalAuras)
-                    {
-                        allAuraOptions.Add(CreateAuraBuffOption(tribe, aura));
-                    }
                 }
-
-                // 随机取 2 个
-                var selectedAuraOptions = WeightedRandomSelect(allAuraOptions, 2);
-                options.AddRange(selectedAuraOptions);
             }
 
-            // 3. 随机打乱这 3 个选项的顺序
-            for (int i = 0; i < options.Count; i++)
+            if (allFighterIds.Count == 0)
             {
-                int swapIdx = Random.Range(i, options.Count);
-                var temp = options[i];
-                options[i] = options[swapIdx];
-                options[swapIdx] = temp;
+                Debug.LogWarning("[RecruitmentService] 没有可用的兵种");
+                return options;
+            }
+
+            // 随机选择一个兵种来生成词缀选项
+            int fighterId = allFighterIds[Random.Range(0, allFighterIds.Count)];
+
+            // 获取当前关卡
+            int currentRound = GameManager.Instance?.BattleCampaignRuntime?.CurrentBattleNumber ?? 1;
+
+            // 生成3个词缀选项
+            options = GenerateAffixOptions(currentRound, fighterId);
+
+            // 从 choice_config 补充 buff 选项（招募来源）
+            var buffArchetypes = TribeConfigLoader.Instance?.GetArchetypesBySource("recruitment");
+            if (buffArchetypes != null && buffArchetypes.Count > 0)
+            {
+                // 随机选1个buff选项混入
+                var arch = buffArchetypes[Random.Range(0, buffArchetypes.Count)];
+                var randomTribe = playerData.tribes[Random.Range(0, playerData.tribes.Count)];
+                var buffOption = CreateBuffOptionFromArchetype(randomTribe, arch);
+                if (buffOption != null)
+                {
+                    options.Add(buffOption);
+                    Debug.Log($"[RecruitmentService] 补充 buff 选项: {arch.displayName} (scope={arch.buffScope})");
+                }
             }
 
             return options;
@@ -151,12 +121,16 @@ namespace TribeSystem
             var choice = GameChoice.CreateBuff(
                 archetype.id,
                 archetype.displayName,
-                FormatDescription(archetype.descriptionTemplate, tribe.tribeType, buffEffects),
+                FormatDescription(archetype.descriptionTemplate, tribe.tribeType, tribe.fighterId, buffEffects),
                 ChoiceSource.Recruitment,
                 scopeFilter,
                 applyType,
                 buffEffects,
                 tribe.tribeType);
+
+            // 使用 fighter 表中的名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
 
             return new RecruitmentOption
             {
@@ -166,7 +140,7 @@ namespace TribeSystem
                 targetTribeId = tribe.tribeId,
                 bonusAttack = GetEffectValue(buffEffects, StatType.Attack),
                 bonusHp = GetEffectValue(buffEffects, StatType.Hp),
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n{archetype.displayName}",
+                description = $"{fighterName}\n{archetype.displayName}",
                 // 附加 GameChoice 供执行时使用
                 gameChoice = choice
             };
@@ -207,10 +181,15 @@ namespace TribeSystem
             return result;
         }
 
-        private string FormatDescription(string template, TribeType tribeType, List<BuffEffectItem> effects)
+        private string FormatDescription(string template, TribeType tribeType, int fighterId, List<BuffEffectItem> effects)
         {
             if (string.IsNullOrEmpty(template)) return template;
-            string result = template.Replace("{tribe_name}", GetTribeTypeName(tribeType));
+
+            // 使用 fighter 表中的名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{fighterId}";
+
+            string result = template.Replace("{tribe_name}", fighterName);
             foreach (var eff in effects)
             {
                 result = result.Replace("{value}", Mathf.RoundToInt(eff.value).ToString());
@@ -270,7 +249,7 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 执行增加小猫（不消耗猫粮）
+        /// 执行增加兵种（不消耗猫粮）
         /// </summary>
         public int ExecuteAddCats(TribeRecord tribe, long cost, UnitTier? tier = null)
         {
@@ -282,26 +261,18 @@ namespace TribeSystem
                 return 0;
             }
 
-            int catsToAdd = config.initialCatCount;
-            if (tier.HasValue)
-            {
-                var unitType = config.GetUnitType(tier.Value);
-                if (unitType != null && unitType.recruitCount > 0)
-                    catsToAdd = unitType.recruitCount;
-            }
+            // 每次只增加一只兵种
+            int catsToAdd = 1;
 
-            for (int i = 0; i < catsToAdd; i++)
-            {
-                var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
-                if (tier.HasValue)
-                    cat.tier = tier.Value;
-                _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
-                tribe.cats.Add(cat);
-            }
+            var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
+            if (tier.HasValue)
+                cat.tier = tier.Value;
+            _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
+            tribe.cats.Add(cat);
 
             _dataManager.SavePlayerData();
             string tierLog = tier.HasValue ? $" (tier={tier.Value})" : "";
-            Debug.Log($"[RecruitmentService] Added {catsToAdd} cats to tribe {tribe.tribeType} (free){tierLog}");
+            Debug.Log($"[RecruitmentService] Added {catsToAdd} cat to tribe {tribe.tribeType} (free){tierLog}");
 
             return catsToAdd;
         }
@@ -350,6 +321,7 @@ namespace TribeSystem
             var newTribe = new TribeRecord
             {
                 tribeId = _dataManager.PlayerData.tribes.Count,
+                fighterId = config.leaderFighterId,
                 tribeType = tribeType,
                 leader = CreateLeader(config),
                 cats = new List<CatData>(),
@@ -455,25 +427,26 @@ namespace TribeSystem
 
         private RecruitmentOption CreateAddCatsOption(TribeRecord tribe)
         {
-            var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-            int catCount = config != null ? config.initialCatCount : 1;
+            // 使用 fighter 表中的名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+
             return new RecruitmentOption
             {
                 optionType = ChoiceCategory.AddCats,
                 cost = 0,
                 targetTribeType = null,
                 targetTribeId = tribe.tribeId,
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只小猫"
+                description = $"招募 {fighterName}\n+1只"
             };
         }
 
         private RecruitmentOption CreateAddCatsOptionWithTier(TribeRecord tribe, UnitTier tier)
         {
-            var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
-            int catCount = config != null ? config.initialCatCount : 1;
             string tierName = GetUnitTierName(tier);
-            // 从 fighter_config.json 读取单位名和招募数量
+            // 从 fighter_config.json 读取单位名
             string unitName = "";
+            var config = TribeConfigLoader.Instance.GetTribeConfig(tribe.tribeType);
             if (config != null)
             {
                 var unitType = config.GetUnitType(tier);
@@ -482,13 +455,13 @@ namespace TribeSystem
                     var fighterConfig = TribeConfigLoader.Instance.GetFighterConfig(unitType.fighterId);
                     if (fighterConfig != null)
                         unitName = fighterConfig.fighterName;
-                    if (unitType.recruitCount > 0)
-                        catCount = unitType.recruitCount;
                 }
             }
-            string display = string.IsNullOrEmpty(unitName)
-                ? $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只{tierName}"
-                : $"{GetTribeTypeName(tribe.tribeType)}\n+{catCount}只{unitName}({tierName})";
+
+            // 使用 fighterName 而不是 tribeName
+            string fighterDisplayName = !string.IsNullOrEmpty(unitName) ? unitName : $"兵种{tribe.fighterId}";
+            string display = $"招募 {fighterDisplayName}\n+1只";
+
             return new RecruitmentOption
             {
                 optionType = ChoiceCategory.AddCats,
@@ -510,6 +483,10 @@ namespace TribeSystem
             else
                 bonusText = $"+{hpBonus}血";
 
+            // 使用 fighter 表中的名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+
             return new RecruitmentOption
             {
                 optionType = ChoiceCategory.Buff,
@@ -518,7 +495,7 @@ namespace TribeSystem
                 targetTribeId = tribe.tribeId,
                 bonusAttack = attackBonus,
                 bonusHp = hpBonus,
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n{bonusText}"
+                description = $"{fighterName}\n{bonusText}"
             };
         }
 
@@ -549,13 +526,17 @@ namespace TribeSystem
                 buffEffects,
                 tribe.tribeType);
 
+            // 使用 fighter 表中的名称
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+            string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+
             return new RecruitmentOption
             {
                 optionType = ChoiceCategory.Buff,
                 cost = 0,
                 targetTribeType = null,
                 targetTribeId = tribe.tribeId,
-                description = $"{GetTribeTypeName(tribe.tribeType)}\n{aura.auraName}\n{aura.description}",
+                description = $"{fighterName}\n{aura.auraName}\n{aura.description}",
                 gameChoice = choice
             };
         }
@@ -564,18 +545,6 @@ namespace TribeSystem
 
         #region Helper Methods
 
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花猫族";
-                case TribeType.Orange: return "大橘猫族";
-                case TribeType.Cow: return "奶牛猫族";
-                case TribeType.Siamese: return "暹罗猫族";
-                default: return type.ToString();
-            }
-        }
-
         private string GetUnitTierName(UnitTier tier)
         {
             switch (tier)
@@ -583,7 +552,7 @@ namespace TribeSystem
                 case UnitTier.Tier1: return "一级兵";
                 case UnitTier.Tier2: return "二级兵";
                 case UnitTier.Tier3: return "三级兵";
-                default: return "小猫";
+                default: return "兵种";
             }
         }
 
@@ -600,5 +569,325 @@ namespace TribeSystem
         }
 
         #endregion
+
+        #region 摇人系统方法
+
+        /// <summary>
+        /// 生成摇人选项（3选1）
+        /// </summary>
+        /// <param name="excludeTribeTypes">需要排除的族群类型</param>
+        /// <returns>3个摇人选项</returns>
+        public List<NewTribeEventOption> GenerateRecruitOptions(List<TribeType> excludeTribeTypes = null)
+        {
+            var options = new List<NewTribeEventOption>();
+            var availableTypes = GetAvailableTribeTypes();
+
+            // 排除指定的族群类型
+            if (excludeTribeTypes != null)
+            {
+                availableTypes.RemoveAll(t => excludeTribeTypes.Contains(t));
+            }
+
+            // 如果可用族群不足3个，则全部返回
+            int count = Mathf.Min(3, availableTypes.Count);
+
+            // 随机打乱
+            for (int i = 0; i < availableTypes.Count; i++)
+            {
+                int swapIdx = UnityEngine.Random.Range(i, availableTypes.Count);
+                var temp = availableTypes[i];
+                availableTypes[i] = availableTypes[swapIdx];
+                availableTypes[swapIdx] = temp;
+            }
+
+            // 取前count个
+            for (int i = 0; i < count; i++)
+            {
+                var tribeType = availableTypes[i];
+                var config = TribeConfigLoader.Instance.GetTribeConfig(tribeType);
+                if (config != null)
+                {
+                    options.Add(new NewTribeEventOption
+                    {
+                        optionType = NewTribeEventOptionType.NewTribe,
+                        tribeType = tribeType,
+                        description = $"{config.tribeName}\n{config.description}",
+                        catCount = config.recruitCountA
+                    });
+                }
+            }
+
+            return options;
+        }
+
+        /// <summary>
+        /// 生成增加已有族群猫咪数量的选项（3选1）
+        /// </summary>
+        /// <returns>3个增加猫咪数量的选项</returns>
+        public List<NewTribeEventOption> GenerateAddCatOptions()
+        {
+            var options = new List<NewTribeEventOption>();
+            var playerData = _dataManager?.PlayerData;
+
+            if (playerData?.tribes == null || playerData.tribes.Count == 0)
+            {
+                return options;
+            }
+
+            // 为每个已有的族群生成选项
+            foreach (var tribe in playerData.tribes)
+            {
+                // 使用 fighter 表中的名称
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
+                string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
+
+                options.Add(new NewTribeEventOption
+                {
+                    optionType = NewTribeEventOptionType.AddCats,
+                    tribeType = tribe.tribeType,
+                    tribeId = tribe.tribeId,
+                    fighterId = tribe.fighterId,
+                    description = $"{fighterName}\n+1只",
+                    catCount = 1
+                });
+            }
+
+            // 随机打乱
+            for (int i = 0; i < options.Count; i++)
+            {
+                int swapIdx = UnityEngine.Random.Range(i, options.Count);
+                var temp = options[i];
+                options[i] = options[swapIdx];
+                options[swapIdx] = temp;
+            }
+
+            // 取前3个
+            int count = Mathf.Min(3, options.Count);
+            return options.GetRange(0, count);
+        }
+
+        /// <summary>
+        /// 执行摇人选择（获得新族群）
+        /// </summary>
+        /// <param name="option">选择的选项</param>
+        /// <returns>是否成功</returns>
+        public bool ExecuteRecruitSelection(NewTribeEventOption option)
+        {
+            if (option == null)
+            {
+                Debug.LogError("[RecruitmentService] 摇人选项为空");
+                return false;
+            }
+
+            if (option.optionType == NewTribeEventOptionType.NewTribe)
+            {
+                // 获得新族群（使用 recruitCountA）
+                var config = TribeConfigLoader.Instance.GetTribeConfig(option.tribeType);
+                int catCount = config?.recruitCountA ?? 1;
+
+                var newTribe = ExecuteFreeNewTribeRecruitment(option.tribeType);
+                if (newTribe != null)
+                {
+                    Debug.Log($"[RecruitmentService] 摇人成功：获得{option.tribeType}，数量{catCount}");
+                    return true;
+                }
+            }
+            else if (option.optionType == NewTribeEventOptionType.AddCats)
+            {
+                // 增加已有族群猫咪数量（使用 option.catCount）
+                var playerData = _dataManager?.PlayerData;
+                var tribe = playerData?.tribes?.Find(t => t.tribeId == option.tribeId);
+                if (tribe != null)
+                {
+                    int catCount = option.catCount;
+
+                    for (int i = 0; i < catCount; i++)
+                    {
+                        var cat = CatData.CreateWithRandomQuality(tribe.tribeType);
+                        _auraService?.ApplyAurasToNewCat(cat, tribe.tribeType);
+                        tribe.cats.Add(cat);
+                    }
+
+                    _dataManager.SavePlayerData();
+                    Debug.Log($"[RecruitmentService] 摇人成功：{option.tribeType}增加{catCount}只猫");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 判断当前关卡是否需要触发摇人
+        /// </summary>
+        /// <param name="round">当前关卡</param>
+        /// <param name="isNewGame">是否是新游戏</param>
+        /// <returns>是否需要触发摇人</returns>
+        public bool ShouldTriggerRecruit(int round, bool isNewGame)
+        {
+            // 时机1：新游戏开局
+            if (isNewGame && round == 1)
+            {
+                return true;
+            }
+
+            // 时机2：第10关
+            if (round == 10)
+            {
+                var playerData = _dataManager?.PlayerData;
+                if (playerData?.tribes != null && playerData.tribes.Count < 3)
+                {
+                    return true;
+                }
+            }
+
+            // 时机3：第3、5、7、9、11、13、15、17、19关
+            if (round >= 3 && round <= 19 && round % 2 == 1)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 获取摇人类型（时机1/2/3）
+        /// </summary>
+        /// <param name="round">当前关卡</param>
+        /// <param name="isNewGame">是否是新游戏</param>
+        /// <returns>摇人类型</returns>
+        public RecruitType GetRecruitType(int round, bool isNewGame)
+        {
+            // 时机1：新游戏开局
+            if (isNewGame && round == 1)
+            {
+                return RecruitType.NewTribe;
+            }
+
+            // 时机2：第10关
+            if (round == 10)
+            {
+                var playerData = _dataManager?.PlayerData;
+                if (playerData?.tribes != null && playerData.tribes.Count < 3)
+                {
+                    return RecruitType.NewTribe;
+                }
+            }
+
+            // 时机3：第3、5、7、9、11、13、15、17、19关
+            if (round >= 3 && round <= 19 && round % 2 == 1)
+            {
+                return RecruitType.AddCats;
+            }
+
+            return RecruitType.None;
+        }
+
+        #endregion
+
+        #region 撸铁系统方法
+
+        /// <summary>
+        /// 生成词缀选项（3选1）
+        /// </summary>
+        /// <param name="level">当前关卡</param>
+        /// <param name="fighterId">目标兵种ID</param>
+        /// <returns>3个词缀选项</returns>
+        public List<RecruitmentOption> GenerateAffixOptions(int level, int fighterId)
+        {
+            var options = new List<RecruitmentOption>();
+
+            // 获取已拥有的词缀
+            var playerData = _dataManager?.PlayerData;
+            var ownedAffixes = playerData?.ownedAffixes ?? new List<string>();
+
+            // 使用上一关的难度（如果没有则使用普通难度）
+            DifficultyLevel difficulty = DifficultyLevel.Normal;
+            if (playerData != null && playerData.lastBattleDifficulty > 0)
+            {
+                difficulty = (DifficultyLevel)playerData.lastBattleDifficulty;
+            }
+
+            // 使用 AffixDrawService 抽取词缀
+            var affixDrawService = new AffixDrawService();
+            var affixes = affixDrawService.DrawAffixes(level, difficulty, fighterId, ownedAffixes, 3);
+
+            foreach (var affix in affixes)
+            {
+                options.Add(new RecruitmentOption
+                {
+                    optionType = ChoiceCategory.Affix,
+                    cost = 0,
+                    description = affix.description,
+                    affixData = affix
+                });
+            }
+
+            return options;
+        }
+
+        /// <summary>
+        /// 执行词缀选择
+        /// </summary>
+        /// <param name="option">选择的词缀选项</param>
+        /// <returns>是否成功</returns>
+        public bool ExecuteAffixSelection(RecruitmentOption option)
+        {
+            if (option == null || option.affixData == null)
+            {
+                Debug.LogError("[RecruitmentService] 词缀选项为空");
+                return false;
+            }
+
+            // 添加词缀到玩家已拥有的词缀列表
+            var playerData = _dataManager?.PlayerData;
+            if (playerData != null)
+            {
+                if (playerData.ownedAffixes == null)
+                    playerData.ownedAffixes = new List<string>();
+
+                playerData.ownedAffixes.Add(option.affixData.affixId);
+                _dataManager.SavePlayerData();
+
+                Debug.Log($"[RecruitmentService] 获得词缀：{option.affixData.displayName}（兵种{option.affixData.fighterId}）");
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 判断当前关卡是否需要触发撸铁
+        /// </summary>
+        /// <param name="round">当前关卡</param>
+        /// <returns>是否需要触发撸铁</returns>
+        public bool ShouldTriggerAffix(int round)
+        {
+            // 第2~19关出现
+            return round >= 2 && round <= 19;
+        }
+
+        /// <summary>
+        /// 判断是否需要触发双倍撸铁（极难难度通关后）
+        /// </summary>
+        /// <param name="previousRoundDifficulty">上一关难度</param>
+        /// <returns>是否需要双倍撸铁</returns>
+        public bool ShouldTriggerDoubleAffix(DifficultyLevel previousRoundDifficulty)
+        {
+            // 极难难度通关后，下一关出现2次撸铁选择
+            return previousRoundDifficulty == DifficultyLevel.Bloodbath;
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// 摇人类型
+    /// </summary>
+    public enum RecruitType
+    {
+        None,       // 无摇人
+        NewTribe,   // 获得新族群
+        AddCats     // 增加已有族群猫咪数量
     }
 }

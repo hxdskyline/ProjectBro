@@ -47,6 +47,7 @@ namespace TribeSystem.UI
         private bool _isDeployed;
         private int _currentVariant = 1;
         private TribeType _tribeType;
+        private int _fighterId;
         private AsyncOperationHandle<Sprite> _portraitHandle;
         private TerrainType _currentTerrain;
         private WeatherType _currentWeather;
@@ -73,8 +74,9 @@ namespace TribeSystem.UI
             _currentWeather = weather;
 
             _tribeType = tribe.tribeType;
+            _fighterId = tribe.fighterId;
             _currentVariant = 1;
-            LoadPortrait(_tribeType, _currentVariant);
+            LoadPortrait(_fighterId, _currentVariant);
 
             UpdateTexts();
         }
@@ -87,8 +89,9 @@ namespace TribeSystem.UI
             _tribe = tribe;
             _selectedCat = cat;
             _tribeType = tribe.tribeType;
+            _fighterId = tribe.fighterId;
             _currentVariant = 1;
-            LoadPortrait(_tribeType, _currentVariant);
+            LoadPortrait(_fighterId, _currentVariant);
             UpdateTexts();
         }
 
@@ -101,14 +104,14 @@ namespace TribeSystem.UI
         {
             if (_currentVariant == variant) return;
             _currentVariant = variant;
-            LoadPortrait(_tribeType, _currentVariant);
+            LoadPortrait(_fighterId, _currentVariant);
         }
 
-        private void LoadPortrait(TribeType tribeType, int variant)
+        private void LoadPortrait(int fighterId, int variant)
         {
             if (_portraitImage == null) return;
 
-            string address = GetTribePortraitAddress(tribeType, variant);
+            string address = GetTribePortraitAddress(fighterId, variant);
             if (!string.IsNullOrEmpty(address))
             {
                 if (_portraitHandle.IsValid())
@@ -126,19 +129,20 @@ namespace TribeSystem.UI
             }
         }
 
-        private string GetTribePortraitAddress(TribeType tribeType, int variant)
+        private string GetTribePortraitAddress(int fighterId, int variant)
         {
-            return TribeConfigLoader.Instance?.GetLeaderAvatarAddress(tribeType, variant);
+            return TribeConfigLoader.Instance?.GetFighterAvatarAddress(fighterId, variant);
         }
 
         private void UpdateTexts()
         {
             if (_tribe == null) return;
 
-            // 族群名称
+            // 兵种名称（从 fighter 表获取）
             if (_nameText != null)
             {
-                _nameText.text = GetTribeTypeName(_tribe.tribeType);
+                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(_tribe.fighterId);
+                _nameText.text = fighterConfig?.fighterName ?? $"兵种{_tribe.fighterId}";
             }
 
             // 小猫数量
@@ -670,18 +674,6 @@ namespace TribeSystem.UI
             if (_portraitHandle.IsValid())
             {
                 Addressables.Release(_portraitHandle);
-            }
-        }
-
-        private string GetTribeTypeName(TribeType type)
-        {
-            switch (type)
-            {
-                case TribeType.Tabby: return "狸花";
-                case TribeType.Orange: return "大橘";
-                case TribeType.Cow: return "奶牛";
-                case TribeType.Siamese: return "暹罗";
-                default: return type.ToString();
             }
         }
     }
