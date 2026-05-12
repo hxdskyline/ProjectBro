@@ -15,14 +15,8 @@ public static class CopyPathShortcut
     [Shortcut("Copy Path/CopySelectedPath", KeyCode.C, ShortcutModifiers.Control | ShortcutModifiers.Shift)]
     static void CopySelectedPath()
     {
-        if (Selection.activeGameObject != null)
-        {
-            string path = GetGameObjectPath(Selection.activeGameObject);
-            EditorGUIUtility.systemCopyBuffer = path;
-            Debug.Log($"[CopyPath] Hierarchy: {path}");
-            return;
-        }
-
+        // 优先判断是否为资源（Project 面板中的 prefab/asset）
+        // 场景物体的 GetAssetPath 返回空，资源物体返回 "Assets/..."
         if (Selection.activeObject != null)
         {
             string path = AssetDatabase.GetAssetPath(Selection.activeObject);
@@ -32,6 +26,15 @@ public static class CopyPathShortcut
                 Debug.Log($"[CopyPath] Asset: {path}");
                 return;
             }
+        }
+
+        // 场景中的 GameObject（Hierarchy 面板）
+        if (Selection.activeGameObject != null)
+        {
+            string path = GetGameObjectPath(Selection.activeGameObject);
+            EditorGUIUtility.systemCopyBuffer = path;
+            Debug.Log($"[CopyPath] Hierarchy: {path}");
+            return;
         }
 
         Debug.LogWarning("[CopyPath] 没有选中任何物体");
