@@ -106,7 +106,11 @@
       "Bash(grep -v '.meta$')",
       "Bash(python -c \"import json; json.load\\(open\\('Assets/StreamingAssets/Tables/levels_config.json', 'r', encoding='utf-8'\\)\\); print\\('JSON is valid'\\)\")",
       "Bash(python -c \"import json; f=open\\('Assets/StreamingAssets/Tables/levels_config.json', 'r'\\); json.load\\(f\\); print\\('JSON is valid'\\)\")",
-      "Bash(find Assets/Scripts -name \"*.cs\" -exec grep -l \"CS1519\\\\|CS7036\\\\|CS0177\" {} \\\\;)"
+      "Bash(find Assets/Scripts -name \"*.cs\" -exec grep -l \"CS1519\\\\|CS7036\\\\|CS0177\" {} \\\\;)",
+      "Bash(mv \"201_奇物设计.md\" \"物品_201_奇物设计.md\")",
+      "Bash(mv \"202_消耗品设计.md\" \"物品_202_消耗品设计.md\")",
+      "Bash(mv \"301_撸铁buff设计.md\" \"技能_301_撸铁buff设计.md\")",
+      "Bash(mv \"401_兵种设计.md\" \"单位_401_兵种设计.md\")"
     ]
   }
 }

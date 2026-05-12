@@ -739,7 +739,7 @@ public class DataManager : MonoBehaviour
                     buffScopeText = equip.buffScopeText,
                     buffApplyType = equip.buffApplyType,
                     buffEffects = equip.effects,
-                    targetTribeType = null
+                    targetTribeType = TribeSystem.TribeType.None
                 });
             }
         }

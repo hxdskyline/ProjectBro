@@ -333,7 +333,7 @@ namespace TribeSystem
             // 为新族长补发 aura buff
             _auraService?.ApplyAurasToNewLeader(newTribe.leader, tribeType);
 
-            for (int i = 0; i < config.initialCatCount; i++)
+            for (int i = 0; i < 1; i++)
             {
                 var cat = CatData.CreateWithQuality(CatQuality.White, tribeType);
                 _auraService?.ApplyAurasToNewCat(cat, tribeType);
@@ -612,7 +612,7 @@ namespace TribeSystem
                         optionType = NewTribeEventOptionType.NewTribe,
                         tribeType = tribeType,
                         description = $"{config.tribeName}\n{config.description}",
-                        catCount = config.recruitCountA
+                        catCount = 1
                     });
                 }
             }
@@ -681,9 +681,8 @@ namespace TribeSystem
 
             if (option.optionType == NewTribeEventOptionType.NewTribe)
             {
-                // 获得新族群（使用 recruitCountA）
-                var config = TribeConfigLoader.Instance.GetTribeConfig(option.tribeType);
-                int catCount = config?.recruitCountA ?? 1;
+                // 获得新族群
+                int catCount = 1;
 
                 var newTribe = ExecuteFreeNewTribeRecruitment(option.tribeType);
                 if (newTribe != null)
@@ -869,13 +868,13 @@ namespace TribeSystem
 
         /// <summary>
         /// 判断是否需要触发双倍撸铁（极难难度通关后）
+        /// 【暂未接入】将来在单局流程文档中单独设计，当前不做。
         /// </summary>
         /// <param name="previousRoundDifficulty">上一关难度</param>
         /// <returns>是否需要双倍撸铁</returns>
         public bool ShouldTriggerDoubleAffix(DifficultyLevel previousRoundDifficulty)
         {
-            // 极难难度通关后，下一关出现2次撸铁选择
-            return previousRoundDifficulty == DifficultyLevel.Bloodbath;
+            return false; // 暂未接入，将来在单局流程中处理
         }
 
         #endregion

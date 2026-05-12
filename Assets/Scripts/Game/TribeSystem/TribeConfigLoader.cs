@@ -514,7 +514,6 @@ namespace TribeSystem
                 {
                     tribeType = type,
                     tribeName = type.ToString(),
-                    initialCatCount = 3,
                     leaderFighterId = 0
                 });
             }

@@ -4,9 +4,6 @@
       "tribeType": 1,
       "tribeName": "狸花猫族",
       "description": "致命的射手",
-      "initialCatCount": 5,
-      "recruitCountA": 2,
-      "recruitCountB": 1,
       "deployCostPerCat": 10,
       "leaderFighterId": 1000,
       "unitTypes": [
@@ -19,14 +16,11 @@
       "tribeType": 2,
       "tribeName": "大橘猫族",
       "description": "巨大体型\n无情碾压对手",
-      "initialCatCount": 2,
-      "recruitCountA": 2,
-      "recruitCountB": 1,
       "deployCostPerCat": 10,
       "leaderFighterId": 2000,
       "unitTypes": [
         { "tier": 1, "fighterId": 2001 },
-        { "tier": 2, "fighterId": 2002, "recruitCount": 3 },
+        { "tier": 2, "fighterId": 2002 },
         { "tier": 3, "fighterId": 2003 }
       ]
     },
@@ -34,9 +28,6 @@
       "tribeType": 3,
       "tribeName": "奶牛猫族",
       "description": "增殖、分裂\n猫越多就越强",
-      "initialCatCount": 4,
-      "recruitCountA": 2,
-      "recruitCountB": 1,
       "deployCostPerCat": 8,
       "leaderFighterId": 3000,
       "unitTypes": [
@@ -48,9 +39,6 @@
       "tribeType": 4,
       "tribeName": "暹罗猫族",
       "description": "闪现、能量盾\n神秘魔法输出",
-      "initialCatCount": 3,
-      "recruitCountA": 2,
-      "recruitCountB": 1,
       "deployCostPerCat": 12,
       "leaderFighterId": 4000,
       "unitTypes": [

@@ -1275,7 +1275,7 @@ namespace TribeSystem.UI
             };
 
             // 添加初始白色小猫
-            for (int i = 0; i < config.initialCatCount; i++)
+            for (int i = 0; i < 1; i++)
             {
                 var cat = CatData.CreateWithQuality(CatQuality.White, type);
                 tribe.cats.Add(cat);
