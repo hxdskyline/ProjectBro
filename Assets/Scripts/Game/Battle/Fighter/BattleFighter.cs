@@ -23,7 +23,7 @@ namespace BattleSystem.Fighter
         public float DeathTimer;
         public float FreezeTimer { get; set; }
         public TribeType TribeType;
-        public bool IsLeader;
+        public int FighterId;
         public List<int> InnateBuffIds;
         public bool HasDoubleHit;
         public bool IsInvulnerable;

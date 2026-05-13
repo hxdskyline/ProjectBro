@@ -424,8 +424,8 @@ public class BattlePreparePanel : UIPanel
                 int catCount = tribe.GetCatCount();
                 for (int i = 0; i < catCount; i++)
                 {
-                    var cat = tribe.cats[i];
-                    int fighterId = GetCatFighterIdForAvatar(tribe.tribeType, cat.tier);
+                    var cat = tribe.units[i];
+                    int fighterId = cat.fighterId > 0 ? cat.fighterId : GetCatFighterIdForAvatar(tribe.tribeType, cat.tier);
                     GetCatAvatarAddresses(fighterId, out string catIdleAddr, out string catAttackAddr);
                     if (string.IsNullOrEmpty(catIdleAddr) && string.IsNullOrEmpty(catAttackAddr)) continue;
 
@@ -557,7 +557,7 @@ public class BattlePreparePanel : UIPanel
     private void OnCatAvatarClicked(int tribeId, int catIndex)
     {
         var tribe = _deployedTribes?.Find(t => t.tribeId == tribeId);
-        if (tribe == null || tribe.cats == null || catIndex >= tribe.cats.Count) return;
+        if (tribe == null || tribe.units == null || catIndex >= tribe.units.Count) return;
 
         GameObject clickedGo = FindAvatarGoByTribe(tribeId, catIndex);
         if (_selectedAvatarGo != null && _selectedAvatarGo != clickedGo)
@@ -717,18 +717,17 @@ public class BattlePreparePanel : UIPanel
                 tribeId = tribe.tribeId,
                 fighterId = tribe.fighterId,
                 tribeType = tribe.tribeType,
-                leader = tribe.leader,
                 moodId = tribe.moodId,
                 isActive = tribe.isActive,
-                cats = new List<CatData>()
+                units = new List<FighterData>()
             };
 
-            if (tribe.cats != null)
+            if (tribe.units != null)
             {
-                int take = Mathf.Min(GetCommandLimit(tribe), tribe.cats.Count);
+                int take = Mathf.Min(GetCommandLimit(tribe), tribe.units.Count);
                 for (int i = 0; i < take; i++)
                 {
-                    copy.cats.Add(tribe.cats[i]);
+                    copy.units.Add(tribe.units[i]);
                 }
             }
 

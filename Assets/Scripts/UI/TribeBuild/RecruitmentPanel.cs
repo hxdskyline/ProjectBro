@@ -185,42 +185,15 @@ namespace TribeSystem.UI
                 GameObject cardGo;
                 RecruitmentOptionCard cardComponent;
 
-                if (_optionCardPrefab != null)
+                cardGo = Instantiate(_optionCardPrefab, _optionsContainer);
+                cardComponent = cardGo.GetComponent<RecruitmentOptionCard>();
+                if (cardComponent != null)
                 {
-                    cardGo = Instantiate(_optionCardPrefab, _optionsContainer);
-                    cardComponent = cardGo.GetComponent<RecruitmentOptionCard>();
-                    if (cardComponent != null)
+                    cardComponent.Setup(option, optionIndex, selectedOption =>
                     {
-                        cardComponent.Setup(option, optionIndex, selectedOption =>
-                        {
-                            Hide();
-                            onSelected?.Invoke(selectedOption);
-                        });
-                    }
-
-                    Image cardImg = cardGo.GetComponent<Image>();
-                    if (cardImg != null)
-                    {
-                        cardImg.color = GetOptionCardColor(option.optionType);
-                    }
-                }
-                else
-                {
-                    cardGo = new GameObject("OptionCard", typeof(RectTransform), typeof(Image));
-                    cardGo.transform.SetParent(_optionsContainer, false);
-
-                    RectTransform cardRect = cardGo.GetComponent<RectTransform>();
-                    cardRect.sizeDelta = new Vector2(200f, 250f);
-
-                    Image cardImg = cardGo.GetComponent<Image>();
-                    cardImg.color = GetOptionCardColor(option.optionType);
-
-                    CreateOptionCardContent(cardRect, option);
-
-                    cardComponent = cardGo.AddComponent<RecruitmentOptionCard>();
-                    cardComponent.Option = option;
-                    cardComponent.Index = optionIndex;
-                    cardComponent.BackgroundImage = cardImg;
+                        Hide();
+                        onSelected?.Invoke(selectedOption);
+                    });
                 }
             }
         }

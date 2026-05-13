@@ -22,7 +22,7 @@ namespace BattleSystem
             foreach (TribeRecord tribe in deployedTribes)
             {
                 int costPerCat = GetDeployCostPerCat(tribe.tribeType);
-                int catCount = tribe.cats?.Count ?? 0;
+                int catCount = tribe.units?.Count ?? 0;
                 total += costPerCat * catCount;
             }
             return total;

@@ -3,7 +3,7 @@ using UnityEngine;
 namespace TribeSystem
 {
     /// <summary>
-    /// 族群属性计算器 - 负责计算族长和小猫的最终属性
+    /// 族群属性计算器 - 负责计算兵种的最终属性
     /// </summary>
     public static class TribeStatsCalculator
     {
@@ -62,32 +62,37 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 计算族长的最终属性（包含所有加成）
+        /// 计算兵种的最终属性（包含所有加成）
         /// </summary>
-        public static LeaderStats CalculateLeaderStats(LeaderData leader, string moodId = null)
+        public static FighterStats CalculateFighterStats(FighterData unit, string moodId = null)
         {
-            if (leader == null)
+            if (unit == null)
             {
-                return new LeaderStats(0, 0, 0, 1.0f, 0.5f);
+                return new FighterStats(0, 0, 0, 1.0f, 0.5f);
             }
 
-            float atk = leader.baseAttack;
-            float def = leader.baseDefense;
-            float hp = leader.baseHp;
-            float moveSpd = leader.baseMoveSpeed;
-            float atkSpd = 0.5f; // 默认攻速，实际值由 BattlePanel 从 fighterConfig 读取
+            float atk = unit.staticAttack;
+            float def = unit.staticDefense;
+            float hp = unit.staticHp;
+            float moveSpd = unit.staticMoveSpeed;
+            float atkSpd = unit.staticAttackSpeed > 0 ? unit.staticAttackSpeed : 0.5f;
 
             // 从 ActiveBuffs 汇总永久加成
-            if (leader.ActiveBuffs != null)
+            if (unit.ActiveBuffs != null)
             {
                 var acc = new StatAccumulator();
-                foreach (var buff in leader.ActiveBuffs)
+                foreach (var buff in unit.ActiveBuffs)
                 {
                     if (buff.persistence != BuffPersistence.Persistent) continue;
                     acc.Accumulate(buff);
                 }
                 acc.ApplyTo(ref atk, ref def, ref hp, ref moveSpd, ref atkSpd);
             }
+
+            // 全局奇物加成：直接从 PlayerData 读取，确保所有单位一致
+            var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
+            if (globalBonus > 0)
+                atk += globalBonus;
 
             // 应用心情修正
             if (!string.IsNullOrEmpty(moodId))
@@ -99,7 +104,7 @@ namespace TribeSystem
                 moveSpd = ApplyModifiers(moveSpd, moodMod.spdPercent, 0f);
             }
 
-            return new LeaderStats(
+            return new FighterStats(
                 Mathf.Max(1, Mathf.RoundToInt(atk)),
                 Mathf.Max(1, Mathf.RoundToInt(def)),
                 Mathf.Max(1, Mathf.RoundToInt(hp)),
@@ -107,48 +112,6 @@ namespace TribeSystem
                 Mathf.Max(0.001f, atkSpd)
             );
         }
-
-        /// <summary>
-        /// 计算小猫的实际属性（基于小猫基础属性和品质乘数）
-        /// </summary>
-        public static CatStats CalculateCatStats(CatData cat)
-        {
-            if (cat == null)
-            {
-                return new CatStats(0, 0, 0, 1.0f, 0.5f);
-            }
-
-            float catAtk = cat.staticAttack;
-            float catDef = cat.staticDefense;
-            float catHp = cat.staticHp;
-            float catMoveSpd = cat.staticMoveSpeed;
-            float catAtkSpd = cat.staticAttackSpeed > 0 ? cat.staticAttackSpeed : 0.5f;
-
-            // 应用小猫自身的 buff（攻防血速）
-            if (cat.ActiveBuffs != null && cat.ActiveBuffs.Count > 0)
-            {
-                var acc = new StatAccumulator();
-                foreach (var buff in cat.ActiveBuffs)
-                {
-                    if (buff.persistence != BuffPersistence.Persistent) continue;
-                    acc.Accumulate(buff);
-                }
-                acc.ApplyTo(ref catAtk, ref catDef, ref catHp, ref catMoveSpd, ref catAtkSpd);
-            }
-
-            // 全局奇物加成：直接从 PlayerData 读取，确保所有小猫一致
-            var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
-            if (globalBonus > 0)
-                catAtk += globalBonus;
-
-            return new CatStats(
-                Mathf.Max(1, Mathf.RoundToInt(catAtk)),
-                Mathf.Max(1, Mathf.RoundToInt(catDef)),
-                Mathf.Max(1, Mathf.RoundToInt(catHp)),
-                Mathf.Max(0.001f, catMoveSpd),
-                Mathf.Max(0.001f, catAtkSpd));
-        }
-
 
         /// <summary>
         /// 计算品质对应的属性比例范围（从 quality_config.json 读取）

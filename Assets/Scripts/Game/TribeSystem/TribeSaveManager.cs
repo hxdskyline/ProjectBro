@@ -123,15 +123,9 @@ namespace TribeSystem
             // 检查每个族群的数据完整性
             foreach (var tribe in playerData.tribes)
             {
-                if (tribe.leader == null)
+                if (tribe.units == null)
                 {
-                    Debug.LogError($"[TribeSaveManager] 存档数据无效: 族群{tribe.tribeId}的leader为空");
-                    return false;
-                }
-
-                if (tribe.cats == null)
-                {
-                    Debug.LogError($"[TribeSaveManager] 存档数据无效: 族群{tribe.tribeId}的cats为空");
+                    Debug.LogError($"[TribeSaveManager] 存档数据无效: 族群{tribe.tribeId}的units为空");
                     return false;
                 }
             }

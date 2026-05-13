@@ -110,7 +110,13 @@
       "Bash(mv \"201_奇物设计.md\" \"物品_201_奇物设计.md\")",
       "Bash(mv \"202_消耗品设计.md\" \"物品_202_消耗品设计.md\")",
       "Bash(mv \"301_撸铁buff设计.md\" \"技能_301_撸铁buff设计.md\")",
-      "Bash(mv \"401_兵种设计.md\" \"单位_401_兵种设计.md\")"
+      "Bash(mv \"401_兵种设计.md\" \"单位_401_兵种设计.md\")",
+      "Bash(python -u -c ':*)",
+      "Bash(py -3 -u -c ':*)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Bash(ls /c/Users/hxd_s/AppData/Local/Programs/Python/*/python.exe)",
+      "Bash(/c/Users/hxd_s/AppData/Local/Microsoft/WindowsApps/python3 -u -c ':*)",
+      "Bash(unity-mcp-cli run-tool:*)"
     ]
   }
 }

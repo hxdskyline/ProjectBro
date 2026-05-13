@@ -37,7 +37,7 @@ namespace TribeSystem.UI
         private Action<ShopItem> _onItemBuy;
         private Action _onRefresh;
         private Action _onClose;
-        private Action<TribeRecord, CatData> _onCatSell;
+        private Action<TribeRecord, FighterData> _onCatSell;
 
         // ItemInfo 面板
         [Header("ItemInfo 面板")]
@@ -90,7 +90,7 @@ namespace TribeSystem.UI
         /// <summary>
         /// 显示商店
         /// </summary>
-        public void ShowShop(List<ShopItem> items, int refreshCost, Action<ShopItem> onBuy, Action onRefresh, Action onClose, Action<TribeRecord, CatData> onCatSell = null)
+        public void ShowShop(List<ShopItem> items, int refreshCost, Action<ShopItem> onBuy, Action onRefresh, Action onClose, Action<TribeRecord, FighterData> onCatSell = null)
         {
             _currentItems = items;
             _refreshCost = refreshCost;
@@ -652,7 +652,7 @@ namespace TribeSystem.UI
             bool hasAnyCats = false;
             foreach (var tribe in tribes)
             {
-                if (tribe.cats == null || tribe.cats.Count == 0) continue;
+                if (tribe.units == null || tribe.units.Count == 0) continue;
 
                 // 族群标题
                 GameObject tribeHeader = new GameObject($"Tribe_{tribe.tribeType}", typeof(RectTransform), typeof(LayoutElement));
@@ -675,20 +675,20 @@ namespace TribeSystem.UI
                 // 使用 fighter 表中的名称
                 var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
                 string fighterName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
-                hlText.text = $"  {fighterName} ({tribe.cats.Count}只)";
+                hlText.text = $"  {fighterName} ({tribe.units.Count}只)";
 
-                for (int i = 0; i < tribe.cats.Count; i++)
+                for (int i = 0; i < tribe.units.Count; i++)
                 {
                     hasAnyCats = true;
-                    var cat = tribe.cats[i];
-                    int sellPrice = shopService.GetCatSellPrice(tribe.tribeType, cat.quality);
+                    var unit = tribe.units[i];
+                    int sellPrice = shopService.GetCatSellPrice(tribe.tribeType, unit.quality);
 
                     GameObject row = new GameObject("CatRow", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
                     row.transform.SetParent(content, false);
                     LayoutElement rowLayout = row.GetComponent<LayoutElement>();
                     rowLayout.preferredHeight = 35f;
                     Image rowBg = row.GetComponent<Image>();
-                    rowBg.color = GetQualityColor(cat.quality) * 0.4f;
+                    rowBg.color = GetQualityColor(unit.quality) * 0.4f;
 
                     // 品质+属性文本
                     GameObject infoGo = new GameObject("Info", typeof(RectTransform), typeof(Text));
@@ -703,7 +703,7 @@ namespace TribeSystem.UI
                     infoText.fontSize = 12;
                     infoText.alignment = TextAnchor.MiddleLeft;
                     infoText.color = Color.white;
-                    infoText.text = $"  {GetQualityName(cat.quality)}  攻{cat.attackMultiplier:P0} 防{cat.defenseMultiplier:P0} 血{cat.hpMultiplier:P0} 速{cat.speedMultiplier:P0}";
+                    infoText.text = $"  {GetQualityName(unit.quality)}  攻{unit.staticAttack} 防{unit.staticDefense} 血{unit.staticHp} 速{unit.staticMoveSpeed}";
 
                     // 出售按钮
                     GameObject sellBtnGo = new GameObject("SellBtn", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -735,8 +735,8 @@ namespace TribeSystem.UI
 
                     // 捕获闭包变量
                     TribeRecord capturedTribe = tribe;
-                    CatData capturedCat = cat;
-                    sellBtn.onClick.AddListener(() => OnSellCatClicked(capturedTribe, capturedCat));
+                    FighterData capturedUnit = unit;
+                    sellBtn.onClick.AddListener(() => OnSellUnitClicked(capturedTribe, capturedUnit));
                 }
             }
 
@@ -755,9 +755,9 @@ namespace TribeSystem.UI
             }
         }
 
-        private void OnSellCatClicked(TribeRecord tribe, CatData cat)
+        private void OnSellUnitClicked(TribeRecord tribe, FighterData unit)
         {
-            _onCatSell?.Invoke(tribe, cat);
+            _onCatSell?.Invoke(tribe, unit);
             // 刷新出售列表和猫粮
             UpdateCatFoodDisplay();
             GenerateSellList();

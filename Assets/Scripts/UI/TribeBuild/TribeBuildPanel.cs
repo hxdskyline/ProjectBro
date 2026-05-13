@@ -73,8 +73,8 @@ namespace TribeSystem.UI
 
         private TribeCard _displayedCard;
         private int _currentDisplayTribeId = -1;
-        private int _selectedCatIndex = -1; // -1=选中leader, >=0=选中小猫索引
-        private int _selectedCatTribeId = -1; // 选中小猫所属的 tribeId
+        private int _selectedUnitIndex = 0; // 选中的单位索引（0=首个单位）
+        private int _selectedUnitTribeId = -1; // 选中单位所属的 tribeId
 
         private System.Collections.Generic.List<AsyncOperationHandle<Sprite>> _avatarHandles = new System.Collections.Generic.List<AsyncOperationHandle<Sprite>>();
 
@@ -417,7 +417,6 @@ namespace TribeSystem.UI
         /// </summary>
         private void ProcessRecruitment()
         {
-            // 本回合已完成过招募，跳过
             if (_dataManager.IsRecruitmentCompletedForRound(_roundManager.CurrentRound))
             {
                 ProcessNextPopupEvent();
@@ -426,7 +425,6 @@ namespace TribeSystem.UI
 
             _isProcessingRecruitment = true;
 
-            // 生成词缀选项（撸铁系统）
             var options = _recruitmentService.GenerateOptions();
 
             if (_recruitmentPanel != null)
@@ -476,7 +474,7 @@ namespace TribeSystem.UI
                     // 使用 fighter 表中的名称
                     var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
                     string tribeName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
-                    var beforeCats = SnapshotCats(tribe.cats);
+                    var beforeUnits = SnapshotUnits(tribe.units);
                     _recruitmentService.ExecuteAddCats(tribe, option.cost, option.targetTier);
                     _tribes = _dataManager.GetTribes();
 
@@ -490,14 +488,14 @@ namespace TribeSystem.UI
                             {
                                 _tribeAuraService?.ApplyChosenAuras(tribe.tribeType, option.targetTier.Value, chosenIds);
                                 RefreshUI();
-                                ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                                ShowUnitListResult(tribeName, beforeUnits, tribe.units, tribe);
                             });
                             return;
                         }
                     }
 
                     RefreshUI();
-                    ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                    ShowUnitListResult(tribeName, beforeUnits, tribe.units, tribe);
                     return;
                 }
                 case ChoiceCategory.QualityEvolution:
@@ -509,11 +507,11 @@ namespace TribeSystem.UI
                     var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(tribe.fighterId);
                     string tribeName = fighterConfig?.fighterName ?? $"兵种{tribe.fighterId}";
 
-                    var beforeCats = SnapshotCats(tribe.cats);
+                    var beforeUnits = SnapshotUnits(tribe.units);
                     _recruitmentService.ExecuteQualityEvolution(tribe, option.cost);
                     _tribes = _dataManager.GetTribes();
                     RefreshUI();
-                    ShowCatListResult(tribeName, beforeCats, tribe.cats, tribe);
+                    ShowUnitListResult(tribeName, beforeUnits, tribe.units, tribe);
                     return;
                 }
                 case ChoiceCategory.Buff:
@@ -535,7 +533,7 @@ namespace TribeSystem.UI
                     }
                     _tribes = _dataManager.GetTribes();
                     RefreshUI();
-                    ShowLeaderBoostResult(tribeName, tribe.leader, option.bonusAttack, option.bonusHp, tribe.fighterId);
+                    ShowLeaderBoostResult(tribeName, tribe.units[0], option.bonusAttack, option.bonusHp, tribe.fighterId);
                     return;
                 }
                 case ChoiceCategory.Reinforcement:
@@ -552,7 +550,7 @@ namespace TribeSystem.UI
                         var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(newTribe.fighterId);
                         string tribeName = fighterConfig?.fighterName ?? $"兵种{newTribe.fighterId}";
 
-                        ShowCatListResult(tribeName, new List<CatData>(), newTribe.cats, newTribe);
+                        ShowUnitListResult(tribeName, new List<FighterData>(), newTribe.units, newTribe);
                         return;
                     }
                     break;
@@ -564,7 +562,7 @@ namespace TribeSystem.UI
             ProcessNextPopupEvent();
         }
 
-        private void ShowCatListResult(string tribeName, List<CatData> beforeCats, List<CatData> afterCats, TribeRecord tribe)
+        private void ShowUnitListResult(string tribeName, List<FighterData> beforeUnits, List<FighterData> afterUnits, TribeRecord tribe)
         {
             if (_recruitmentResultPanel == null)
             {
@@ -575,7 +573,7 @@ namespace TribeSystem.UI
             if (_forcedPopupRoot != null)
                 _forcedPopupRoot.gameObject.SetActive(true);
 
-            _recruitmentResultPanel.ShowCatListResult(tribeName, beforeCats, afterCats, tribe, () =>
+            _recruitmentResultPanel.ShowCatListResult(tribeName, beforeUnits, afterUnits, tribe, () =>
             {
                 if (_forcedPopupRoot != null)
                     _forcedPopupRoot.gameObject.SetActive(false);
@@ -583,7 +581,7 @@ namespace TribeSystem.UI
             });
         }
 
-        private void ShowLeaderBoostResult(string tribeName, LeaderData leader, int bonusAttack, int bonusHp, int fighterId)
+        private void ShowLeaderBoostResult(string tribeName, FighterData unit, int bonusAttack, int bonusHp, int fighterId)
         {
             if (_recruitmentResultPanel == null)
             {
@@ -594,7 +592,7 @@ namespace TribeSystem.UI
             if (_forcedPopupRoot != null)
                 _forcedPopupRoot.gameObject.SetActive(true);
 
-            _recruitmentResultPanel.ShowLeaderBoostResult(tribeName, leader, bonusAttack, bonusHp, fighterId, () =>
+            _recruitmentResultPanel.ShowLeaderBoostResult(tribeName, unit, bonusAttack, bonusHp, fighterId, () =>
             {
                 if (_forcedPopupRoot != null)
                     _forcedPopupRoot.gameObject.SetActive(false);
@@ -602,20 +600,23 @@ namespace TribeSystem.UI
             });
         }
 
-        private List<CatData> SnapshotCats(List<CatData> cats)
+        private List<FighterData> SnapshotUnits(List<FighterData> units)
         {
-            var snapshot = new List<CatData>();
-            if (cats == null) return snapshot;
-            foreach (var cat in cats)
+            var snapshot = new List<FighterData>();
+            if (units == null) return snapshot;
+            foreach (var unit in units)
             {
-                snapshot.Add(new CatData
+                snapshot.Add(new FighterData
                 {
-                    catId = cat.catId,
-                    quality = cat.quality,
-                    attackMultiplier = cat.attackMultiplier,
-                    defenseMultiplier = cat.defenseMultiplier,
-                    hpMultiplier = cat.hpMultiplier,
-                    speedMultiplier = cat.speedMultiplier
+                    id = unit.id,
+                    fighterId = unit.fighterId,
+                    quality = unit.quality,
+                    tier = unit.tier,
+                    staticAttack = unit.staticAttack,
+                    staticDefense = unit.staticDefense,
+                    staticHp = unit.staticHp,
+                    staticMoveSpeed = unit.staticMoveSpeed,
+                    staticAttackSpeed = unit.staticAttackSpeed
                 });
             }
             return snapshot;
@@ -950,9 +951,9 @@ namespace TribeSystem.UI
             _isShopOpen = true;
         }
 
-        private void OnCatToSellSelected(TribeRecord tribe, CatData cat)
+        private void OnCatToSellSelected(TribeRecord tribe, FighterData unit)
         {
-            _shopService.SellCat(tribe, cat);
+            _shopService.SellCat(tribe, unit);
             _tribes = _dataManager.GetTribes();
             RefreshUI();
         }
@@ -1205,16 +1206,11 @@ namespace TribeSystem.UI
 
         private void DecreaseRoundBasedBuffs(TribeRecord tribe)
         {
-            // 族长
-            if (tribe.leader?.ActiveBuffs != null)
-                DecreaseBuffs(tribe.leader.ActiveBuffs);
-
-            // 小猫
-            if (tribe.cats == null) return;
-            foreach (var cat in tribe.cats)
+            if (tribe.units == null) return;
+            foreach (var unit in tribe.units)
             {
-                if (cat?.ActiveBuffs != null)
-                    DecreaseBuffs(cat.ActiveBuffs);
+                if (unit?.ActiveBuffs != null)
+                    DecreaseBuffs(unit.ActiveBuffs);
             }
         }
 
@@ -1250,36 +1246,18 @@ namespace TribeSystem.UI
             var config = TribeConfigLoader.Instance.GetTribeConfig(type);
             if (config == null) return null;
 
-            // 从 fighter_config.json 读取族长属性
-            var leaderConfig = TribeConfigLoader.Instance.GetFighterConfig(config.leaderFighterId);
-
             var tribe = new TribeRecord
             {
                 tribeId = _tribes.Count,
                 fighterId = config.leaderFighterId,
                 tribeType = type,
-                leader = new LeaderData
-                {
-                    leaderId = UnityEngine.Random.Range(1000, 9999),
-                    name = leaderConfig?.fighterName ?? $"{config.tribeName}族长",
-                    baseAttack = leaderConfig?.attack ?? 0,
-                    baseDefense = leaderConfig?.defense ?? 0,
-                    baseHp = leaderConfig?.hp ?? 0,
-                    baseMoveSpeed = leaderConfig?.moveSpeed ?? 1.0f,
-                    skillIds = new List<int>(),
-                    permanentBuffs = new PermanentBuffs(),
-                    restTurns = 0
-                },
-                cats = new List<CatData>(),
+                units = new List<FighterData>(),
                 isActive = true
             };
 
-            // 添加初始白色小猫
-            for (int i = 0; i < 1; i++)
-            {
-                var cat = CatData.CreateWithQuality(CatQuality.White, type);
-                tribe.cats.Add(cat);
-            }
+            // 添加初始白色单位
+            var unit = FighterData.CreateWithQuality(CatQuality.White, type);
+            tribe.units.Add(unit);
 
             return tribe;
         }
@@ -1349,7 +1327,7 @@ namespace TribeSystem.UI
             if (_tribes != null && _tribes.Count > 0)
             {
                 var t = _tribes[0];
-                Debug.Log($"[TribeBuildPanel][Debug] RefreshTribeList: tribes[0]={t.tribeType}, leader={t.leader != null}, hpBonus={t.leader?.permanentBuffs?.hpBonus}");
+                Debug.Log($"[TribeBuildPanel][Debug] RefreshTribeList: tribes[0]={t.tribeType}, units={t.units?.Count}");
             }
 
             if (_tribes == null || _tribes.Count == 0) return;
@@ -1373,7 +1351,7 @@ namespace TribeSystem.UI
             if (_displayedCard == null || tribe == null) { Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: card={_displayedCard != null}, tribe={tribe != null}"); return; }
             if (_currentDisplayTribeId == tribe.tribeId) { Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: same tribe {_currentDisplayTribeId}, skipping"); return; }
 
-            Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: tribe={tribe.tribeType}, leader={tribe.leader != null}, hpBonus={tribe.leader?.permanentBuffs?.hpBonus}");
+            Debug.Log($"[TribeBuildPanel][Debug] ShowTribeOnCard: tribe={tribe.tribeType}, units={tribe.units?.Count}");
             _currentDisplayTribeId = tribe.tribeId;
             _displayedCard.Setup(tribe, false, null, null);
         }
@@ -1421,140 +1399,143 @@ namespace TribeSystem.UI
             for (int t = 0; t < tribeCount; t++)
             {
                 var tribe = _tribes[t];
+                if (tribe.units == null || tribe.units.Count == 0) continue;
 
                 float tribeCenterX = (t - (tribeCount - 1) / 2f) * spacing;
                 int clickedTribeId = tribe.tribeId;
 
-                // 使用 fighterId 加载对应兵种的头像
-                string leaderIdleAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(tribe.fighterId, 1);
-                string leaderAttackAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(tribe.fighterId, 2);
-                if (string.IsNullOrEmpty(leaderIdleAddr) && string.IsNullOrEmpty(leaderAttackAddr)) continue;
+                // 使用 units[0] 的 fighterId 加载头像
+                var firstUnit = tribe.units[0];
+                int firstFighterId = firstUnit.fighterId > 0 ? firstUnit.fighterId : tribe.fighterId;
+                string firstIdleAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(firstFighterId, 1);
+                string firstAttackAddr = TribeConfigLoader.Instance?.GetFighterAvatarAddress(firstFighterId, 2);
+                if (string.IsNullOrEmpty(firstIdleAddr) && string.IsNullOrEmpty(firstAttackAddr)) continue;
 
-                // 并行加载族长 idle 和 attack 两帧
-                var idleHandle = Addressables.LoadAssetAsync<Sprite>(leaderIdleAddr);
-                var attackHandle = Addressables.LoadAssetAsync<Sprite>(leaderAttackAddr);
+                // 并行加载首个单位 idle 和 attack 两帧
+                var idleHandle = Addressables.LoadAssetAsync<Sprite>(firstIdleAddr);
+                var attackHandle = Addressables.LoadAssetAsync<Sprite>(firstAttackAddr);
                 _avatarHandles.Add(idleHandle);
                 _avatarHandles.Add(attackHandle);
 
                 int pending = 2;
-                Sprite leaderIdleSprite = null;
-                Sprite leaderAttackSprite = null;
+                Sprite firstIdleSprite = null;
+                Sprite firstAttackSprite = null;
 
-                System.Action onLeaderLoaded = () =>
+                System.Action onFirstUnitLoaded = () =>
                 {
                     if (_tribeAvatarRoot == null) return;
-                    Sprite defaultSprite = leaderIdleSprite ?? leaderAttackSprite;
+                    Sprite defaultSprite = firstIdleSprite ?? firstAttackSprite;
                     if (defaultSprite == null) return;
 
                     bool tribeIsSelected = (_currentDisplayTribeId == clickedTribeId);
-                    bool leaderIsSelected = tribeIsSelected && _selectedCatIndex < 0;
+                    bool firstUnitIsSelected = tribeIsSelected && _selectedUnitIndex == 0;
 
-                    // Leader
-                    GameObject leaderGo = new GameObject($"Leader_{tribe.tribeType}", typeof(RectTransform), typeof(Image), typeof(Button));
-                    leaderGo.transform.SetParent(_tribeAvatarRoot.transform, false);
-                    RectTransform leaderRt = leaderGo.GetComponent<RectTransform>();
-                    leaderRt.anchorMin = new Vector2(0.5f, 0.5f);
-                    leaderRt.anchorMax = new Vector2(0.5f, 0.5f);
-                    float leaderX = tribeCenterX + Random.Range(-30f, 30f);
-                    float leaderY = Random.Range(-30f, 30f);
-                    leaderRt.anchoredPosition = new Vector2(leaderX, leaderY);
-                    float leaderScale = Random.Range(160f, 220f);
-                    leaderRt.sizeDelta = new Vector2(leaderScale, leaderScale);
-                    Image leaderImg = leaderGo.GetComponent<Image>();
-                    leaderImg.sprite = leaderIsSelected && leaderAttackSprite != null ? leaderAttackSprite : defaultSprite;
-                    leaderImg.color = new Color(1f, 1f, 1f, Random.Range(0.85f, 1f));
-                    Button leaderBtn = leaderGo.GetComponent<Button>();
-                    leaderBtn.transition = Selectable.Transition.None;
-                    leaderBtn.onClick.AddListener(() => OnLeaderAvatarClicked(clickedTribeId));
+                    // 第一个单位（大头像）
+                    GameObject firstGo = new GameObject($"Leader_{tribe.tribeType}", typeof(RectTransform), typeof(Image), typeof(Button));
+                    firstGo.transform.SetParent(_tribeAvatarRoot.transform, false);
+                    RectTransform firstRt = firstGo.GetComponent<RectTransform>();
+                    firstRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    firstRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    float firstX = tribeCenterX + Random.Range(-30f, 30f);
+                    float firstY = Random.Range(-30f, 30f);
+                    firstRt.anchoredPosition = new Vector2(firstX, firstY);
+                    float firstScale = 180f;
+                    firstRt.sizeDelta = new Vector2(firstScale, firstScale);
+                    Image firstImg = firstGo.GetComponent<Image>();
+                    firstImg.sprite = firstUnitIsSelected && firstAttackSprite != null ? firstAttackSprite : defaultSprite;
+                    firstImg.color = new Color(1f, 1f, 1f, Random.Range(0.85f, 1f));
+                    Button firstBtn = firstGo.GetComponent<Button>();
+                    firstBtn.transition = Selectable.Transition.None;
+                    firstBtn.onClick.AddListener(() => OnUnitAvatarClicked(clickedTribeId, 0));
 
-                    if (leaderIdleSprite != null) _avatarIdleSprites[leaderGo] = leaderIdleSprite;
-                    if (leaderAttackSprite != null) _avatarAttackSprites[leaderGo] = leaderAttackSprite;
-                    if (leaderIsSelected)
+                    if (firstIdleSprite != null) _avatarIdleSprites[firstGo] = firstIdleSprite;
+                    if (firstAttackSprite != null) _avatarAttackSprites[firstGo] = firstAttackSprite;
+                    if (firstUnitIsSelected)
                     {
-                        _selectedAvatarGo = leaderGo;
-                        PositionIndicatorAbove(leaderRt);
+                        _selectedAvatarGo = firstGo;
+                        PositionIndicatorAbove(firstRt);
                     }
 
-                    // 为每只猫单独加载外观（根据 fighterId → avatarId）
-                    int catCount = tribe.GetCatCount();
-                    for (int i = 0; i < catCount; i++)
+                    // 为后续单位加载外观
+                    int unitCount = tribe.GetUnitCount();
+                    for (int i = 1; i < unitCount; i++)
                     {
-                        var cat = tribe.cats[i];
-                        int fighterId = GetCatFighterIdForAvatar(tribe.tribeType, cat.tier);
-                        GetCatAvatarAddresses(fighterId, out string catIdleAddr, out string catAttackAddr);
-                        if (string.IsNullOrEmpty(catIdleAddr) && string.IsNullOrEmpty(catAttackAddr)) continue;
+                        var unit = tribe.units[i];
+                        int unitFighterId = GetFighterIdForAvatar(tribe.tribeType, unit.tier);
+                        GetCatAvatarAddresses(unitFighterId, out string unitIdleAddr, out string unitAttackAddr);
+                        if (string.IsNullOrEmpty(unitIdleAddr) && string.IsNullOrEmpty(unitAttackAddr)) continue;
 
-                        int catIdx = i;
-                        bool catIsSelected = (tribeIsSelected && i == _selectedCatIndex);
+                        int unitIdx = i;
+                        bool unitIsSelected = (tribeIsSelected && i == _selectedUnitIndex);
 
-                        var catIdleHandle = Addressables.LoadAssetAsync<Sprite>(catIdleAddr);
-                        var catAttackHandle = Addressables.LoadAssetAsync<Sprite>(catAttackAddr);
-                        _avatarHandles.Add(catIdleHandle);
-                        _avatarHandles.Add(catAttackHandle);
+                        var unitIdleHandle = Addressables.LoadAssetAsync<Sprite>(unitIdleAddr);
+                        var unitAttackHandle = Addressables.LoadAssetAsync<Sprite>(unitAttackAddr);
+                        _avatarHandles.Add(unitIdleHandle);
+                        _avatarHandles.Add(unitAttackHandle);
 
-                        int catPending = 2;
-                        Sprite catIdle = null;
-                        Sprite catAttack = null;
+                        int unitPending = 2;
+                        Sprite unitIdle = null;
+                        Sprite unitAttack = null;
 
-                        System.Action onCatLoaded = () =>
+                        System.Action onUnitLoaded = () =>
                         {
                             if (_tribeAvatarRoot == null) return;
-                            Sprite catDefault = catIdle ?? catAttack;
-                            if (catDefault == null) return;
+                            Sprite unitDefault = unitIdle ?? unitAttack;
+                            if (unitDefault == null) return;
 
-                            GameObject catGo = new GameObject($"Cat_{tribe.tribeType}_{catIdx}", typeof(RectTransform), typeof(Image), typeof(Button));
-                            catGo.transform.SetParent(_tribeAvatarRoot.transform, false);
-                            RectTransform catRt = catGo.GetComponent<RectTransform>();
-                            catRt.anchorMin = new Vector2(0.5f, 0.5f);
-                            catRt.anchorMax = new Vector2(0.5f, 0.5f);
+                            GameObject unitGo = new GameObject($"Cat_{tribe.tribeType}_{unitIdx - 1}", typeof(RectTransform), typeof(Image), typeof(Button));
+                            unitGo.transform.SetParent(_tribeAvatarRoot.transform, false);
+                            RectTransform unitRt = unitGo.GetComponent<RectTransform>();
+                            unitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                            unitRt.anchorMax = new Vector2(0.5f, 0.5f);
 
-                            float baseX = tribeCenterX + (catIdx - (catCount - 1) / 2f) * 80f;
-                            float catX = baseX + Random.Range(-30f, 30f);
-                            float catY = Random.Range(-200f, -120f);
-                            catRt.anchoredPosition = new Vector2(catX, catY);
+                            float baseX = tribeCenterX + ((unitIdx - 1) - (unitCount - 2) / 2f) * 80f;
+                            float unitX = baseX + Random.Range(-30f, 30f);
+                            float unitY = Random.Range(-200f, -120f);
+                            unitRt.anchoredPosition = new Vector2(unitX, unitY);
 
-                            float catSize = Random.Range(50f, 80f);
-                            catRt.sizeDelta = new Vector2(catSize, catSize);
+                            float unitSize = 65f;
+                            unitRt.sizeDelta = new Vector2(unitSize, unitSize);
 
-                            Image catImg = catGo.GetComponent<Image>();
-                            catImg.sprite = catIsSelected && catAttack != null ? catAttack : catDefault;
-                            catImg.color = new Color(1f, 1f, 1f, Random.Range(0.6f, 0.95f));
-                            Button catBtn = catGo.GetComponent<Button>();
-                            catBtn.transition = Selectable.Transition.None;
-                            catBtn.onClick.AddListener(() => OnCatAvatarClicked(clickedTribeId, catIdx));
+                            Image unitImg = unitGo.GetComponent<Image>();
+                            unitImg.sprite = unitIsSelected && unitAttack != null ? unitAttack : unitDefault;
+                            unitImg.color = new Color(1f, 1f, 1f, Random.Range(0.6f, 0.95f));
+                            Button unitBtn = unitGo.GetComponent<Button>();
+                            unitBtn.transition = Selectable.Transition.None;
+                            unitBtn.onClick.AddListener(() => OnUnitAvatarClicked(clickedTribeId, unitIdx));
 
-                            if (catIdle != null) _avatarIdleSprites[catGo] = catIdle;
-                            if (catAttack != null) _avatarAttackSprites[catGo] = catAttack;
-                            if (catIsSelected)
+                            if (unitIdle != null) _avatarIdleSprites[unitGo] = unitIdle;
+                            if (unitAttack != null) _avatarAttackSprites[unitGo] = unitAttack;
+                            if (unitIsSelected)
                             {
-                                _selectedAvatarGo = catGo;
-                                PositionIndicatorAbove(catRt);
+                                _selectedAvatarGo = unitGo;
+                                PositionIndicatorAbove(unitRt);
                             }
                         };
 
-                        int capturedCatPending = catPending;
-                        catIdleHandle.Completed += (op) =>
+                        int capturedUnitPending = unitPending;
+                        unitIdleHandle.Completed += (op) =>
                         {
-                            if (op.Status == AsyncOperationStatus.Succeeded) catIdle = op.Result;
-                            if (--capturedCatPending == 0) onCatLoaded();
+                            if (op.Status == AsyncOperationStatus.Succeeded) unitIdle = op.Result;
+                            if (--capturedUnitPending == 0) onUnitLoaded();
                         };
-                        catAttackHandle.Completed += (op) =>
+                        unitAttackHandle.Completed += (op) =>
                         {
-                            if (op.Status == AsyncOperationStatus.Succeeded) catAttack = op.Result;
-                            if (--capturedCatPending == 0) onCatLoaded();
+                            if (op.Status == AsyncOperationStatus.Succeeded) unitAttack = op.Result;
+                            if (--capturedUnitPending == 0) onUnitLoaded();
                         };
                     }
                 };
 
                 idleHandle.Completed += (op) =>
                 {
-                    if (op.Status == AsyncOperationStatus.Succeeded) leaderIdleSprite = op.Result;
-                    if (--pending == 0) onLeaderLoaded();
+                    if (op.Status == AsyncOperationStatus.Succeeded) firstIdleSprite = op.Result;
+                    if (--pending == 0) onFirstUnitLoaded();
                 };
                 attackHandle.Completed += (op) =>
                 {
-                    if (op.Status == AsyncOperationStatus.Succeeded) leaderAttackSprite = op.Result;
-                    if (--pending == 0) onLeaderLoaded();
+                    if (op.Status == AsyncOperationStatus.Succeeded) firstAttackSprite = op.Result;
+                    if (--pending == 0) onFirstUnitLoaded();
                 };
             }
         }
@@ -1597,53 +1578,39 @@ namespace TribeSystem.UI
             );
         }
 
-        private void OnLeaderAvatarClicked(int tribeId)
+        private void OnUnitAvatarClicked(int tribeId, int unitIndex)
         {
             var tribe = _tribes?.Find(t => t.tribeId == tribeId);
-            if (tribe == null) return;
+            if (tribe == null || tribe.units == null || unitIndex < 0 || unitIndex >= tribe.units.Count) return;
 
             // 切换选中头像的 sprite
-            GameObject clickedGo = FindAvatarGoByTribe(tribeId, -1);
+            GameObject clickedGo = FindAvatarGoByTribe(tribeId, unitIndex);
             if (_selectedAvatarGo != null && _selectedAvatarGo != clickedGo)
                 SetAvatarSelected(_selectedAvatarGo, false);
             SetAvatarSelected(clickedGo, true);
             _selectedAvatarGo = clickedGo;
 
-            _selectedCatIndex = -1;
-            _selectedCatTribeId = -1;
-            if (_sellCatButton != null) _sellCatButton.gameObject.SetActive(false);
-            ShowTribeOnCard(tribe);
-        }
-
-        private void OnCatAvatarClicked(int tribeId, int catIndex)
-        {
-            var tribe = _tribes?.Find(t => t.tribeId == tribeId);
-            if (tribe == null || tribe.cats == null || catIndex >= tribe.cats.Count) return;
-
-            // 切换选中头像的 sprite
-            GameObject clickedGo = FindAvatarGoByTribe(tribeId, catIndex);
-            if (_selectedAvatarGo != null && _selectedAvatarGo != clickedGo)
-                SetAvatarSelected(_selectedAvatarGo, false);
-            SetAvatarSelected(clickedGo, true);
-            _selectedAvatarGo = clickedGo;
-
-            _selectedCatIndex = catIndex;
-            _selectedCatTribeId = tribeId;
+            _selectedUnitIndex = unitIndex;
+            _selectedUnitTribeId = tribeId;
             _currentDisplayTribeId = -1;
-            if (_sellCatButton != null) _sellCatButton.gameObject.SetActive(true);
-            _displayedCard?.SetupForCat(tribe.cats[catIndex], tribe);
+            // 第一个单位不可出售，其他单位可以出售
+            if (_sellCatButton != null) _sellCatButton.gameObject.SetActive(unitIndex > 0);
+            if (unitIndex > 0)
+                _displayedCard?.SetupForUnit(tribe.units[unitIndex], tribe);
+            else
+                ShowTribeOnCard(tribe);
         }
 
         /// <summary>
-        /// 根据 tribeId 和 catIndex 查找对应的头像 GameObject
-        /// catIndex == -1 表示查找 leader
+        /// 根据 tribeId 和 unitIndex 查找对应的头像 GameObject
+        /// unitIndex == 0 表示首个单位（大头像），>0 表示后续单位
         /// </summary>
-        private GameObject FindAvatarGoByTribe(int tribeId, int catIndex)
+        private GameObject FindAvatarGoByTribe(int tribeId, int unitIndex)
         {
             var tribe = _tribes?.Find(t => t.tribeId == tribeId);
             if (tribe == null || _tribeAvatarRoot == null) return null;
 
-            string prefix = catIndex < 0 ? $"Leader_{tribe.tribeType}" : $"Cat_{tribe.tribeType}_{catIndex}";
+            string prefix = unitIndex == 0 ? $"Leader_{tribe.tribeType}" : $"Cat_{tribe.tribeType}_{unitIndex - 1}";
             for (int i = 0; i < _tribeAvatarRoot.transform.childCount; i++)
             {
                 var child = _tribeAvatarRoot.transform.GetChild(i);
@@ -1655,13 +1622,13 @@ namespace TribeSystem.UI
 
         private void OnSellCatButtonClicked()
         {
-            if (_selectedCatIndex < 0) return;
-            var tribe = _tribes?.Find(t => t.tribeId == _selectedCatTribeId);
-            if (tribe == null || tribe.cats == null || _selectedCatIndex >= tribe.cats.Count) return;
+            if (_selectedUnitIndex <= 0) return;
+            var tribe = _tribes?.Find(t => t.tribeId == _selectedUnitTribeId);
+            if (tribe == null || tribe.units == null || _selectedUnitIndex >= tribe.units.Count) return;
 
-            CatData cat = tribe.cats[_selectedCatIndex];
-            int sellPrice = _shopService.SellCat(tribe, cat);
-            Debug.Log($"[TribeBuildPanel] 出售小猫获得 {sellPrice} 猫粮");
+            FighterData unit = tribe.units[_selectedUnitIndex];
+            int sellPrice = _shopService.SellCat(tribe, unit);
+            Debug.Log($"[TribeBuildPanel] 出售单位获得 {sellPrice} 猫粮");
 
             if (_catFoodText != null)
                 _catFoodText.text = $"猫粮: {_dataManager.GetCatFood()}";
@@ -1673,18 +1640,18 @@ namespace TribeSystem.UI
             // 刷新头像
             RebuildAllTribeAvatars();
 
-            // 隐藏出售按钮（猫已卖掉）
-            _selectedCatIndex = -1;
-            _selectedCatTribeId = -1;
+            // 隐藏出售按钮（已卖掉）
+            _selectedUnitIndex = 0;
+            _selectedUnitTribeId = -1;
             if (_sellCatButton != null) _sellCatButton.gameObject.SetActive(false);
 
             _dataManager?.SavePlayerData();
         }
 
         /// <summary>
-        /// 从 tribe_config + fighter_config 获取小猫的 fighterId
+        /// 从 tribe_config + fighter_config 获取单位的 fighterId
         /// </summary>
-        private int GetCatFighterIdForAvatar(TribeType tribeType, UnitTier tier)
+        private int GetFighterIdForAvatar(TribeType tribeType, UnitTier tier)
         {
             var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
             if (tribeConfig != null)

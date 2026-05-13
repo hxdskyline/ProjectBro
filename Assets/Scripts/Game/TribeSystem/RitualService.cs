@@ -185,9 +185,19 @@ namespace TribeSystem
                 case RitualRewardType.LeaderSkill:
                     if (tribe != null && item.leaderSkillId > 0)
                     {
-                        if (!tribe.leader.skillIds.Contains(item.leaderSkillId))
+                        // 检查该族群是否已有单位拥有此技能
+                        bool alreadyOwned = false;
+                        foreach (var unit in tribe.units)
                         {
-                            tribe.leader.skillIds.Add(item.leaderSkillId);
+                            if (unit.skillIds.Contains(item.leaderSkillId))
+                            {
+                                alreadyOwned = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyOwned && tribe.units.Count > 0)
+                        {
+                            tribe.units[0].skillIds.Add(item.leaderSkillId);
                             Debug.Log($"[RitualService] Unlocked leader skill {item.leaderSkillId} for tribe {tribe.tribeType}");
                         }
                     }
@@ -221,14 +231,23 @@ namespace TribeSystem
             var availableSkills = new List<LeaderSkillData>();
             foreach (var tribe in playerData.tribes)
             {
-                if (tribe.leader == null) continue;
+                if (tribe.units == null || tribe.units.Count == 0) continue;
                 var tribeSkills = config.GetSkillsForTribe(tribe.tribeType);
                 if (tribeSkills == null) continue;
 
                 foreach (var skill in tribeSkills)
                 {
-                    // 跳过已解锁的技能
-                    if (tribe.leader.skillIds.Contains(skill.skillId)) continue;
+                    // 跳过已解锁的技能（检查所有单位）
+                    bool alreadyOwned = false;
+                    foreach (var unit in tribe.units)
+                    {
+                        if (unit.skillIds.Contains(skill.skillId))
+                        {
+                            alreadyOwned = true;
+                            break;
+                        }
+                    }
+                    if (alreadyOwned) continue;
                     availableSkills.Add(skill);
                 }
             }
@@ -238,11 +257,11 @@ namespace TribeSystem
             // 随机选1个
             var selected = availableSkills[Random.Range(0, availableSkills.Count)];
 
-            // 找到对应的族长
+            // 找到对应的族群
             TribeRecord targetTribe = null;
             foreach (var tribe in playerData.tribes)
             {
-                if (tribe.leader == null) continue;
+                if (tribe.units == null || tribe.units.Count == 0) continue;
                 var tribeSkills = config.GetSkillsForTribe(tribe.tribeType);
                 if (tribeSkills == null) continue;
                 foreach (var s in tribeSkills)

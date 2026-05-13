@@ -21,7 +21,7 @@ namespace TribeSystem.UI
         private AsyncOperationHandle<Sprite> _portraitHandleBefore;
         private AsyncOperationHandle<Sprite> _portraitHandleAfter;
 
-        public void ShowCatListResult(string tribeName, List<CatData> beforeCats, List<CatData> afterCats, TribeRecord tribe, Action onConfirmed)
+        public void ShowCatListResult(string tribeName, List<FighterData> beforeUnits, List<FighterData> afterUnits, TribeRecord tribe, Action onConfirmed)
         {
             EnsureUI();
             ClearContent();
@@ -38,14 +38,14 @@ namespace TribeSystem.UI
             hlg.childForceExpandHeight = true;
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
-            BuildCatListColumn(_contentArea, "提升前", beforeCats, tribe, 400f);
-            BuildCatListColumn(_contentArea, "提升后", afterCats, tribe, 400f);
+            BuildCatListColumn(_contentArea, "提升前", beforeUnits, tribe, 400f);
+            BuildCatListColumn(_contentArea, "提升后", afterUnits, tribe, 400f);
 
             WireConfirmButton(onConfirmed);
             Show();
         }
 
-        public void ShowLeaderBoostResult(string tribeName, LeaderData leader, int bonusAttack, int bonusHp, int fighterId, Action onConfirmed)
+        public void ShowLeaderBoostResult(string tribeName, FighterData unit, int bonusAttack, int bonusHp, int fighterId, Action onConfirmed)
         {
             EnsureUI();
             ClearContent();
@@ -62,7 +62,7 @@ namespace TribeSystem.UI
             hlg.padding = new RectOffset(10, 10, 5, 5);
 
             // 旧值面板：减去本次加成
-            BuildLeaderCardFlat(_contentArea, leader, fighterId,
+            BuildLeaderCardFlat(_contentArea, unit, fighterId,
                 -(bonusAttack), -(bonusHp), false);
 
             // 箭头
@@ -71,7 +71,7 @@ namespace TribeSystem.UI
             arrowRect.sizeDelta = new Vector2(40f, 300f);
 
             // 新值面板：当前值，标记提升属性
-            BuildLeaderCardFlat(_contentArea, leader, fighterId,
+            BuildLeaderCardFlat(_contentArea, unit, fighterId,
                 bonusAttack, bonusHp, true);
 
             WireConfirmButton(onConfirmed);
@@ -80,7 +80,7 @@ namespace TribeSystem.UI
 
         #region Cat List Column
 
-        private void BuildCatListColumn(RectTransform parent, string header, List<CatData> cats, TribeRecord tribe, float width)
+        private void BuildCatListColumn(RectTransform parent, string header, List<FighterData> units, TribeRecord tribe, float width)
         {
             // 列容器
             var colGo = new GameObject($"Column_{header}", typeof(RectTransform), typeof(Image));
@@ -156,14 +156,14 @@ namespace TribeSystem.UI
             scrollRect.horizontal = false;
 
             // 填充小猫 items
-            if (cats != null)
+            if (units != null)
             {
-                foreach (var cat in cats)
-                    BuildCatItem(contentRt, cat, tribe);
+                foreach (var unit in units)
+                    BuildCatItem(contentRt, unit, tribe);
             }
         }
 
-        private void BuildCatItem(RectTransform parent, CatData cat, TribeRecord tribe)
+        private void BuildCatItem(RectTransform parent, FighterData unit, TribeRecord tribe)
         {
             var itemGo = new GameObject("CatItem", typeof(RectTransform), typeof(Image));
             itemGo.transform.SetParent(parent, false);
@@ -171,7 +171,7 @@ namespace TribeSystem.UI
             itemRt.sizeDelta = new Vector2(0, 36f);
 
             var bgImg = itemGo.GetComponent<Image>();
-            bgImg.color = GetQualityBgColor(cat.quality);
+            bgImg.color = GetQualityBgColor(unit.quality);
 
             var le = itemGo.AddComponent<LayoutElement>();
             le.preferredHeight = 36f;
@@ -190,8 +190,8 @@ namespace TribeSystem.UI
             qualityText.font = font;
             qualityText.fontSize = 16;
             qualityText.alignment = TextAnchor.MiddleLeft;
-            qualityText.color = GetQualityTextColor(cat.quality);
-            qualityText.text = GetQualityLabel(cat.quality);
+            qualityText.color = GetQualityTextColor(unit.quality);
+            qualityText.text = GetQualityLabel(unit.quality);
 
             // 属性
             var statsGo = new GameObject("Stats", typeof(RectTransform), typeof(Text));
@@ -207,26 +207,18 @@ namespace TribeSystem.UI
             statsText.alignment = TextAnchor.MiddleLeft;
             statsText.color = new Color(0.9f, 0.9f, 0.9f);
 
-            if (tribe?.leader != null)
-            {
-                var l = tribe.leader;
-                int atk = Mathf.RoundToInt(l.baseAttack * cat.attackMultiplier);
-                int def = Mathf.RoundToInt(l.baseDefense * cat.defenseMultiplier);
-                int hp = Mathf.RoundToInt(l.baseHp * cat.hpMultiplier);
-                int spd = Mathf.RoundToInt(l.baseMoveSpeed * cat.speedMultiplier * 1000);
-                statsText.text = $"攻{atk} 防{def} 血{hp} 速{spd}";
-            }
-            else
-            {
-                statsText.text = $"攻{cat.attackMultiplier:P0} 防{cat.defenseMultiplier:P0} 血{cat.hpMultiplier:P0} 速{cat.speedMultiplier:P0}";
-            }
+            int atk = Mathf.RoundToInt(unit.staticAttack);
+            int def = Mathf.RoundToInt(unit.staticDefense);
+            int hp = Mathf.RoundToInt(unit.staticHp);
+            int spd = Mathf.RoundToInt(unit.staticMoveSpeed * 1000);
+            statsText.text = $"攻{atk} 防{def} 血{hp} 速{spd}";
         }
 
         #endregion
 
         #region Leader Card
 
-        private void BuildLeaderCard(RectTransform parent, LeaderData leader, int fighterId,
+        private void BuildLeaderCard(RectTransform parent, FighterData unit, int fighterId,
             StatType? boostedStat, float? buffOverrideForBoosted, bool highlight)
         {
             var cardGo = new GameObject("LeaderCard", typeof(RectTransform), typeof(Image));
@@ -264,12 +256,12 @@ namespace TribeSystem.UI
 
             // 4项属性
             string[] attrNames = { "攻击", "防御", "生命", "速度" };
-            int[] baseValues = { leader.baseAttack, leader.baseDefense, leader.baseHp, Mathf.RoundToInt(leader.baseMoveSpeed * 1000) };
+            int[] baseValues = { Mathf.RoundToInt(unit.staticAttack), Mathf.RoundToInt(unit.staticDefense), Mathf.RoundToInt(unit.staticHp), Mathf.RoundToInt(unit.staticMoveSpeed * 1000) };
             float[] buffPcts = {
-                leader.permanentBuffs?.attackPercent ?? 0f,
-                leader.permanentBuffs?.defensePercent ?? 0f,
-                leader.permanentBuffs?.hpPercent ?? 0f,
-                leader.permanentBuffs?.speedPercent ?? 0f
+                ComputeBuffPercent(unit, StatType.Attack),
+                ComputeBuffPercent(unit, StatType.Defense),
+                ComputeBuffPercent(unit, StatType.Hp),
+                ComputeBuffPercent(unit, StatType.MoveSpeed)
             };
 
             for (int i = 0; i < 4; i++)
@@ -292,7 +284,7 @@ namespace TribeSystem.UI
             }
         }
 
-        private void BuildLeaderCardFlat(RectTransform parent, LeaderData leader, int fighterId,
+        private void BuildLeaderCardFlat(RectTransform parent, FighterData unit, int fighterId,
             int deltaAttack, int deltaHp, bool highlight)
         {
             var cardGo = new GameObject("LeaderCard", typeof(RectTransform), typeof(Image));
@@ -329,10 +321,9 @@ namespace TribeSystem.UI
             nameLe.preferredHeight = 28f;
 
             // 属性（攻击、防御、生命）
-            var buffs = leader.permanentBuffs;
-            int atk = leader.baseAttack + (buffs?.attackBonus ?? 0) + deltaAttack;
-            int def = leader.baseDefense + (buffs?.defenseBonus ?? 0);
-            int hp = leader.baseHp + (buffs?.hpBonus ?? 0) + deltaHp;
+            int atk = Mathf.RoundToInt(unit.staticAttack) + ComputeBuffFlat(unit, StatType.Attack) + deltaAttack;
+            int def = Mathf.RoundToInt(unit.staticDefense) + ComputeBuffFlat(unit, StatType.Defense);
+            int hp = Mathf.RoundToInt(unit.staticHp) + ComputeBuffFlat(unit, StatType.Hp) + deltaHp;
 
             bool showAtk = highlight ? deltaAttack > 0 : deltaAttack < 0;
             bool showHp = highlight ? deltaHp > 0 : deltaHp < 0;
@@ -498,17 +489,34 @@ namespace TribeSystem.UI
 
         #region Helpers
 
-        private float GetBuffPct(PermanentBuffs buffs, StatType statType)
+        /// <summary>
+        /// 从 FighterData.ActiveBuffs 计算指定属性的百分比加成总和
+        /// </summary>
+        private float ComputeBuffPercent(FighterData unit, StatType statType)
         {
-            if (buffs == null) return 0f;
-            switch (statType)
+            if (unit?.ActiveBuffs == null) return 0f;
+            float total = 0f;
+            foreach (var buff in unit.ActiveBuffs)
             {
-                case StatType.Attack: return buffs.attackPercent;
-                case StatType.Defense: return buffs.defensePercent;
-                case StatType.Hp: return buffs.hpPercent;
-                case StatType.MoveSpeed: return buffs.speedPercent;
-                default: return 0f;
+                if (buff.statType == statType && buff.isPercent)
+                    total += buff.value * buff.currentStacks;
             }
+            return total;
+        }
+
+        /// <summary>
+        /// 从 FighterData.ActiveBuffs 计算指定属性的固定值加成总和
+        /// </summary>
+        private int ComputeBuffFlat(FighterData unit, StatType statType)
+        {
+            if (unit?.ActiveBuffs == null) return 0;
+            int total = 0;
+            foreach (var buff in unit.ActiveBuffs)
+            {
+                if (buff.statType == statType && !buff.isPercent)
+                    total += Mathf.RoundToInt(buff.value * buff.currentStacks);
+            }
+            return total;
         }
 
         private GameObject CreateText(string name, RectTransform parent, string text, int fontSize, Color color)

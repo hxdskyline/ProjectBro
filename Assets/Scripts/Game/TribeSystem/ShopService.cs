@@ -266,12 +266,12 @@ namespace TribeSystem
         /// <summary>
         /// 卖出小猫
         /// </summary>
-        public int SellCat(TribeRecord tribe, CatData cat)
+        public int SellCat(TribeRecord tribe, FighterData cat)
         {
             int sellPrice = GetCatSellPrice(tribe.tribeType, cat.quality);
 
             _dataManager.AddCatFood(sellPrice);
-            tribe.cats.Remove(cat);
+            tribe.units.Remove(cat);
 
             Debug.Log($"[ShopService] Sold {cat.quality} cat for {sellPrice} cat food");
 
@@ -468,9 +468,9 @@ namespace TribeSystem
             if (targetTribe != null)
             {
                 // 每次只增加一只兵种
-                var cat = CatData.CreateWithQuality(quality, targetTribe.tribeType, tier);
-                _auraService?.ApplyAurasToNewCat(cat, targetTribe.tribeType);
-                targetTribe.cats.Add(cat);
+                var cat = FighterData.CreateWithQuality(quality, targetTribe.tribeType, tier);
+                _auraService?.ApplyAurasToNewUnit(cat, targetTribe.tribeType);
+                targetTribe.units.Add(cat);
                 Debug.Log($"[ShopService] Added 1 {quality} cat to tribe {tribeType}");
             }
             else

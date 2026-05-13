@@ -19,42 +19,34 @@ namespace TribeSystem.UI
 
         }
 
-        public void Setup(CatData cat, TribeRecord tribe)
+        public void Setup(FighterData unit, TribeRecord tribe)
         {
-            if (cat == null) return;
+            if (unit == null) return;
 
             // 品质名称
             if (_nameText != null)
-                _nameText.text = GetQualityName(cat.quality);
+                _nameText.text = GetQualityName(unit.quality);
 
-            // 属性倍率（展示相对于族长基础属性的比例）
+            // 属性值（直接使用 FighterData 的静态属性）
             if (_statsText != null)
             {
-                if (tribe?.leader != null)
-                {
-                    var leader = tribe.leader;
-                    int atk = Mathf.RoundToInt(leader.baseAttack * cat.attackMultiplier);
-                    int def = Mathf.RoundToInt(leader.baseDefense * cat.defenseMultiplier);
-                    int hp  = Mathf.RoundToInt(leader.baseHp * cat.hpMultiplier);
-                    int spd = Mathf.RoundToInt(leader.baseMoveSpeed * cat.speedMultiplier * 1000);
-                    _statsText.text = $"攻{atk} 防{def}\n血{hp} 速{spd}";
-                }
-                else
-                {
-                    _statsText.text = $"攻{cat.attackMultiplier:P0} 防{cat.defenseMultiplier:P0}\n血{cat.hpMultiplier:P0} 速{cat.speedMultiplier:P0}";
-                }
+                int atk = Mathf.RoundToInt(unit.staticAttack);
+                int def = Mathf.RoundToInt(unit.staticDefense);
+                int hp  = Mathf.RoundToInt(unit.staticHp);
+                int spd = Mathf.RoundToInt(unit.staticMoveSpeed * 1000);
+                _statsText.text = $"攻{atk} 防{def}\n血{hp} 速{spd}";
             }
 
             // 品质标签（复用 Status 节点）
             if (_statusText != null)
             {
-                _statusText.text = GetQualityLabel(cat.quality);
-                _statusText.color = GetQualityColor(cat.quality);
+                _statusText.text = GetQualityLabel(unit.quality);
+                _statusText.color = GetQualityColor(unit.quality);
             }
 
             // 背景色随品质变化
             if (_backgroundImage != null)
-                _backgroundImage.color = GetQualityBgColor(cat.quality);
+                _backgroundImage.color = GetQualityBgColor(unit.quality);
         }
 
         private string GetQualityName(CatQuality quality)

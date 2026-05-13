@@ -43,7 +43,7 @@ namespace TribeSystem.UI
         [SerializeField] private StatTooltip _statTooltipPrefab;
 
         private TribeRecord _tribe;
-        private CatData _selectedCat;
+        private FighterData _selectedUnit;
         private bool _isDeployed;
         private int _currentVariant = 1;
         private TribeType _tribeType;
@@ -68,7 +68,7 @@ namespace TribeSystem.UI
         public void Setup(TribeRecord tribe, bool isDeployed, System.Action<int, bool> onToggleChanged, System.Action<TribeRecord, bool> onShowDetail, TerrainType terrain, WeatherType weather)
         {
             _tribe = tribe;
-            _selectedCat = null;
+            _selectedUnit = null;
             _isDeployed = isDeployed;
             _currentTerrain = terrain;
             _currentWeather = weather;
@@ -82,12 +82,12 @@ namespace TribeSystem.UI
         }
 
         /// <summary>
-        /// 设置为显示小猫属性
+        /// 设置为显示指定单位属性
         /// </summary>
-        public void SetupForCat(CatData cat, TribeRecord tribe)
+        public void SetupForUnit(FighterData unit, TribeRecord tribe)
         {
             _tribe = tribe;
-            _selectedCat = cat;
+            _selectedUnit = unit;
             _tribeType = tribe.tribeType;
             _fighterId = tribe.fighterId;
             _currentVariant = 1;
@@ -154,28 +154,24 @@ namespace TribeSystem.UI
             // Big卡属性节点
             if (_attrItemNums != null && _attrItemNums.Length >= 5)
             {
-                if (_selectedCat != null)
+                if (_selectedUnit != null)
                 {
-                    // 显示小猫属性
-                    var config = TribeConfigLoader.Instance?.GetTribeConfig(_tribe.tribeType);
-                    if (config != null)
-                    {
-                        var catStats = TribeStatsCalculator.CalculateCatStats(_selectedCat);
-                        SetAttr(TribeCardAttrIndex.Attack, catStats.attack.ToString());
-                        SetAttr(TribeCardAttrIndex.Defense, catStats.defense.ToString());
-                        SetAttr(TribeCardAttrIndex.Hp, catStats.hp.ToString());
-                    }
+                    // 显示指定单位属性
+                    var unitStats = TribeStatsCalculator.CalculateFighterStats(_selectedUnit);
+                    SetAttr(TribeCardAttrIndex.Attack, unitStats.attack.ToString());
+                    SetAttr(TribeCardAttrIndex.Defense, unitStats.defense.ToString());
+                    SetAttr(TribeCardAttrIndex.Hp, unitStats.hp.ToString());
                 }
-                else if (_tribe.leader != null)
+                else if (_tribe.units != null && _tribe.units.Count > 0)
                 {
-                    // 显示族长属性（含buff的最终值）
-                    var finalStats = TribeStatsCalculator.CalculateLeaderStats(_tribe.leader, _tribe.moodId);
+                    // 显示首个单位属性（含buff的最终值）
+                    var finalStats = TribeStatsCalculator.CalculateFighterStats(_tribe.units[0], _tribe.moodId);
                     // 奶牛族：猫群之力，每只本族小猫+3攻击力
                     int displayAtk = finalStats.attack;
                     if (_tribe.tribeType == TribeType.Cow)
                     {
-                        int catCount = _tribe.cats?.Count ?? 0;
-                        displayAtk += catCount * 3;
+                        int unitCount = _tribe.units?.Count ?? 0;
+                        displayAtk += unitCount * 3;
                     }
                     SetAttr(TribeCardAttrIndex.Attack, displayAtk.ToString());
                     SetAttr(TribeCardAttrIndex.Defense, finalStats.defense.ToString());
@@ -235,20 +231,17 @@ namespace TribeSystem.UI
 
         private void OnAttrHoverEnter(StatType stat, RectTransform anchor)
         {
-            if (_selectedCat != null)
+            if (_selectedUnit != null)
             {
-                // 小猫视图
-                var config = TribeConfigLoader.Instance?.GetTribeConfig(_tribe.tribeType);
-                if (config == null) return;
+                // 指定单位视图
+                var unitStats = TribeStatsCalculator.CalculateFighterStats(_selectedUnit);
 
-                var catStats = TribeStatsCalculator.CalculateCatStats(_selectedCat);
-
-                int baseValue = GetCatBaseValue(_selectedCat, stat);
-                int finalValue = GetCatFinalValue(catStats, stat);
+                int baseValue = GetBaseValue(_selectedUnit, stat);
+                int finalValue = GetFinalValue(unitStats, stat);
 
                 var flatEntries = new List<UnifiedBuff>();
                 var percentEntries = new List<UnifiedBuff>();
-                foreach (var buff in _selectedCat.ActiveBuffs)
+                foreach (var buff in _selectedUnit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
                     if (buff.source == BuffSource.Artifact && buff.sourceId == "Artifact_CatAttackFlat_Global") continue;
@@ -269,17 +262,17 @@ namespace TribeSystem.UI
             }
             else
             {
-                // 族长视图
-                if (_tribe?.leader == null) return;
+                // 首个单位视图
+                if (_tribe?.units == null || _tribe.units.Count == 0) return;
 
-                var leader = _tribe.leader;
-                int baseValue = GetBaseValue(leader, stat);
-                var finalStats = TribeStatsCalculator.CalculateLeaderStats(leader, _tribe.moodId);
+                var unit = _tribe.units[0];
+                int baseValue = GetBaseValue(unit, stat);
+                var finalStats = TribeStatsCalculator.CalculateFighterStats(unit, _tribe.moodId);
                 int finalValue = GetFinalValue(finalStats, stat);
 
                 var flatEntries = new List<UnifiedBuff>();
                 var percentEntries = new List<UnifiedBuff>();
-                foreach (var buff in leader.ActiveBuffs)
+                foreach (var buff in unit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
                     if (buff.isPercent) percentEntries.Add(buff); else flatEntries.Add(buff);
@@ -291,21 +284,21 @@ namespace TribeSystem.UI
             }
         }
 
-        private int GetCatBaseValue(CatData cat, StatType stat)
+        private int GetBaseValue(FighterData unit, StatType stat)
         {
-            if (cat == null) return 0;
+            if (unit == null) return 0;
             switch (stat)
             {
-                case StatType.Attack: return cat.staticAttack;
-                case StatType.Defense: return cat.staticDefense;
-                case StatType.Hp: return cat.staticHp;
-                case StatType.MoveSpeed: return Mathf.RoundToInt(cat.staticMoveSpeed * 1000);
-                case StatType.AttackSpeed: return Mathf.RoundToInt(0.5f * 1000); // 默认攻速 0.5f
+                case StatType.Attack: return Mathf.RoundToInt(unit.staticAttack);
+                case StatType.Defense: return Mathf.RoundToInt(unit.staticDefense);
+                case StatType.Hp: return Mathf.RoundToInt(unit.staticHp);
+                case StatType.MoveSpeed: return Mathf.RoundToInt(unit.staticMoveSpeed * 1000);
+                case StatType.AttackSpeed: return Mathf.RoundToInt(unit.staticAttackSpeed * 1000);
                 default: return 0;
             }
         }
 
-        private int GetCatFinalValue(CatStats stats, StatType stat)
+        private int GetFinalValue(FighterStats stats, StatType stat)
         {
             switch (stat)
             {
@@ -332,39 +325,6 @@ namespace TribeSystem.UI
             }
         }
 
-        private int GetBaseValue(LeaderData leader, StatType stat)
-        {
-            switch (stat)
-            {
-                case StatType.Attack: return leader.baseAttack;
-                case StatType.Defense: return leader.baseDefense;
-                case StatType.Hp: return leader.baseHp;
-                case StatType.MoveSpeed: return Mathf.RoundToInt(leader.baseMoveSpeed * 1000);
-                case StatType.AttackSpeed:
-                    var cfg = TribeConfigLoader.Instance?.GetTribeConfig(_tribe.tribeType);
-                    if (cfg != null)
-                    {
-                        var leaderConfig = TribeConfigLoader.Instance?.GetFighterConfig(cfg.leaderFighterId);
-                        return leaderConfig != null ? Mathf.RoundToInt(leaderConfig.attackSpeed * 1000) : 500;
-                    }
-                    return 500;
-                default: return 0;
-            }
-        }
-
-        private int GetFinalValue(LeaderStats stats, StatType stat)
-        {
-            switch (stat)
-            {
-                case StatType.Attack: return stats.attack;
-                case StatType.Defense: return stats.defense;
-                case StatType.Hp: return stats.hp;
-                case StatType.MoveSpeed: return Mathf.RoundToInt(stats.moveSpeed * 1000);
-                case StatType.AttackSpeed: return Mathf.RoundToInt(stats.attackSpeed * 1000);
-                default: return 0;
-            }
-        }
-
         // ─── Buff 栏
         private void RebuildBuffBar()
         {
@@ -387,21 +347,18 @@ namespace TribeSystem.UI
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            if (_selectedCat != null)
+            if (_selectedUnit != null)
             {
-                // 显示小猫的 buff
-                AddUnifiedBuffEntries(_selectedCat.ActiveBuffs, font);
+                // 显示指定单位的 buff
+                AddUnifiedBuffEntries(_selectedUnit.ActiveBuffs, font);
             }
             else
             {
-                var leader = _tribe.leader;
-                if (leader != null)
+                if (_tribe.units != null && _tribe.units.Count > 0)
                 {
-                    // 1. 永久buff（从 ActiveBuffs 读取）
-                    AddUnifiedBuffEntries(leader.ActiveBuffs, font);
-
-                    // 2. 天生特殊buff（specialBuffs 中 visible=true 的条目）
-                    AddInnateBuffEntries(leader.permanentBuffs, font);
+                    var unit = _tribe.units[0];
+                    // 显示首个单位的 buff
+                    AddUnifiedBuffEntries(unit.ActiveBuffs, font);
                 }
             }
 
@@ -526,37 +483,6 @@ namespace TribeSystem.UI
             CreateBuffEntry("env_icon", "环境修正", twBuff.GetDescription(), font, new Color(0.4f, 0.7f, 0.5f, 0.8f), null);
         }
 
-        private void AddInnateBuffEntries(PermanentBuffs pb, Font font)
-        {
-            if (pb == null || pb.specialBuffs == null) return;
-            Color[] colors = {
-                new Color(0.9f, 0.3f, 0.2f, 0.8f), // 0红
-                new Color(0.3f, 0.5f, 0.9f, 0.8f), // 1蓝
-                new Color(0.2f, 0.8f, 0.3f, 0.8f), // 2绿
-                new Color(0.9f, 0.7f, 0.1f, 0.8f), // 3金
-                new Color(0.6f, 0.3f, 0.8f, 0.8f)  // 4紫
-            };
-            foreach (var buff in pb.specialBuffs)
-            {
-                if (!buff.visible) continue;
-                int ci = Mathf.Clamp(buff.iconColorIndex, 0, colors.Length - 1);
-                string desc = buff.description;
-                if (buff.effectType == InnateEffectType.AttackPerDefeatedCat && _tribe != null)
-                {
-                    int catCount = _tribe.cats?.Count ?? 0;
-                    int totalBonus = catCount * Mathf.RoundToInt(buff.effectValue);
-                    desc = $"{desc} (当前+{totalBonus})";
-                }
-                else if (buff.effectType == InnateEffectType.AttackPerFriendlyUnit && _tribe != null)
-                {
-                    int catCount = _tribe.cats?.Count ?? 0;
-                    int totalBonus = catCount * Mathf.RoundToInt(buff.effectValue);
-                    desc = $"{desc} (当前+{totalBonus})";
-                }
-                CreateBuffEntry($"{buff.buffId}_icon", buff.displayName, desc, font, colors[ci], null);
-            }
-        }
-
         private string FormatStatBuff(string statName, int flatBonus, float percentBonus)
         {
             var parts = new List<string>();
@@ -613,20 +539,17 @@ namespace TribeSystem.UI
 
         private void OnBuffEntryHoverEnter(StatType stat, RectTransform anchor)
         {
-            if (_selectedCat != null)
+            if (_selectedUnit != null)
             {
-                // 小猫视图
-                var config = TribeConfigLoader.Instance?.GetTribeConfig(_tribe.tribeType);
-                if (config == null) return;
+                // 指定单位视图
+                var unitStats = TribeStatsCalculator.CalculateFighterStats(_selectedUnit);
 
-                var catStats = TribeStatsCalculator.CalculateCatStats(_selectedCat);
-
-                int baseValue = GetCatBaseValue(_selectedCat, stat);
-                int finalValue = GetCatFinalValue(catStats, stat);
+                int baseValue = GetBaseValue(_selectedUnit, stat);
+                int finalValue = GetFinalValue(unitStats, stat);
 
                 var flatEntries = new List<UnifiedBuff>();
                 var percentEntries = new List<UnifiedBuff>();
-                foreach (var buff in _selectedCat.ActiveBuffs)
+                foreach (var buff in _selectedUnit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
                     if (buff.source == BuffSource.Artifact && buff.sourceId == "Artifact_CatAttackFlat_Global") continue;
@@ -647,17 +570,17 @@ namespace TribeSystem.UI
             }
             else
             {
-                // 族长视图
-                if (_tribe?.leader == null) return;
+                // 首个单位视图
+                if (_tribe?.units == null || _tribe.units.Count == 0) return;
 
-                var leader = _tribe.leader;
-                int baseValue = GetBaseValue(leader, stat);
-                var finalStats = TribeStatsCalculator.CalculateLeaderStats(leader, _tribe.moodId);
+                var unit = _tribe.units[0];
+                int baseValue = GetBaseValue(unit, stat);
+                var finalStats = TribeStatsCalculator.CalculateFighterStats(unit, _tribe.moodId);
                 int finalValue = GetFinalValue(finalStats, stat);
 
                 var flatEntries = new List<UnifiedBuff>();
                 var percentEntries = new List<UnifiedBuff>();
-                foreach (var buff in leader.ActiveBuffs)
+                foreach (var buff in unit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
                     if (buff.isPercent) percentEntries.Add(buff); else flatEntries.Add(buff);

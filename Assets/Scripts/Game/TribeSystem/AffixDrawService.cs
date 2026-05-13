@@ -12,10 +12,12 @@ namespace TribeSystem
     {
         private AffixDrawTableConfig _drawTableConfig;
         private Dictionary<string, AffixData> _allAffixes;
+        internal static Dictionary<int, List<BuffEffectItem>> _buffEffectsMap;
 
         public AffixDrawService()
         {
             LoadDrawTable();
+            LoadBuffEffects();
             LoadAllAffixes();
         }
 
@@ -28,6 +30,55 @@ namespace TribeSystem
             if (_drawTableConfig == null)
             {
                 Debug.LogError("[AffixDrawService] 无法加载词缀抽取概率表");
+            }
+        }
+
+        /// <summary>
+        /// 从 buff_config.json 加载所有 buff 的效果数据
+        /// </summary>
+        private void LoadBuffEffects()
+        {
+            _buffEffectsMap = new Dictionary<int, List<BuffEffectItem>>();
+            try
+            {
+                string configPath = System.IO.Path.Combine(Application.streamingAssetsPath, "Tables/buff_config.json");
+                if (!System.IO.File.Exists(configPath)) return;
+
+                string json = System.IO.File.ReadAllText(configPath);
+                var root = LitJson.JsonMapper.ToObject(json);
+
+                if (root != null && root.Keys.Contains("buffs"))
+                {
+                    var buffsJson = root["buffs"];
+                    for (int i = 0; i < buffsJson.Count; i++)
+                    {
+                        var item = buffsJson[i];
+                        int buffId = ReadInt(item, "buffId", -1);
+                        if (buffId < 0) continue;
+
+                        var effects = new List<BuffEffectItem>();
+                        if (item.Keys.Contains("buffEffects") && item["buffEffects"].IsArray)
+                        {
+                            var effArray = item["buffEffects"];
+                            for (int e = 0; e < effArray.Count; e++)
+                            {
+                                var effJson = effArray[e];
+                                effects.Add(new BuffEffectItem(
+                                    ParseStatType(ReadString(effJson, "statType", "Attack")),
+                                    ReadBool(effJson, "isPercent"),
+                                    ReadFloat(effJson, "value", 0f)
+                                ));
+                            }
+                        }
+                        _buffEffectsMap[buffId] = effects;
+                    }
+                }
+
+                Debug.Log($"[AffixDrawService] 加载了 {_buffEffectsMap.Count} 个 buff 效果");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[AffixDrawService] 加载 buff 效果失败: {e.Message}");
             }
         }
 
@@ -59,30 +110,27 @@ namespace TribeSystem
                         {
                             affixId = ReadString(item, "affixId", ""),
                             displayName = ReadString(item, "displayName", ""),
-                            description = ReadString(item, "description", ""),
                             fighterId = ReadInt(item, "fighterId", 0),
                             tier = ParseAffixTier(ReadString(item, "tier", "Low")),
                             weight = ReadInt(item, "weight", 10),
                             upgradeFrom = ReadString(item, "upgradeFrom", ""),
                             upgradeTo = ReadString(item, "upgradeTo", ""),
-                            effects = new List<BuffEffectItem>(),
-                            scope = new BuffScopeFilter()
+                            buffIds = new List<int>()
                         };
 
-                        // 解析 effects
-                        if (item.Keys.Contains("effects") && item["effects"].IsArray)
+                        // 解析 buffIds
+                        if (item.Keys.Contains("buffIds") && item["buffIds"].IsArray)
                         {
-                            var effectsJson = item["effects"];
-                            for (int e = 0; e < effectsJson.Count; e++)
+                            var buffIdsJson = item["buffIds"];
+                            for (int b = 0; b < buffIdsJson.Count; b++)
                             {
-                                var effJson = effectsJson[e];
-                                affix.effects.Add(new BuffEffectItem(
-                                    ParseStatType(ReadString(effJson, "statType", "Attack")),
-                                    ReadBool(effJson, "isPercent"),
-                                    ReadFloat(effJson, "value", 0f)
-                                ));
+                                if (int.TryParse(buffIdsJson[b].ToString(), out int buffId))
+                                    affix.buffIds.Add(buffId);
                             }
                         }
+
+                        // 从 buff_config 解析描述
+                        affix.description = affix.ResolveDescription();
 
                         if (!string.IsNullOrEmpty(affix.affixId))
                         {
@@ -273,8 +321,16 @@ namespace TribeSystem
                 return;
             }
 
-            // TODO: 实际应用词缀效果
-            Debug.Log($"[AffixDrawService] 应用词缀{affix.displayName}到{tribe.tribeType}的第{catIndex}只猫");
+            // 通过 buffIds 从 buff_config 获取效果
+            var effects = affix.ResolveEffects();
+            if (effects == null || effects.Count == 0)
+            {
+                Debug.LogWarning($"[AffixDrawService] 词缀{affix.displayName}没有效果（buffIds为空或buff_config中未找到）");
+                return;
+            }
+
+            // TODO: 实际应用词缀效果到猫咪属性
+            Debug.Log($"[AffixDrawService] 应用词缀{affix.displayName}到{tribe.tribeType}的第{catIndex}只猫，{effects.Count}个效果");
         }
 
         #region JSON 解析辅助方法
@@ -414,9 +470,36 @@ namespace TribeSystem
         public AffixTier tier;
         public string upgradeFrom;
         public string upgradeTo;
-        public List<BuffEffectItem> effects;
-        public BuffScopeFilter scope;
+        public List<int> buffIds;       // 关联的 buff_config ID 列表
         public int weight;
+
+        /// <summary>
+        /// 通过 buffIds 从 buffEffectsMap 解析所有效果
+        /// </summary>
+        public List<BuffEffectItem> ResolveEffects()
+        {
+            var effects = new List<BuffEffectItem>();
+            if (buffIds == null) return effects;
+            foreach (var buffId in buffIds)
+            {
+                if (AffixDrawService._buffEffectsMap != null
+                    && AffixDrawService._buffEffectsMap.TryGetValue(buffId, out var effs))
+                {
+                    effects.AddRange(effs);
+                }
+            }
+            return effects;
+        }
+
+        /// <summary>
+        /// 通过 buffIds 从 buff_config 解析描述（取第一个 buff 的 description）
+        /// </summary>
+        public string ResolveDescription()
+        {
+            if (buffIds == null || buffIds.Count == 0) return "";
+            var cfg = TribeConfigLoader.Instance?.GetBuffConfig(buffIds[0]);
+            return cfg?.description ?? "";
+        }
     }
 
     /// <summary>

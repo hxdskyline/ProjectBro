@@ -123,8 +123,7 @@ namespace BattleSystem.Fighter
                     fighterDefinition.ScaleMultiplier > 0f ? fighterDefinition.ScaleMultiplier : 1.0f,
                     fighterDefinition.TribeType,
                     fighterDefinition.FighterId,
-                    fighterDefinition.AuraBuffs,
-                    fighterDefinition.IsLeader);
+                    fighterDefinition.AuraBuffs);
 
                 occupiedPositions.Add(spawnPosition);
             }
@@ -218,8 +217,7 @@ namespace BattleSystem.Fighter
             float scaleMultiplier = 1.0f,
             TribeType tribeType = TribeType.None,
             int fighterId = 0,
-            List<UnifiedBuff> auraBuffs = null,
-            bool isLeader = false)
+            List<UnifiedBuff> auraBuffs = null)
         {
             GameObject go;
             if (config.FighterPrefab != null)
@@ -313,9 +311,9 @@ namespace BattleSystem.Fighter
                 runtimeAttributes.ApplyBuff(unifiedBuff);
             }
 
-            // 应用光环 buff（从 LeaderData/CatData 传入）
+            // 应用光环 buff（从 FighterData 传入）
             // 所有类型的 buff（Persistent / TemporaryRoundBased / BattleOnly）统一在此应用
-            Debug.Log($"[CreateFighter] {objectName} ({(isLeader ? "leader" : "cat")}) tribe={tribeType}, auraBuffs count={auraBuffs?.Count ?? 0}");
+            Debug.Log($"[CreateFighter] {objectName} tribe={tribeType}, auraBuffs count={auraBuffs?.Count ?? 0}");
             if (auraBuffs != null)
             {
                 foreach (var buff in auraBuffs)
@@ -348,7 +346,7 @@ namespace BattleSystem.Fighter
                 Transform = go.transform,
                 BaseScale = scale,
                 TribeType = tribeType,
-                IsLeader = isLeader || hasInnateBuffs,
+                FighterId = fighterId,
                 InnateBuffIds = innateBuffIds
             };
         }

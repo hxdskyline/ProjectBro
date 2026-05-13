@@ -23,7 +23,7 @@ namespace TribeSystem
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  玩家状态 — 族群实例、族长、小猫
+    //  玩家状态 — 族群实例、兵种
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
@@ -33,10 +33,9 @@ namespace TribeSystem
     public class TribeRecord
     {
         public int tribeId;
-        public int fighterId;          // 关联的兵种ID
+        public int fighterId;          // 关联的兵种ID（该族群的代表兵种）
         public TribeType tribeType;
-        public LeaderData leader;
-        public List<CatData> cats;
+        public List<FighterData> units;
         public string moodId;
         public bool isActive;
 
@@ -45,44 +44,45 @@ namespace TribeSystem
             tribeId = -1;
             fighterId = 0;
             tribeType = TribeType.Tabby;
-            leader = new LeaderData();
-            cats = new List<CatData>();
+            units = new List<FighterData>();
             moodId = null;
             isActive = true;
         }
 
         /// <summary>
-        /// 获取小猫总数
+        /// 获取单位总数
         /// </summary>
-        public int GetCatCount()
+        public int GetUnitCount()
         {
-            return cats != null ? cats.Count : 0;
+            return units != null ? units.Count : 0;
         }
 
         /// <summary>
-        /// 检查族长是否在休息
+        /// 获取单位总数（兼容旧代码）
         /// </summary>
-        public bool IsLeaderResting()
+        public int GetCatCount()
         {
-            return leader != null && leader.restTurns > 0;
+            return GetUnitCount();
         }
     }
 
     /// <summary>
-    /// 族长数据
+    /// 兵种数据 — 所有战斗单位的统一数据结构
     /// </summary>
     [Serializable]
-    public class LeaderData : IHasBuffs
+    public class FighterData : IHasBuffs
     {
-        public int leaderId;
-        public string name;
-        public int baseAttack;
-        public int baseDefense;
-        public int baseHp;
-        public float baseMoveSpeed;
-        public List<int> skillIds;
-        public PermanentBuffs permanentBuffs;
-        public int restTurns;
+        public long id;                    // 实例唯一 ID
+        public int fighterId;              // 关联 fighter_config 的 ID
+        public CatQuality quality;         // 品质
+        public UnitTier tier;              // 等级
+
+        // 静态属性（从 fighter_config 加载）
+        public float staticAttack;
+        public float staticDefense;
+        public float staticHp;
+        public float staticMoveSpeed;
+        public float staticAttackSpeed;
 
         // ── 统一 buff 运行时列表（不序列化，加载存档时从 buffEntries 转换） ──
         [NonSerialized] private List<UnifiedBuff> _activeBuffs;
@@ -95,143 +95,23 @@ namespace TribeSystem
             }
         }
 
-        public LeaderData()
-        {
-            leaderId = -1;
-            name = "兵种";
-            baseAttack = 100;
-            baseDefense = 80;
-            baseHp = 1000;
-            baseMoveSpeed = 1.0f;
-            skillIds = new List<int>();
-            permanentBuffs = new PermanentBuffs();
-            restTurns = 0;
-        }
-
-        /// <summary>
-        /// 添加一个统一 buff（自动处理叠加/刷新）
-        /// </summary>
-        public bool AddUnifiedBuff(UnifiedBuff buff)
-        {
-            if (buff == null) return false;
-            // 尝试叠加现有同类 buff
-            for (int i = 0; i < ActiveBuffs.Count; i++)
-            {
-                if (ActiveBuffs[i].buffId == buff.buffId)
-                {
-                    ActiveBuffs[i].TryStackOrRefresh(buff);
-                    return true;
-                }
-            }
-            ActiveBuffs.Add(buff.Clone());
-            return true;
-        }
-
-        /// <summary>
-        /// 移除指定 buffId 的 buff
-        /// </summary>
-        public bool RemoveBuff(string buffId)
-        {
-            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
-            {
-                if (ActiveBuffs[i].buffId == buffId)
-                {
-                    ActiveBuffs.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// 移除指定来源的所有 buff
-        /// </summary>
-        public int RemoveBuffBySource(string sourceId)
-        {
-            int removed = 0;
-            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
-            {
-                if (ActiveBuffs[i].sourceId == sourceId)
-                {
-                    ActiveBuffs.RemoveAt(i);
-                    removed++;
-                }
-            }
-            return removed;
-        }
-
-        /// <summary>
-        /// 获取指定持久性的所有 buff
-        /// </summary>
-        public List<UnifiedBuff> GetBuffsByPersistence(BuffPersistence persistence)
-        {
-            var result = new List<UnifiedBuff>();
-            for (int i = 0; i < ActiveBuffs.Count; i++)
-            {
-                if (ActiveBuffs[i].persistence == persistence)
-                    result.Add(ActiveBuffs[i]);
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// 清除所有战斗内 buff（战斗结束时调用）
-        /// </summary>
-        public int ClearBattleBuffs()
-        {
-            int removed = 0;
-            for (int i = ActiveBuffs.Count - 1; i >= 0; i--)
-            {
-                if (ActiveBuffs[i].persistence == BuffPersistence.BattleOnly)
-                {
-                    ActiveBuffs.RemoveAt(i);
-                    removed++;
-                }
-            }
-            return removed;
-        }
-    }
-
-    /// <summary>
-    /// 小猫数据
-    /// </summary>
-    [Serializable]
-    public class CatData : IHasBuffs
-    {
-        public long catId;
-        public CatQuality quality;
-        public TribeType tribeType;
-        public UnitTier tier;
-        public float attackMultiplier;
-        public float defenseMultiplier;
-        public float hpMultiplier;
-        public float speedMultiplier;
-        public int staticAttack;
-        public int staticDefense;
-        public int staticHp;
-        public float staticMoveSpeed;
-        public float staticAttackSpeed;
-
-        // ── 统一 buff 运行时列表 ──
-        [NonSerialized] private List<UnifiedBuff> _activeBuffs;
-        public List<UnifiedBuff> ActiveBuffs
+        // ── 首领技能 ID 列表（不序列化，运行时维护） ──
+        [NonSerialized] private List<int> _skillIds;
+        public List<int> skillIds
         {
             get
             {
-                if (_activeBuffs == null) _activeBuffs = new List<UnifiedBuff>();
-                return _activeBuffs;
+                if (_skillIds == null) _skillIds = new List<int>();
+                return _skillIds;
             }
         }
 
-        public CatData()
+        public FighterData()
         {
-            catId = -1;
+            id = -1;
+            fighterId = 0;
             quality = CatQuality.White;
             tier = UnitTier.Tier1;
-            attackMultiplier = 1.0f;
-            defenseMultiplier = 1.0f;
-            hpMultiplier = 1.0f;
-            speedMultiplier = 1.0f;
             staticAttack = 0;
             staticDefense = 0;
             staticHp = 0;
@@ -322,38 +202,63 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 创建指定品质的小猫（从 fighter_config.json 读取静态属性）
+        /// 从 fighter_config 创建兵种实例
         /// </summary>
-        public static CatData CreateWithQuality(CatQuality quality, TribeType tribeType, UnitTier? tier = null)
+        public static FighterData CreateWithFighterId(int fighterId, CatQuality quality = CatQuality.White, UnitTier? tier = null)
         {
-            var cat = new CatData
+            var unit = new FighterData
             {
-                catId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + UnityEngine.Random.Range(0, 1000),
+                fighterId = fighterId,
                 quality = quality,
-                tribeType = tribeType,
                 tier = tier ?? UnitTier.Tier1
             };
 
-            // 从 fighter_config.json 读取小猫基础属性
-            var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-            var unitType = tribeConfig?.GetUnitType(cat.tier);
-            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitType?.fighterId ?? 0);
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(fighterId);
             if (fighterConfig != null)
             {
-                cat.staticAttack = fighterConfig.attack;
-                cat.staticDefense = fighterConfig.defense;
-                cat.staticHp = fighterConfig.hp;
-                cat.staticMoveSpeed = fighterConfig.moveSpeed;
-                cat.staticAttackSpeed = fighterConfig.attackSpeed;
+                unit.staticAttack = fighterConfig.attack;
+                unit.staticDefense = fighterConfig.defense;
+                unit.staticHp = fighterConfig.hp;
+                unit.staticMoveSpeed = fighterConfig.moveSpeed;
+                unit.staticAttackSpeed = fighterConfig.attackSpeed;
             }
 
-            return cat;
+            return unit;
         }
 
         /// <summary>
-        /// 创建随机品质的小猫（白40% 蓝30% 紫20% 金10%）
+        /// 创建指定品质的兵种（从 fighter_config.json 读取静态属性）
         /// </summary>
-        public static CatData CreateWithRandomQuality(TribeType tribeType)
+        public static FighterData CreateWithQuality(CatQuality quality, TribeType tribeType, UnitTier? tier = null)
+        {
+            var unit = new FighterData
+            {
+                id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                quality = quality,
+                tier = tier ?? UnitTier.Tier1
+            };
+
+            var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
+            var unitType = tribeConfig?.GetUnitType(unit.tier);
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitType?.fighterId ?? 0);
+            if (fighterConfig != null)
+            {
+                unit.fighterId = fighterConfig.fighterId;
+                unit.staticAttack = fighterConfig.attack;
+                unit.staticDefense = fighterConfig.defense;
+                unit.staticHp = fighterConfig.hp;
+                unit.staticMoveSpeed = fighterConfig.moveSpeed;
+                unit.staticAttackSpeed = fighterConfig.attackSpeed;
+            }
+
+            return unit;
+        }
+
+        /// <summary>
+        /// 创建随机品质的兵种（白40% 蓝30% 紫20% 金10%）
+        /// </summary>
+        public static FighterData CreateWithRandomQuality(TribeType tribeType)
         {
             float roll = UnityEngine.Random.value;
             CatQuality quality;
@@ -367,15 +272,13 @@ namespace TribeSystem
         /// <summary>
         /// 尝试进化到下一品质（50%概率）
         /// </summary>
-        public bool TryEvolve()
+        public bool TryEvolve(TribeType tribeType)
         {
             if (UnityEngine.Random.value < 0.5f)
             {
-                // 进化成功
                 if (quality < CatQuality.Gold)
                 {
                     quality++;
-                    // 从配置表读取新品质的静态属性
                     var stats = TribeConfigLoader.Instance?.GetCatStaticStats(tribeType, quality);
                     if (stats != null)
                     {
@@ -388,6 +291,31 @@ namespace TribeSystem
                 }
             }
             return false;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  计算结果快照（只读）
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 计算后的兵种属性
+    /// </summary>
+    public struct FighterStats
+    {
+        public int attack;
+        public int defense;
+        public int hp;
+        public float moveSpeed;
+        public float attackSpeed;
+
+        public FighterStats(int atk, int def, int hp, float moveSpd, float atkSpd)
+        {
+            attack = atk;
+            defense = def;
+            this.hp = hp;
+            moveSpeed = moveSpd;
+            attackSpeed = atkSpd;
         }
     }
 
@@ -420,7 +348,7 @@ namespace TribeSystem
 
         /// <summary>
         /// 计算最终属性：基础值 + 所有 buff 的 effects 叠加
-        /// 基础值由外部传入（来自 Card 或 LeaderData/CatData）
+        /// 基础值由外部传入（来自 Card 或 FighterData）
         /// </summary>
         public int GetFinalStat(StatType statType, int baseValue)
         {
@@ -590,52 +518,6 @@ namespace TribeSystem
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  计算结果快照（只读）
-    // ═══════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// 计算后的族长属性
-    /// </summary>
-    public struct LeaderStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public float moveSpeed;
-        public float attackSpeed;
-
-        public LeaderStats(int atk, int def, int hp, float moveSpd, float atkSpd)
-        {
-            attack = atk;
-            defense = def;
-            this.hp = hp;
-            moveSpeed = moveSpd;
-            attackSpeed = atkSpd;
-        }
-    }
-
-    /// <summary>
-    /// 计算后的小猫属性
-    /// </summary>
-    public struct CatStats
-    {
-        public int attack;
-        public int defense;
-        public int hp;
-        public float moveSpeed;
-        public float attackSpeed;
-
-        public CatStats(int atk, int def, int hp, float moveSpd, float atkSpd)
-        {
-            attack = atk;
-            defense = def;
-            this.hp = hp;
-            moveSpeed = moveSpd;
-            attackSpeed = atkSpd;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
     //  招募相关
     // ═══════════════════════════════════════════════════════════
 
@@ -649,7 +531,7 @@ namespace TribeSystem
         public int cost;
         public TribeType? targetTribeType; // 目标族群类型（新增族群时）
         public int targetTribeId;          // 目标族群ID（已有族群操作时）
-        public StatType targetStatType;    // 目标属性类型（族长强化时）
+        public StatType targetStatType;    // 目标属性类型（兵种强化时）
         public float boostValue;           // 属性提升的百分比值（例如0.2代表20%）
         public int bonusAttack;            // 固定攻击加成
         public int bonusHp;                // 固定血量加成
@@ -687,13 +569,13 @@ namespace TribeSystem
     /// </summary>
     public enum RitualRewardType
     {
-        LeaderStatBoostTemporary,   // 族长属性临时提升
-        LeaderStatBoostPermanent,   // 族长属性永久提升
-        LeaderStatBoostPercent,     // 族长属性百分比提升
+        LeaderStatBoostTemporary,   // 兵种属性临时提升
+        LeaderStatBoostPermanent,   // 兵种属性永久提升
+        LeaderStatBoostPercent,     // 兵种属性百分比提升
         Consumable,                 // 一次性道具
         CatFood,                    // 猫粮
         Accessory,                  // 饰品
-        LeaderSkill                 // 族长技能
+        LeaderSkill                 // 固有技能
     }
 
     /// <summary>
@@ -745,7 +627,7 @@ namespace TribeSystem
         public CatQuality? catQuality;     // 小猫品质
         public int consumableId;           // 道具ID
         public int accessoryId;            // 饰品ID
-        public int leaderSkillId;          // 族长技能ID
+        public int leaderSkillId;          // 固有技能ID
         public string displayName;         // UI 显示文本（在 DrawBlessings 时生成）
 
         public RitualRewardItem()
@@ -782,8 +664,8 @@ namespace TribeSystem
     /// </summary>
     public enum ArtifactEffectType
     {
-        LeaderHpFlat,    // 族长生命值+500
-        CatAttackFlat    // 小猫攻击力+20
+        LeaderHpFlat,    // 兵种生命值+500
+        CatAttackFlat    // 兵种攻击力+20
     }
 
     /// <summary>

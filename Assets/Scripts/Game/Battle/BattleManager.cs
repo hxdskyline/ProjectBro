@@ -46,10 +46,8 @@ namespace BattleSystem
         private UnitStaticAttributes? _enemyStaticAttributes;
         private TerrainType _currentTerrain = TerrainType.Plain;
         private WeatherType _currentWeather = WeatherType.Sunny;
-        private BattleFighter _artifactLeaderFighter;
         private int _artifactAtkPerDeadCat;
         private int _artifactLeaderLastDeadCount;
-        private LeaderSkillExecutor _leaderSkillExecutor;
         private int _lastEnemyDeathCount;
 
         public System.Action<bool> BattleEnded;
@@ -137,8 +135,6 @@ namespace BattleSystem
                     DeathDuration = _deathDuration
                 });
 
-            // 初始化首领技能执行器（需要 _simulation 提供 CorpseManager / SummonManager）
-            InitLeaderSkillExecutor();
             BattleSimulation.OnBulletFired += SpawnBullet;
             _battleCoroutine = StartCoroutine(DemoBattleLoop());
         }
@@ -171,8 +167,8 @@ namespace BattleSystem
             // Battle summary log
             LogBattleSummary(victory);
 
-            // 将战斗内 Persistent buff 同步回 LeaderData（饱食层等）
-            BattleBuffService.SyncPersistentBuffsToLeaderData(_playerFighters);
+            // 将战斗内 Persistent buff 同步回 FighterData（饱食层等）
+            BattleBuffService.SyncPersistentBuffsToUnits(_playerFighters);
 
             // 清除所有战斗内 buff（BattleOnly 类型）
             BuffService.ClearAllBattleBuffs();
@@ -272,11 +268,8 @@ namespace BattleSystem
             {
                 // 动态更新奶牛族长的猫群之力 buff
                 // 天生 buff 的动态更新由 IBuffEffect.OnTick 处理
-                // 动态更新奇物：每死一只小猫族长+攻击
+                // 动态更新奇物：每死一只小猫+攻击
                 UpdateArtifactLeaderBuff();
-                // 首领技能 tick
-                if (_leaderSkillExecutor != null)
-                    _leaderSkillExecutor.Tick(Time.deltaTime, _playerFighters, _enemyFighters);
                 // 战斗内成长触发
                 UpdateBattleGrowth();
 
@@ -306,7 +299,7 @@ namespace BattleSystem
             go.transform.localScale = new Vector3(1.3f, 1.3f, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sortingOrder = -100;
+            sr.sortingOrder = -1000;
 
             var handle = Addressables.LoadAssetAsync<Sprite>("ui/sprite/addcat/greenbg");
             handle.Completed += op =>
@@ -323,10 +316,8 @@ namespace BattleSystem
             _simulation = null;
             _playerFighters = null;
             _enemyFighters = null;
-            _artifactLeaderFighter = null;
             _artifactAtkPerDeadCat = 0;
             _artifactLeaderLastDeadCount = 0;
-            _leaderSkillExecutor = null;
             _lastEnemyDeathCount = 0;
             ClearOldAvatars();
         }
@@ -389,19 +380,6 @@ namespace BattleSystem
                         case TribeSystem.GameEffect.LeaderAttackPerDeadCat:
                             _artifactAtkPerDeadCat += Mathf.RoundToInt(eff.value);
                             break;
-                    }
-                }
-            }
-
-            // 找到族长 fighter 引用（用于亡猫之力动态加成）
-            if (_artifactAtkPerDeadCat > 0)
-            {
-                for (int i = 0; i < _playerFighters.Length; i++)
-                {
-                    if (_playerFighters[i] != null && _playerFighters[i].IsLeader)
-                    {
-                        _artifactLeaderFighter = _playerFighters[i];
-                        break;
                     }
                 }
             }
@@ -470,11 +448,12 @@ namespace BattleSystem
                     continue;
                 }
 
-                Debug.Log($"[BattleManager] ApplyAffixBuffs: applying affix '{affixId}' ({affix.displayName}), effects={affix.effects?.Count ?? 0}");
+                Debug.Log($"[BattleManager] ApplyAffixBuffs: applying affix '{affixId}' ({affix.displayName})");
 
-                if (affix.effects == null) continue;
+                var affixEffects = affix.ResolveEffects();
+                if (affixEffects == null || affixEffects.Count == 0) continue;
 
-                foreach (var eff in affix.effects)
+                foreach (var eff in affixEffects)
                 {
                     if (eff.isPercent)
                     {
@@ -571,25 +550,23 @@ namespace BattleSystem
                         {
                             affixId = ReadString(item, "affixId", ""),
                             displayName = ReadString(item, "displayName", ""),
-                            description = ReadString(item, "description", ""),
                             fighterId = ReadInt(item, "fighterId", 0),
-                            effects = new List<TribeSystem.BuffEffectItem>()
+                            buffIds = new List<int>()
                         };
 
-                        // 解析 effects
-                        if (item.Keys.Contains("effects") && item["effects"].IsArray)
+                        // 解析 buffIds
+                        if (item.Keys.Contains("buffIds") && item["buffIds"].IsArray)
                         {
-                            var effectsJson = item["effects"];
-                            for (int e = 0; e < effectsJson.Count; e++)
+                            var buffIdsJson = item["buffIds"];
+                            for (int b = 0; b < buffIdsJson.Count; b++)
                             {
-                                var effJson = effectsJson[e];
-                                affix.effects.Add(new TribeSystem.BuffEffectItem(
-                                    ParseStatType(ReadString(effJson, "statType", "Attack")),
-                                    ReadBool(effJson, "isPercent"),
-                                    ReadFloat(effJson, "value", 0f)
-                                ));
+                                if (int.TryParse(buffIdsJson[b].ToString(), out int buffId))
+                                    affix.buffIds.Add(buffId);
                             }
                         }
+
+                        // 从 buff_config 解析描述
+                        affix.description = affix.ResolveDescription();
 
                         if (!string.IsNullOrEmpty(affix.affixId))
                         {
@@ -628,101 +605,43 @@ namespace BattleSystem
                 && v;
         }
 
-        private static TribeSystem.StatType ParseStatType(string s)
-        {
-            switch (s)
-            {
-                case "Attack": return TribeSystem.StatType.Attack;
-                case "Defense": return TribeSystem.StatType.Defense;
-                case "Hp": return TribeSystem.StatType.Hp;
-                case "MoveSpeed": return TribeSystem.StatType.MoveSpeed;
-                case "AttackSpeed": return TribeSystem.StatType.AttackSpeed;
-                default: return TribeSystem.StatType.Attack;
-            }
-        }
 
         /// <summary>
-        /// 初始化首领技能执行器
-        /// </summary>
-        private void InitLeaderSkillExecutor()
-        {
-            if (_playerFighters == null) return;
-
-            // 找到族长
-            BattleFighter leader = null;
-            for (int i = 0; i < _playerFighters.Length; i++)
-            {
-                if (_playerFighters[i] != null && _playerFighters[i].IsLeader)
-                {
-                    leader = _playerFighters[i];
-                    break;
-                }
-            }
-            if (leader == null) return;
-
-            _leaderSkillExecutor = new LeaderSkillExecutor(leader, leader.TribeType);
-            _leaderSkillExecutor.SetManagers(_simulation.CorpseManager, _simulation.SummonManager);
-
-            // 加载技能配置
-            var configText = LoadLeaderSkillConfig();
-            if (configText != null)
-            {
-                var config = JsonUtility.FromJson<LeaderSkillConfigTable>(configText);
-                _leaderSkillExecutor.LoadSkills(config);
-            }
-        }
-
-        private string LoadLeaderSkillConfig()
-        {
-            string path = System.IO.Path.Combine(Application.streamingAssetsPath, "Tables/leader_skill_config.json");
-            try
-            {
-                if (System.IO.File.Exists(path))
-                    return System.IO.File.ReadAllText(path);
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[BattleManager] 加载首领技能配置失败: {e.Message}");
-            }
-            return null;
-        }
-
-
-
-        /// <summary>
-        /// 动态更新奇物效果：每有一只死去的小猫，族长增加攻击力
+        /// 动态更新奇物效果：每有一只死去的单位，所有存活单位增加攻击力
         /// </summary>
         private void UpdateArtifactLeaderBuff()
         {
-            if (_artifactLeaderFighter == null || _artifactAtkPerDeadCat <= 0)
-                return;
-            if (_artifactLeaderFighter.IsDead || _artifactLeaderFighter.IsRemoved)
+            if (_artifactAtkPerDeadCat <= 0 || _playerFighters == null)
                 return;
 
-            // 统计已死亡的小猫数量
-            int deadCatCount = 0;
+            // 统计已死亡的单位数量
+            int deadCount = 0;
             for (int i = 0; i < _playerFighters.Length; i++)
             {
                 var f = _playerFighters[i];
-                if (f == null || f == _artifactLeaderFighter) continue;
-                if (f.IsLeader) continue; // 跳过族长
-                if (f.IsDead || f.IsDying || f.IsRemoved) deadCatCount++;
+                if (f == null) continue;
+                if (f.IsDead || f.IsDying || f.IsRemoved) deadCount++;
             }
 
             // 数量没变化则跳过
-            if (deadCatCount == _artifactLeaderLastDeadCount)
+            if (deadCount == _artifactLeaderLastDeadCount)
                 return;
 
-            // 回退旧的 buff，应用新的
-            UnitRuntimeAttributes attrs = _artifactLeaderFighter.RuntimeAttributes;
-            if (attrs == null) return;
+            // 回退旧的 buff，应用新的到所有存活单位
+            int delta = deadCount - _artifactLeaderLastDeadCount;
+            _artifactLeaderLastDeadCount = deadCount;
 
-            attrs.AttackFlatBuff -= _artifactLeaderLastDeadCount * _artifactAtkPerDeadCat;
-            _artifactLeaderLastDeadCount = deadCatCount;
-            attrs.AttackFlatBuff += deadCatCount * _artifactAtkPerDeadCat;
-            attrs.Recalculate();
+            for (int i = 0; i < _playerFighters.Length; i++)
+            {
+                var f = _playerFighters[i];
+                if (f == null || f.IsDead || f.IsRemoved) continue;
+                UnitRuntimeAttributes attrs = f.RuntimeAttributes;
+                if (attrs == null) continue;
+                attrs.AttackFlatBuff += delta * _artifactAtkPerDeadCat;
+                attrs.Recalculate();
+            }
 
-            Debug.Log($"[BattleManager] {_artifactLeaderFighter.Name} 奇物(亡猫之力)更新: {deadCatCount}只小猫死亡，+{deadCatCount * _artifactAtkPerDeadCat}攻击");
+            Debug.Log($"[BattleManager] 奇物(亡猫之力)更新: {deadCount}只单位死亡，+{delta * _artifactAtkPerDeadCat}攻击");
         }
 
         /// <summary>
@@ -744,27 +663,27 @@ namespace BattleSystem
             int newKills = enemyDeathCount - _lastEnemyDeathCount;
             _lastEnemyDeathCount = enemyDeathCount;
 
-            // 找到橘猫族长
-            BattleFighter orangeLeader = null;
+            // 找到橘猫单位
+            BattleFighter orangeUnit = null;
             for (int i = 0; i < _playerFighters.Length; i++)
             {
                 var f = _playerFighters[i];
-                if (f == null || !f.IsAlive || !f.IsLeader) continue;
+                if (f == null || !f.IsAlive) continue;
                 if (f.TribeType != TribeType.Orange) continue;
                 if (f.RuntimeAttributes == null) continue;
-                orangeLeader = f;
+                orangeUnit = f;
                 break;
             }
-            if (orangeLeader == null) return;
+            if (orangeUnit == null) return;
 
             // 应用饱食层（Persistent buff，自动叠加）
             for (int k = 0; k < newKills; k++)
             {
-                int prevMaxHp = orangeLeader.RuntimeAttributes.MaxHp;
-                orangeLeader.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessStack(60f, 4f));
-                orangeLeader.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessAtkStack(4f));
-                orangeLeader.RuntimeAttributes.Recalculate();
-                orangeLeader.RuntimeAttributes.CurrentHp += orangeLeader.RuntimeAttributes.MaxHp - prevMaxHp;
+                int prevMaxHp = orangeUnit.RuntimeAttributes.MaxHp;
+                orangeUnit.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessStack(60f, 4f));
+                orangeUnit.RuntimeAttributes.ApplyBuff(StatusEffectFactory.CreateFullnessAtkStack(4f));
+                orangeUnit.RuntimeAttributes.Recalculate();
+                orangeUnit.RuntimeAttributes.CurrentHp += orangeUnit.RuntimeAttributes.MaxHp - prevMaxHp;
             }
         }
 

@@ -208,23 +208,13 @@ namespace TribeSystem.UI
 
             TribeType tribeType = (TribeType)fighterConfig.tribeType;
 
+            var unit = FighterData.CreateWithFighterId(fighterId);
             var tribe = new TribeRecord
             {
                 tribeId = dataManager.GetTribes()?.Count ?? 0,
                 fighterId = fighterId,
                 tribeType = tribeType,
-                leader = new LeaderData
-                {
-                    leaderId = UnityEngine.Random.Range(1000, 9999),
-                    name = fighterConfig.fighterName,
-                    baseAttack = fighterConfig.attack,
-                    baseDefense = fighterConfig.defense,
-                    baseHp = fighterConfig.hp,
-                    baseMoveSpeed = fighterConfig.moveSpeed,
-                    skillIds = new List<int>(),
-                    permanentBuffs = new PermanentBuffs()
-                },
-                cats = new List<CatData>(),
+                units = new List<FighterData> { unit },
                 isActive = true
             };
 

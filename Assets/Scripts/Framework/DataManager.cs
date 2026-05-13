@@ -625,27 +625,18 @@ public class DataManager : MonoBehaviour
             _playerData.ownedAffixes = new System.Collections.Generic.List<string>();
         }
 
-        // 修复旧存档：确保每个族群的cats列表不为null，并确保族长拥有天生buff
+        // 修复旧存档：确保每个族群的units列表不为null
         foreach (var tribe in _playerData.tribes)
         {
             if (tribe == null) continue;
 
-            if (tribe.cats == null)
+            if (tribe.units == null)
             {
-                tribe.cats = new System.Collections.Generic.List<TribeSystem.CatData>();
-            }
-
-            if (tribe.leader != null)
-            {
-                // 确保族长拥有天生特殊 buff
-                if (tribe.leader.permanentBuffs != null)
-                {
-                    tribe.leader.permanentBuffs.EnsureInnateBuffs(tribe.tribeType);
-                }
+                tribe.units = new System.Collections.Generic.List<TribeSystem.FighterData>();
             }
         }
 
-        // 从 runChoices / runEquipments 重建 leader/cat 的 ActiveBuffs
+        // 从 runChoices / runEquipments 重建单位的 ActiveBuffs
         RebuildAuraBuffs();
 
         if (_playerData.unlockedAccessories == null)
@@ -751,35 +742,28 @@ public class DataManager : MonoBehaviour
         {
             if (tribe == null || !tribe.isActive) continue;
 
-            int leaderBuffCountBefore = tribe.leader?.ActiveBuffs?.Count ?? 0;
-            int catBuffCountBefore = 0;
-            if (tribe.cats != null) foreach (var c in tribe.cats) catBuffCountBefore += c.ActiveBuffs?.Count ?? 0;
+            int buffCountBefore = 0;
+            if (tribe.units != null) foreach (var u in tribe.units) buffCountBefore += u.ActiveBuffs?.Count ?? 0;
 
             foreach (var entry in auraEntries)
             {
                 var filter = entry.GetScopeFilter();
 
-                if (tribe.leader != null && filter.Matches(true, tribe.tribeType, null))
+                if (tribe.units != null)
                 {
-                    ApplyAuraEffectsGeneric(tribe.leader, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
-                }
-
-                if (tribe.cats != null)
-                {
-                    foreach (var cat in tribe.cats)
+                    foreach (var unit in tribe.units)
                     {
-                        if (filter.Matches(false, tribe.tribeType, cat.tier))
+                        if (filter.Matches(false, tribe.tribeType, unit.tier))
                         {
-                            ApplyAuraEffectsGeneric(cat, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
+                            ApplyAuraEffectsGeneric(unit, entry.buffEffects, entry.displayName, entry.choiceId, entry.description);
                         }
                     }
                 }
             }
 
-            int leaderBuffCountAfter = tribe.leader?.ActiveBuffs?.Count ?? 0;
-            int catBuffCountAfter = 0;
-            if (tribe.cats != null) foreach (var c in tribe.cats) catBuffCountAfter += c.ActiveBuffs?.Count ?? 0;
-            Debug.Log($"[RebuildAuraBuffs] Tribe {tribe.tribeType}: leader buffs {leaderBuffCountBefore}->{leaderBuffCountAfter}, cat buffs {catBuffCountBefore}->{catBuffCountAfter}");
+            int buffCountAfter = 0;
+            if (tribe.units != null) foreach (var u in tribe.units) buffCountAfter += u.ActiveBuffs?.Count ?? 0;
+            Debug.Log($"[RebuildAuraBuffs] Tribe {tribe.tribeType}: unit buffs {buffCountBefore}->{buffCountAfter}");
         }
     }
 
@@ -794,7 +778,6 @@ public class DataManager : MonoBehaviour
                 eff.statType, eff.isPercent, eff.value,
                 gameEffectType: eff.gameEffectType,
                 description: description);
-            Debug.Log($"[RebuildAuraBuffs] Applying buff to {(unit is TribeSystem.LeaderData ? "leader" : "cat")}: id={buff.buffId}, stat={eff.statType}, isPercent={eff.isPercent}, value={eff.value}, persistence={buff.persistence}");
             unit.AddUnifiedBuff(buff);
         }
     }

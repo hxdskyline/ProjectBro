@@ -277,6 +277,22 @@ namespace TribeSystem
             return _buffConfigs;
         }
 
+        /// <summary>
+        /// 按 ID 列表批量获取 buff 配置
+        /// </summary>
+        public List<BuffConfig> GetBuffByIds(List<int> buffIds)
+        {
+            EnsureLoaded();
+            var result = new List<BuffConfig>();
+            if (buffIds == null) return result;
+            foreach (var id in buffIds)
+            {
+                var cfg = _buffConfigs?.Find(b => b.buffId == id);
+                if (cfg != null) result.Add(cfg);
+            }
+            return result;
+        }
+
         private void EnsureLoaded()
         {
             if (!_isLoaded)
@@ -785,7 +801,6 @@ namespace TribeSystem
         public float effectParam1;
         public float effectParam2;
         public int duration;
-        public string category;
         public bool visible;
         public int iconColorIndex;
     }

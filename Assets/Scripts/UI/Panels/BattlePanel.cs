@@ -186,7 +186,7 @@ public class BattlePanel : UIPanel
 
     /// <summary>
     /// 从上阵的族群构建战斗单位生成定义
-    /// 每个族群生成：1个族长 + N个小猫
+    /// 每个族群的所有 units 统一生成战斗单位
     /// </summary>
     private BattleFighterSpawnDefinition[] BuildPlayerSpawnDefinitions(List<TribeRecord> deployedTribes)
     {
@@ -199,28 +199,22 @@ public class BattlePanel : UIPanel
 
         foreach (TribeRecord tribe in deployedTribes)
         {
-            // 添加族长（1个）
-            if (CreateLeaderSpawnDefinition(tribe, out BattleFighterSpawnDefinition leaderDef))
+            int unitCount = tribe.units?.Count ?? 0;
+            Debug.Log($"[BattlePanel] {tribe.tribeType} 族群单位数量: {unitCount}");
+            if (tribe.units != null && tribe.units.Count > 0)
             {
-                definitions.Add(leaderDef);
-            }
-
-            // 添加小猫（N个）
-            int catCount = tribe.cats?.Count ?? 0;
-            Debug.Log($"[BattlePanel] {tribe.tribeType} 族群小猫数量: {catCount}");
-            if (tribe.cats != null && tribe.cats.Count > 0)
-            {
-                foreach (CatData cat in tribe.cats)
+                for (int i = 0; i < tribe.units.Count; i++)
                 {
-                    if (CreateCatSpawnDefinition(tribe, cat, out BattleFighterSpawnDefinition catDef))
+                    FighterData unit = tribe.units[i];
+                    if (CreateSpawnDefinition(tribe, unit, i, out BattleFighterSpawnDefinition unitDef))
                     {
-                        definitions.Add(catDef);
+                        definitions.Add(unitDef);
                     }
                 }
             }
             else
             {
-                Debug.LogWarning($"[BattlePanel] {tribe.tribeType} 族群没有小猫！请检查存档是否为旧版本。如果是，请删除存档重新开始。");
+                Debug.LogWarning($"[BattlePanel] {tribe.tribeType} 族群没有单位！请检查存档是否为旧版本。如果是，请删除存档重新开始。");
             }
         }
 
@@ -228,77 +222,93 @@ public class BattlePanel : UIPanel
     }
 
     /// <summary>
-    /// 创建族长战斗单位定义（基础属性，BUFF 通过运行时修正体系生效）
+    /// 创建战斗单位定义（统一处理所有单位，基础属性/BUFF 通过运行时修正体系生效）
+    /// unitIndex == 0 时作为族长（缩放 1.0），其余按 tier 缩放
     /// </summary>
-    private bool CreateLeaderSpawnDefinition(TribeRecord tribe, out BattleFighterSpawnDefinition definition)
+    private bool CreateSpawnDefinition(TribeRecord tribe, FighterData unit, int unitIndex, out BattleFighterSpawnDefinition definition)
     {
         definition = default;
 
-        if (tribe.leader == null)
+        if (unit == null)
             return false;
 
-        // 计算族长基础属性
-        LeaderStats leaderStats = TribeStatsCalculator.CalculateLeaderStats(tribe.leader, tribe.moodId);
-
-        // 从 fighter_config.json 读取族长基础攻速
-        int leaderFighterId = tribe.fighterId;
-        var leaderFighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(leaderFighterId);
-        float leaderBaseAttackSpeed = leaderFighterConfig?.attackSpeed ?? 0.5f;
-
-        // 从 fighter_config 读取族长射程
-        float attackRange = leaderFighterConfig?.attackRange ?? 1.5f;
-
-        UnitStaticAttributes staticAttributes = new UnitStaticAttributes
+        // 获取 fighterId
+        int unitFighterId = unit.fighterId;
+        if (unitFighterId <= 0)
         {
-            MaxHp = Mathf.Max(1, Mathf.RoundToInt(leaderStats.hp)),
-            Attack = Mathf.Max(1, Mathf.RoundToInt(leaderStats.attack)),
-            Defense = Mathf.Max(0, Mathf.RoundToInt(leaderStats.defense)),
-            MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(leaderStats.moveSpeed * 1000)),
-            AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(leaderBaseAttackSpeed * 1000)),
-            AttackRange = Mathf.Max(0.1f, attackRange)
-        };
+            unitFighterId = GetFighterId(tribe.tribeType, unit.tier);
+        }
+        var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(unitFighterId);
+
+        // 计算战斗属性
+        UnitStaticAttributes staticAttributes;
+        string unitName;
+        float scaleMultiplier;
+
+        if (fighterConfig != null)
+        {
+            // 使用 fighter_config.json 的属性
+            staticAttributes = new UnitStaticAttributes
+            {
+                MaxHp = Mathf.Max(1, fighterConfig.hp),
+                Attack = Mathf.Max(1, fighterConfig.attack),
+                Defense = Mathf.Max(0, fighterConfig.defense),
+                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(fighterConfig.moveSpeed * 1000)),
+                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(fighterConfig.attackSpeed * 1000)),
+                AttackRange = Mathf.Max(0.1f, fighterConfig.attackRange)
+            };
+            unitName = fighterConfig.fighterName;
+            scaleMultiplier = unitIndex == 0 ? 1.0f : unit.tier == UnitTier.Tier3 ? 0.85f : unit.tier == UnitTier.Tier2 ? 0.75f : 0.65f;
+        }
+        else
+        {
+            // 回退：使用品质计算的属性
+            FighterStats unitStats = TribeStatsCalculator.CalculateFighterStats(unit, tribe.moodId);
+            float unitAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
+
+            staticAttributes = new UnitStaticAttributes
+            {
+                MaxHp = Mathf.Max(1, Mathf.RoundToInt(unitStats.hp)),
+                Attack = Mathf.Max(1, Mathf.RoundToInt(unitStats.attack)),
+                Defense = Mathf.Max(0, Mathf.RoundToInt(unitStats.defense)),
+                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(unitStats.moveSpeed * 1000)),
+                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(unitStats.attackSpeed * 1000)),
+                AttackRange = Mathf.Max(0.1f, unitAttackRange)
+            };
+            scaleMultiplier = unitIndex == 0 ? 1.0f : unit.tier == UnitTier.Tier3 ? 0.85f : unit.tier == UnitTier.Tier2 ? 0.75f : 0.65f;
+
+            unitName = fighterConfig?.fighterName ?? $"兵种{unitFighterId}";
+        }
 
         // BUFF 预览文本（实际 BUFF 在 BattleManager 中通过运行时修正生效）
         TerrainWeatherBuff buff = TribeBattleBuffProvider.GetBuff(tribe.tribeType, _currentTerrain, _currentWeather);
         string buffTag = buff.IsNeutral ? "" : $" [{buff.GetDescription()}]";
 
-        // 使用 fighter 表中的名称
-        string leaderName = leaderFighterConfig != null ? $"{leaderFighterConfig.fighterName}{buffTag}" : $"族长{buffTag}";
+        string displayName = $"{unitName}{buffTag}";
 
-        // 从 fighter_config.json 查找族长 fighterId（tribeType*1000 + tier1）
         definition = new BattleFighterSpawnDefinition(
-            leaderName,
+            displayName,
             staticAttributes,
-            GetTribeAvatarDefinition(tribe.tribeType, leaderFighterId),
-            1.0f,
+            GetTribeAvatarDefinition(tribe.tribeType, unitFighterId),
+            scaleMultiplier,
             tribe.tribeType,
-            leaderFighterId);
-        definition.AuraBuffs = tribe.leader.ActiveBuffs;
-        definition.IsLeader = true;
+            unitFighterId);
+        definition.AuraBuffs = unit.ActiveBuffs;
 
-        Debug.Log($"[BattlePanel] Leader {tribe.tribeType} auraBuffs count={tribe.leader.ActiveBuffs?.Count ?? 0}");
-        if (tribe.leader.ActiveBuffs != null)
+        Debug.Log($"[BattlePanel] Unit {tribe.tribeType} index={unitIndex} fighterId={unitFighterId} auraBuffs count={unit.ActiveBuffs?.Count ?? 0}");
+        if (unit.ActiveBuffs != null)
         {
-            foreach (var b in tribe.leader.ActiveBuffs)
-                Debug.Log($"  [BattlePanel] Leader buff: id={b.buffId}, stat={b.statType}, isPercent={b.isPercent}, value={b.value}, persistence={b.persistence}");
+            foreach (var b in unit.ActiveBuffs)
+                Debug.Log($"  [BattlePanel] Unit buff: id={b.buffId}, stat={b.statType}, isPercent={b.isPercent}, value={b.value}, persistence={b.persistence}");
         }
 
         return true;
     }
 
     /// <summary>
-    /// 从 tribe_config.json 获取族长的 fighterId
+    /// 从 tribe_config.json 获取指定 tier 的 fighterId
     /// </summary>
-    private int GetLeaderFighterId(TribeType tribeType)
-    {
-        var config = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
-        return config?.leaderFighterId ?? 0;
-    }
-
-    /// <summary>
-    /// 从 tribe_config.json 的 unitTypes 中获取小猫的 fighterId
-    /// </summary>
-    private int GetCatFighterId(TribeType tribeType, UnitTier tier)
+    private int GetFighterId(TribeType tribeType, UnitTier tier)
     {
         // 优先从 tribe_config.json 的 unitTypes 配置中读取
         var tribeConfig = TribeConfigLoader.Instance?.GetTribeConfig(tribeType);
@@ -316,79 +326,6 @@ public class BattlePanel : UIPanel
         if (config != null) return expectedId;
 
         return 0;
-    }
-
-    /// <summary>
-    /// 创建小猫战斗单位定义（基础属性，BUFF 通过运行时修正体系生效）
-    /// </summary>
-    private bool CreateCatSpawnDefinition(TribeRecord tribe, CatData cat, out BattleFighterSpawnDefinition definition)
-    {
-        definition = default;
-
-        if (tribe.leader == null)
-            return false;
-
-        // 从 fighter_config.json 读取战斗属性
-        UnitStaticAttributes staticAttributes;
-        string unitName;
-        float scaleMultiplier = 0.65f;
-
-        int catFighterId = GetCatFighterId(tribe.tribeType, cat.tier);
-        var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(catFighterId);
-
-        if (fighterConfig != null)
-        {
-            // 使用 fighter_config.json 的属性
-            staticAttributes = new UnitStaticAttributes
-            {
-                MaxHp = Mathf.Max(1, fighterConfig.hp),
-                Attack = Mathf.Max(1, fighterConfig.attack),
-                Defense = Mathf.Max(0, fighterConfig.defense),
-                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(fighterConfig.moveSpeed * 1000)),
-                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(fighterConfig.attackSpeed * 1000)),
-                AttackRange = Mathf.Max(0.1f, fighterConfig.attackRange)
-            };
-            unitName = fighterConfig.fighterName;
-            scaleMultiplier = cat.tier == UnitTier.Tier3 ? 0.85f : cat.tier == UnitTier.Tier2 ? 0.75f : 0.65f;
-        }
-        else
-        {
-            // 回退：使用品质计算的属性
-            CatStats catStats = TribeStatsCalculator.CalculateCatStats(cat);
-            float catAttackRange = tribe.tribeType == TribeType.Tabby ? 4.0f : 1.0f;
-
-            staticAttributes = new UnitStaticAttributes
-            {
-                MaxHp = Mathf.Max(1, Mathf.RoundToInt(catStats.hp)),
-                Attack = Mathf.Max(1, Mathf.RoundToInt(catStats.attack)),
-                Defense = Mathf.Max(0, Mathf.RoundToInt(catStats.defense)),
-                MoveSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.moveSpeed * 1000)),
-                AttackSpeed = Mathf.Max(1, Mathf.RoundToInt(catStats.attackSpeed * 1000)),
-                AttackRange = Mathf.Max(0.1f, catAttackRange)
-            };
-
-            // 使用 fighter 表中的名称
-            var fallbackFighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(catFighterId);
-            unitName = fallbackFighterConfig?.fighterName ?? $"兵种{catFighterId}";
-        }
-
-        definition = new BattleFighterSpawnDefinition(
-            unitName,
-            staticAttributes,
-            GetTribeAvatarDefinition(tribe.tribeType, catFighterId),
-            scaleMultiplier,
-            tribe.tribeType,
-            catFighterId);
-        definition.AuraBuffs = cat.ActiveBuffs;
-
-        Debug.Log($"[BattlePanel] Cat {tribe.tribeType} catId={cat.catId} auraBuffs count={cat.ActiveBuffs?.Count ?? 0}");
-        if (cat.ActiveBuffs != null)
-        {
-            foreach (var b in cat.ActiveBuffs)
-                Debug.Log($"  [BattlePanel] Cat buff: id={b.buffId}, stat={b.statType}, isPercent={b.isPercent}, value={b.value}, persistence={b.persistence}");
-        }
-
-        return true;
     }
 
     private AvatarAnimationDefinition ResolveAvatarDefinition(string address)

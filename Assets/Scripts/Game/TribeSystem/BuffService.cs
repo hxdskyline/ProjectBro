@@ -29,17 +29,12 @@ namespace TribeSystem
             {
                 if (tribe == null || !tribe.isActive) continue;
 
-                // 移除族长的 buff
-                if (tribe.leader != null)
-                    totalRemoved += tribe.leader.RemoveBuffBySource(choiceId);
-
-                // 移除小猫的 buff
-                if (tribe.cats != null)
+                if (tribe.units != null)
                 {
-                    foreach (var cat in tribe.cats)
+                    foreach (var unit in tribe.units)
                     {
-                        if (cat != null)
-                            totalRemoved += cat.RemoveBuffBySource(choiceId);
+                        if (unit != null)
+                            totalRemoved += unit.RemoveBuffBySource(choiceId);
                     }
                 }
             }
@@ -58,41 +53,27 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 替换族长的指定 buff（先移除旧的，再添加新的）
+        /// 替换指定单位的指定 buff（先移除旧的，再添加新的）
         /// </summary>
-        public static bool ReplaceBuff(LeaderData leader, string oldBuffId, UnifiedBuff newBuff)
+        public static bool ReplaceBuff(IHasBuffs unit, string oldBuffId, UnifiedBuff newBuff)
         {
-            if (leader == null || newBuff == null) return false;
-            leader.RemoveBuff(oldBuffId);
-            return leader.AddUnifiedBuff(newBuff);
+            if (unit == null || newBuff == null) return false;
+            if (unit is FighterData fighter)
+            {
+                fighter.RemoveBuff(oldBuffId);
+                return fighter.AddUnifiedBuff(newBuff);
+            }
+            return false;
         }
 
         /// <summary>
-        /// 替换小猫的指定 buff
+        /// 清除指定单位的所有战斗内 buff
         /// </summary>
-        public static bool ReplaceBuff(CatData cat, string oldBuffId, UnifiedBuff newBuff)
+        public static int ClearBattleBuffs(IHasBuffs unit)
         {
-            if (cat == null || newBuff == null) return false;
-            cat.RemoveBuff(oldBuffId);
-            return cat.AddUnifiedBuff(newBuff);
-        }
-
-        /// <summary>
-        /// 清除族长的所有战斗内 buff（战斗结束时调用）
-        /// </summary>
-        public static int ClearBattleBuffs(LeaderData leader)
-        {
-            if (leader == null) return 0;
-            return leader.ClearBattleBuffs();
-        }
-
-        /// <summary>
-        /// 清除小猫的所有战斗内 buff
-        /// </summary>
-        public static int ClearBattleBuffs(CatData cat)
-        {
-            if (cat == null) return 0;
-            return cat.ClearBattleBuffs();
+            if (unit is FighterData fighter)
+                return fighter.ClearBattleBuffs();
+            return 0;
         }
 
         /// <summary>
@@ -117,12 +98,10 @@ namespace TribeSystem
             foreach (var tribe in playerData.tribes)
             {
                 if (tribe == null || !tribe.isActive) continue;
-                if (tribe.leader != null)
-                    total += ClearBattleBuffs(tribe.leader);
-                if (tribe.cats != null)
+                if (tribe.units != null)
                 {
-                    foreach (var cat in tribe.cats)
-                        total += ClearBattleBuffs(cat);
+                    foreach (var unit in tribe.units)
+                        total += ClearBattleBuffs(unit);
                 }
             }
 

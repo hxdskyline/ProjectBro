@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **All documentation must be placed in the `DesignDocs/` folder at the project root.** Do not create .md or .txt docs elsewhere.
 **All responses must be in Chinese (中文).** 与用户的所有交流都使用中文。
+**思考过程必须使用中文。** 所有内部推理、分析、调试思路都用中文表达。
 **已接入 Unity MCP**，启动命令：`C:\Users\hxd_s\.local\bin\uvx.exe --prerelease explicit --from "mcpforunityserver>=0.0.0a0" mcp-for-unity --transport http --http-url http://127.0.0.1:8080 --project-scoped-tools`。如果 MCP 连不上，不要尝试用其他方法代替，直接提醒用户打开 MCP Server。prefab/场景/GameObject 操作由你自动完成，不要等用户确认。
 **所有操作直接执行**，包括 bash、MCP 工具调用等，不要询问用户确认（--yes 模式）。
 **Unity 组件添加/修改由你完成**，不要让用户手动在 Inspector 中操作。如果需要给 GameObject 添加组件，通过 MCP 或修改 prefab/脚本自动完成。

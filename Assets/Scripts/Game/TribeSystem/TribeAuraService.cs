@@ -81,7 +81,7 @@ namespace TribeSystem
         /// <summary>
         /// 获取指定种族的通用光环列表（过滤掉依赖兵种不存在的光环）
         /// </summary>
-        public List<TribeAuraOption> GetAvailableGeneralAuras(TribeType tribeType, List<CatData> cats)
+        public List<TribeAuraOption> GetAvailableGeneralAuras(TribeType tribeType, List<FighterData> cats)
         {
             if (!_isLoaded) LoadConfig();
             if (_configTable == null) return new List<TribeAuraOption>();

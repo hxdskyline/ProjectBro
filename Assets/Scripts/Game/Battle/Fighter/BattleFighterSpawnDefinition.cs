@@ -14,8 +14,7 @@ namespace BattleSystem.Fighter
         public float ScaleMultiplier;
         public TribeType TribeType;
         public int FighterId; // fighter_config.json 中的 fighterId
-        public List<UnifiedBuff> AuraBuffs; // 从 CatData/LeaderData 传入的光环 buff
-        public bool IsLeader; // 是否是族长
+        public List<UnifiedBuff> AuraBuffs; // 从 FighterData 传入的光环 buff
 
         public BattleFighterSpawnDefinition(string name, UnitStaticAttributes staticAttributes, AvatarAnimationDefinition avatarDefinition = null, float scaleMultiplier = 1.0f, TribeType tribeType = TribeType.Tabby, int fighterId = 0)
         {
@@ -26,7 +25,6 @@ namespace BattleSystem.Fighter
             TribeType = tribeType;
             FighterId = fighterId;
             AuraBuffs = null;
-            IsLeader = false;
         }
     }
 }

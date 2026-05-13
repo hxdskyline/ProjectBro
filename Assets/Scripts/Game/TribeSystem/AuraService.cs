@@ -43,18 +43,13 @@ namespace TribeSystem
             {
                 if (tribe == null || !tribe.isActive) continue;
 
-                if (tribe.leader != null && scopeFilter.Matches(true, tribe.tribeType, null))
+                if (tribe.units != null)
                 {
-                    ApplyRoundBasedEffects(tribe.leader, effects, rounds, displayName, buffIdPrefix, description);
-                }
-
-                if (tribe.cats != null)
-                {
-                    foreach (var cat in tribe.cats)
+                    foreach (var unit in tribe.units)
                     {
-                        if (scopeFilter.Matches(false, tribe.tribeType, cat.tier))
+                        if (scopeFilter.Matches(false, tribe.tribeType, unit.tier))
                         {
-                            ApplyRoundBasedEffects(cat, effects, rounds, displayName, buffIdPrefix, description);
+                            ApplyRoundBasedEffects(unit, effects, rounds, displayName, buffIdPrefix, description);
                         }
                     }
                 }
@@ -117,11 +112,11 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 当新 leader 创建后调用，遍历所有 Aura 类型的 choice/equipment 补发 buff
+        /// 当新单位创建后调用，遍历所有 Aura 类型的 choice/equipment 补发 buff
         /// </summary>
-        public void ApplyAurasToNewLeader(LeaderData leader, TribeType tribeType)
+        public void ApplyAurasToNewUnit(FighterData unit, TribeType tribeType)
         {
-            if (leader == null) return;
+            if (unit == null) return;
 
             var playerData = _dataManager.PlayerData;
 
@@ -130,54 +125,25 @@ namespace TribeSystem
                 if (choice.category != ChoiceCategory.Buff) continue;
                 if (choice.buffApplyType != BuffApplyType.Aura) continue;
                 var filter = choice.GetScopeFilter();
-                if (!filter.Matches(true, tribeType, null)) continue;
+                if (!filter.Matches(false, tribeType, unit.tier)) continue;
 
-                ApplyEffects(leader, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
+                ApplyEffects(unit, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
             }
 
             foreach (var equip in playerData.runEquipments)
             {
                 if (equip.buffApplyType != BuffApplyType.Aura) continue;
                 var filter = equip.GetScopeFilter();
-                if (!filter.Matches(true, tribeType, null)) continue;
+                if (!filter.Matches(false, tribeType, unit.tier)) continue;
 
-                ApplyEffects(leader, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
-            }
-        }
-
-        /// <summary>
-        /// 当新 cat 创建后调用，遍历所有 Aura 类型的 choice/equipment 补发 buff
-        /// </summary>
-        public void ApplyAurasToNewCat(CatData cat, TribeType tribeType)
-        {
-            if (cat == null) return;
-
-            var playerData = _dataManager.PlayerData;
-
-            foreach (var choice in playerData.runChoices)
-            {
-                if (choice.category != ChoiceCategory.Buff) continue;
-                if (choice.buffApplyType != BuffApplyType.Aura) continue;
-                var filter = choice.GetScopeFilter();
-                if (!filter.Matches(false, tribeType, null)) continue;
-
-                ApplyEffects(cat, choice.buffEffects, choice.displayName, choice.choiceId, choice.description, BuffSource.Equipment);
-            }
-
-            foreach (var equip in playerData.runEquipments)
-            {
-                if (equip.buffApplyType != BuffApplyType.Aura) continue;
-                var filter = equip.GetScopeFilter();
-                if (!filter.Matches(false, tribeType, null)) continue;
-
-                ApplyEffects(cat, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
+                ApplyEffects(unit, equip.effects, equip.displayName, equip.equipmentId, equip.description, BuffSource.Equipment);
             }
         }
 
         // ─── 私有方法 ──────────────────────────────────────────
 
         /// <summary>
-        /// 按 scopeFilter 分发 buff 到当前已有的 leader/cat
+        /// 按 scopeFilter 分发 buff 到当前已有的单位
         /// </summary>
         private void ApplyToExistingUnits(BuffScopeFilter scopeFilter,
             List<BuffEffectItem> effects, string displayName, string uniqueId, string description, BuffSource source)
@@ -191,18 +157,13 @@ namespace TribeSystem
             {
                 if (tribe == null || !tribe.isActive) continue;
 
-                if (tribe.leader != null && scopeFilter.Matches(true, tribe.tribeType, null))
+                if (tribe.units != null)
                 {
-                    ApplyEffects(tribe.leader, effects, displayName, uniqueId, description, source);
-                }
-
-                if (tribe.cats != null)
-                {
-                    foreach (var cat in tribe.cats)
+                    foreach (var unit in tribe.units)
                     {
-                        if (scopeFilter.Matches(false, tribe.tribeType, cat.tier))
+                        if (scopeFilter.Matches(false, tribe.tribeType, unit.tier))
                         {
-                            ApplyEffects(cat, effects, displayName, uniqueId, description, source);
+                            ApplyEffects(unit, effects, displayName, uniqueId, description, source);
                         }
                     }
                 }

@@ -14,6 +14,7 @@ namespace TribeSystem.UI
     {
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Image _portraitImage;
+        [SerializeField] private GameObject _allCatMark;
         [SerializeField] private Text _titleText;
         [SerializeField] private Text _typeText;
         [SerializeField] private Text _descText;
@@ -96,21 +97,25 @@ namespace TribeSystem.UI
 
         private void LoadAffixPortrait(AffixData affix)
         {
+            // 通用标记：fighterId=0 显示，其他隐藏
+            if (_allCatMark != null)
+                _allCatMark.SetActive(affix.fighterId == 0);
+
             if (_portraitImage == null) return;
 
             if (affix.fighterId == 0)
             {
-                // 所有猫咪 → 使用通用猫神图片
-                LoadSpriteByAddress("ui/sprite/buildcard/zhujiemian_img_maoshen");
+                _portraitImage.gameObject.SetActive(false);
+                return;
             }
-            else
+
+            _portraitImage.gameObject.SetActive(true);
+
+            // 有指定兵种 → 使用该兵种的头像
+            var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(affix.fighterId);
+            if (fighterConfig != null && !string.IsNullOrEmpty(fighterConfig.avatarId))
             {
-                // 特定兵种 → 使用该兵种的头像
-                var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(affix.fighterId);
-                if (fighterConfig != null && !string.IsNullOrEmpty(fighterConfig.avatarId))
-                {
-                    LoadSpriteByAddress($"avatartemp/{fighterConfig.avatarId}1");
-                }
+                LoadSpriteByAddress($"avatartemp/{fighterConfig.avatarId}1");
             }
         }
 

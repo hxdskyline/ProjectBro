@@ -1,6 +1,27 @@
 {
   "drawTable": [
     {
+      "levelRange": [1, 1],
+      "difficulty": "normal",
+      "low": 90,
+      "high": 0,
+      "fixedTier": 10
+    },
+    {
+      "levelRange": [1, 1],
+      "difficulty": "hard",
+      "low": 80,
+      "high": 0,
+      "fixedTier": 20
+    },
+    {
+      "levelRange": [1, 1],
+      "difficulty": "elite",
+      "low": 70,
+      "high": 0,
+      "fixedTier": 30
+    },
+    {
       "levelRange": [2, 5],
       "difficulty": "normal",
       "low": 80,

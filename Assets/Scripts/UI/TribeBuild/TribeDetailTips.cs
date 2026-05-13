@@ -77,20 +77,29 @@ namespace TribeSystem.UI
                 _tribeNameText.text = fighterConfig?.fighterName ?? $"兵种{_tribe.fighterId}";
             }
 
-            // 族长信息
+            // 首个单位信息
             if (_leaderNameText != null)
             {
-                _leaderNameText.text = _tribe.leader?.name ?? "无族长";
+                if (_tribe.units != null && _tribe.units.Count > 0)
+                {
+                    var firstUnit = _tribe.units[0];
+                    var fighterConfig = TribeConfigLoader.Instance?.GetFighterConfig(firstUnit.fighterId);
+                    _leaderNameText.text = fighterConfig?.fighterName ?? $"兵种{firstUnit.fighterId}";
+                }
+                else
+                {
+                    _leaderNameText.text = "无单位";
+                }
             }
 
-            // 族长属性
-            if (_leaderStatsText != null && _tribe.leader != null)
+            // 首个单位属性
+            if (_leaderStatsText != null && _tribe.units != null && _tribe.units.Count > 0)
             {
-                var leader = _tribe.leader;
-                _leaderStatsText.text = $"攻击: {leader.baseAttack}\n" +
-                                        $"防御: {leader.baseDefense}\n" +
-                                        $"血量: {leader.baseHp}\n" +
-                                        $"速度: {Mathf.RoundToInt(leader.baseMoveSpeed * 1000)}";
+                var unit = _tribe.units[0];
+                _leaderStatsText.text = $"攻击: {Mathf.RoundToInt(unit.staticAttack)}\n" +
+                                        $"防御: {Mathf.RoundToInt(unit.staticDefense)}\n" +
+                                        $"血量: {Mathf.RoundToInt(unit.staticHp)}\n" +
+                                        $"速度: {Mathf.RoundToInt(unit.staticMoveSpeed * 1000)}";
             }
 
             // 更新小猫列表
@@ -99,7 +108,7 @@ namespace TribeSystem.UI
 
         private void UpdateCatsList()
         {
-            if (_catsListContainer == null || _tribe?.cats == null) return;
+            if (_catsListContainer == null || _tribe?.units == null) return;
 
             EnsureScrollView();
 
@@ -200,11 +209,11 @@ namespace TribeSystem.UI
 
         private void PopulateCatCards(RectTransform content)
         {
-            foreach (var cat in _tribe.cats)
+            foreach (var unit in _tribe.units)
             {
                 var cardGo = Instantiate(_littleCatCardPrefab, content, false);
                 var card = cardGo.GetComponent<LittleCatCard>();
-                card.Setup(cat, _tribe);
+                card.Setup(unit, _tribe);
             }
         }
     }

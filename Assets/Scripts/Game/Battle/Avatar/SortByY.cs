@@ -11,9 +11,6 @@ namespace BattleSystem.Avatar
         [Tooltip("Multiplier applied to Y position when computing order. Higher gives finer granularity.")]
         public int Multiplier = 100;
 
-        [Tooltip("If true, this unit is a leader and gets extra sorting priority")]
-        public bool IsLeader = false;
-
         [Tooltip("Enable Y-based scale effect (bottom +15%, top -15%)")]
         public bool EnableScaleEffect = true;
 
@@ -42,9 +39,8 @@ namespace BattleSystem.Avatar
 
             float currentY = transform.position.y;
 
-            // 排序：族长 BaseOrder+1000 始终在最上层，其余按 Y 排序
-            int leaderBonus = IsLeader ? 1000 : 0;
-            int order = BaseOrder + leaderBonus + Mathf.RoundToInt(-currentY * Multiplier);
+            // 按 Y 排序
+            int order = BaseOrder + Mathf.RoundToInt(-currentY * Multiplier);
             if (_renderer.sortingOrder != order)
             {
                 _renderer.sortingOrder = order;

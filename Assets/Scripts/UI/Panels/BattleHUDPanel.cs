@@ -7,13 +7,12 @@ using BattleSystem.Fighter;
 /// <summary>
 /// 战斗血条面板 - 左上角显示双方阵营的竖向血条
 /// 左侧玩家（绿色），右侧敌人（红色）
-/// 每个种族一列，族长血条略粗在最左侧，小猫依次排列
+/// 每个种族一列，单位血条依次排列
 /// 血条从下往上涨满
 /// </summary>
 public class BattleHUDPanel : MonoBehaviour
 {
-    private const float BarWidthLeader = 18f;
-    private const float BarWidthCat = 12f;
+    private const float BarWidth = 14f;
     private const float BarHeight = 80f;
     private const float BarSpacing = 3f;
     private const float GroupSpacing = 12f;
@@ -35,7 +34,6 @@ public class BattleHUDPanel : MonoBehaviour
         public Text nameText;
         public RectTransform rect;
         public int maxHp;
-        public bool isLeader;
     }
 
     private class BarGroup
@@ -102,9 +100,8 @@ public class BattleHUDPanel : MonoBehaviour
     {
         if (fighters == null || fighters.Length == 0) return;
 
-        // Group fighters by tribe: each tribe has 1 leader + N cats, in order
-        // The spawn order is: tribe1_leader, tribe1_cat1, tribe1_cat2, ..., tribe2_leader, ...
-        // We detect groups by checking spawn definitions order
+        // Group fighters by tribe: all units in tribe.units are treated uniformly
+        // The spawn order matches the order in tribe.units
         int fighterIndex = 0;
 
         if (deployedTribes != null)
@@ -119,20 +116,13 @@ public class BattleHUDPanel : MonoBehaviour
                 BarGroup group = CreateBarGroup(_playerRoot, groupName,
                     GetTribeColor(tribe.tribeType));
 
-                // Leader
-                if (fighterIndex < fighters.Length && fighters[fighterIndex] != null)
-                {
-                    group.bars.Add(CreateBar(group.root, fighters[fighterIndex], true, false));
-                    fighterIndex++;
-                }
-
-                // Cats
-                int catCount = tribe.cats?.Count ?? 0;
-                for (int c = 0; c < catCount && fighterIndex < fighters.Length; c++)
+                // All units iterated uniformly
+                int unitCount = tribe.units?.Count ?? 0;
+                for (int u = 0; u < unitCount && fighterIndex < fighters.Length; u++)
                 {
                     if (fighters[fighterIndex] != null)
                     {
-                        group.bars.Add(CreateBar(group.root, fighters[fighterIndex], false, false));
+                        group.bars.Add(CreateBar(group.root, fighters[fighterIndex]));
                     }
                     fighterIndex++;
                 }
@@ -149,7 +139,7 @@ public class BattleHUDPanel : MonoBehaviour
             {
                 if (fighters[i] != null)
                 {
-                    fallbackGroup.bars.Add(CreateBar(fallbackGroup.root, fighters[i], false, false));
+                    fallbackGroup.bars.Add(CreateBar(fallbackGroup.root, fighters[i]));
                 }
             }
             if (fallbackGroup.bars.Count > 0)
@@ -168,8 +158,7 @@ public class BattleHUDPanel : MonoBehaviour
         {
             if (fighters[i] != null)
             {
-                bool isFirst = (i == 0);
-                group.bars.Add(CreateBar(group.root, fighters[i], isFirst, true));
+                group.bars.Add(CreateBar(group.root, fighters[i]));
             }
         }
 
@@ -214,14 +203,11 @@ public class BattleHUDPanel : MonoBehaviour
         return group;
     }
 
-    private BarEntry CreateBar(RectTransform parent, BattleFighter fighter, bool isLeader, bool isEnemy)
+    private BarEntry CreateBar(RectTransform parent, BattleFighter fighter)
     {
         BarEntry entry = new BarEntry();
         entry.fighter = fighter;
         entry.maxHp = Mathf.Max(1, fighter.StaticAttributes.MaxHp);
-        entry.isLeader = isLeader;
-
-        float barWidth = isLeader ? BarWidthLeader : BarWidthCat;
 
         // Background
         GameObject bgGo = new GameObject($"Bar_{fighter.Name}",
@@ -229,13 +215,13 @@ public class BattleHUDPanel : MonoBehaviour
         bgGo.transform.SetParent(parent, false);
 
         entry.rect = bgGo.GetComponent<RectTransform>();
-        entry.rect.sizeDelta = new Vector2(barWidth, BarHeight);
+        entry.rect.sizeDelta = new Vector2(BarWidth, BarHeight);
 
         entry.bgImage = bgGo.GetComponent<Image>();
         entry.bgImage.color = new Color(0.15f, 0.15f, 0.15f, 0.85f);
 
         LayoutElement le = bgGo.GetComponent<LayoutElement>();
-        le.preferredWidth = barWidth;
+        le.preferredWidth = BarWidth;
         le.preferredHeight = BarHeight;
 
         // Fill (grows bottom-to-top)
@@ -250,41 +236,27 @@ public class BattleHUDPanel : MonoBehaviour
         fillRect.pivot = new Vector2(0.5f, 0f);
 
         entry.fillImage = fillGo.GetComponent<Image>();
-        if (isEnemy)
-        {
-            entry.fillImage.color = isLeader
-                ? new Color(0.9f, 0.15f, 0.1f, 0.9f)
-                : new Color(0.7f, 0.25f, 0.2f, 0.85f);
-        }
-        else
-        {
-            entry.fillImage.color = isLeader
-                ? new Color(0.15f, 0.75f, 0.2f, 0.9f)
-                : new Color(0.2f, 0.55f, 0.25f, 0.85f);
-        }
+        entry.fillImage.color = new Color(0.2f, 0.65f, 0.25f, 0.85f);
 
-        // Name label (only for leader)
-        if (isLeader)
-        {
-            GameObject nameGo = new GameObject("Name", typeof(RectTransform), typeof(Text));
-            nameGo.transform.SetParent(bgGo.transform, false);
+        // Name label
+        GameObject nameGo = new GameObject("Name", typeof(RectTransform), typeof(Text));
+        nameGo.transform.SetParent(bgGo.transform, false);
 
-            RectTransform nameRect = nameGo.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0f, 1f);
-            nameRect.anchorMax = new Vector2(1f, 1f);
-            nameRect.pivot = new Vector2(0.5f, 0f);
-            nameRect.anchoredPosition = new Vector2(0f, 2f);
-            nameRect.sizeDelta = new Vector2(0f, 14f);
+        RectTransform nameRect = nameGo.GetComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0f, 1f);
+        nameRect.anchorMax = new Vector2(1f, 1f);
+        nameRect.pivot = new Vector2(0.5f, 0f);
+        nameRect.anchoredPosition = new Vector2(0f, 2f);
+        nameRect.sizeDelta = new Vector2(0f, 14f);
 
-            entry.nameText = nameGo.GetComponent<Text>();
-            entry.nameText.font = _uiFont;
-            entry.nameText.fontSize = 10;
-            entry.nameText.color = Color.white;
-            entry.nameText.alignment = TextAnchor.MiddleCenter;
-            entry.nameText.horizontalOverflow = HorizontalWrapMode.Overflow;
-            entry.nameText.verticalOverflow = VerticalWrapMode.Overflow;
-            entry.nameText.raycastTarget = false;
-        }
+        entry.nameText = nameGo.GetComponent<Text>();
+        entry.nameText.font = _uiFont;
+        entry.nameText.fontSize = 10;
+        entry.nameText.color = Color.white;
+        entry.nameText.alignment = TextAnchor.MiddleCenter;
+        entry.nameText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        entry.nameText.verticalOverflow = VerticalWrapMode.Overflow;
+        entry.nameText.raycastTarget = false;
 
         // Apply initial fill
         UpdateBarFill(entry);
