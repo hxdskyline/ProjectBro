@@ -34,6 +34,7 @@ public class AddressableAssetsBuilder
         { "Data", "data" },
         { "Sprites", "sprites" },
         { "Prefabs", "prefabs" },
+        { "2DEffect", "2deffect" },
     };
 
     // ============= 主菜单项 =============

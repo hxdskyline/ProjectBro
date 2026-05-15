@@ -301,7 +301,7 @@ namespace BattleSystem
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = -1000;
 
-            var handle = Addressables.LoadAssetAsync<Sprite>("ui/sprite/addcat/greenbg");
+            var handle = Addressables.LoadAssetAsync<Sprite>("ui/sprite/common/greenbg");
             handle.Completed += op =>
             {
                 if (op.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)

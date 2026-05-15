@@ -75,6 +75,8 @@ namespace BattleSystem.Fighter
                     hud.ShowDamage(_damage, _isCritical);
                     hud.UpdateHp(defenderRuntime.CurrentHp);
                 }
+
+                BattleSimulation.ShowHitEffect(_target);
             }
 
             if (defenderRuntime.CurrentHp <= 0)

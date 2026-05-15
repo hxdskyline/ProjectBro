@@ -28,6 +28,8 @@ namespace BattleSystem.Fighter
         public bool HasDoubleHit;
         public bool IsInvulnerable;
         public bool IsStealthed;
+        public GameObject HitEffect;
+        public float HitEffectTimer;
 
         public int CurrentHp => RuntimeAttributes?.CurrentHp ?? 0;
         public bool IsDead => CurrentHp <= 0;

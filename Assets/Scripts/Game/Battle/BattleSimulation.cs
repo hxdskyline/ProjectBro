@@ -1,6 +1,7 @@
 using UnityEngine;
 using TribeSystem;
 using System;
+using System.Collections.Generic;
 using BattleSystem.Fighter;
 using BattleSystem.Effects;
 
@@ -35,6 +36,7 @@ namespace BattleSystem
         private float _battleElapsed;
         private CorpseManager _corpseManager;
         private SummonManager _summonManager;
+        private static readonly Dictionary<BattleFighter, float> _hitEffectTimers = new Dictionary<BattleFighter, float>();
 
         public bool IsReady =>
             _playerFighters != null && _enemyFighters != null &&
@@ -276,6 +278,7 @@ namespace BattleSystem
             TickAllBuffs(deltaTime);
             UpdateVisualEffects(_playerFighters);
             UpdateVisualEffects(_enemyFighters);
+            UpdateHitEffects(deltaTime);
             _corpseManager?.Tick(deltaTime);
             _summonManager?.Tick(deltaTime);
             UpdatePendingHits(_playerFighters, deltaTime);
@@ -551,6 +554,8 @@ namespace BattleSystem
                         hud.ShowDamage(damage);
                         hud.UpdateHp(defenderRuntime.CurrentHp);
                     }
+
+                    ShowHitEffect(defender);
                 }
             }
 
@@ -742,6 +747,63 @@ namespace BattleSystem
             }
 
             return true;
+        }
+
+        private const string HitEffectAddress = "2deffect/daji";
+        private const float HitEffectDuration = 0.3f;
+        private static Sprite _hitEffectSprite;
+        private static bool _hitEffectSpriteLoaded;
+
+        /// <summary>
+        /// 更新受击火花定时器
+        /// </summary>
+        private static void UpdateHitEffects(float deltaTime)
+        {
+            if (_hitEffectTimers.Count == 0) return;
+
+            List<BattleFighter> toRemove = null;
+            foreach (var kv in _hitEffectTimers)
+            {
+                kv.Key.HitEffectTimer -= deltaTime;
+                if (kv.Key.HitEffectTimer <= 0f)
+                {
+                    kv.Key.HitEffect?.SetActive(false);
+                    if (toRemove == null) toRemove = new List<BattleFighter>();
+                    toRemove.Add(kv.Key);
+                }
+            }
+            if (toRemove != null)
+            {
+                for (int i = 0; i < toRemove.Count; i++)
+                    _hitEffectTimers.Remove(toRemove[i]);
+            }
+        }
+
+        /// <summary>
+        /// 在目标位置显示受击火花效果
+        /// </summary>
+        public static void ShowHitEffect(BattleFighter target)
+        {
+            if (target?.Transform == null || target.HitEffect == null) return;
+
+            // 加载火花图片（只加载一次）
+            if (!_hitEffectSpriteLoaded)
+            {
+                _hitEffectSpriteLoaded = true;
+                var resourceManager = GameManager.Instance?.ResourceManager;
+                if (resourceManager != null)
+                    _hitEffectSprite = resourceManager.LoadSprite(HitEffectAddress);
+            }
+
+            if (_hitEffectSprite == null) return;
+
+            // 设置图片并显示
+            var sr = target.HitEffect.GetComponent<SpriteRenderer>();
+            if (sr != null) sr.sprite = _hitEffectSprite;
+
+            target.HitEffect.SetActive(true);
+            target.HitEffectTimer = HitEffectDuration;
+            _hitEffectTimers[target] = HitEffectDuration;
         }
     }
 }

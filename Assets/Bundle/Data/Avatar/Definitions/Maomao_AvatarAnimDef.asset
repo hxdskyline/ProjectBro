@@ -31,6 +31,6 @@ MonoBehaviour:
     _loop: 0
   - _actionType: 5
     _frameAddresses:
-    - avatartemp/maomao1
+    - 2deffect/xue
     _fps: 10
     _loop: 0

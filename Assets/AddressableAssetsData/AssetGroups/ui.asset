@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: ui
   m_Data:
     m_SerializedData: []
-  m_GUID: 37386fc361b550645b515b098ea4a27e
+  m_GUID: a8ce05a20927fff4f90fbf1804a486ca
   m_SerializeEntries:
   - m_GUID: 02fb47c0f45986a43a4cec830348cf81
     m_Address: ui/mainpanel
@@ -103,7 +103,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 380b41a702c49bd418edc9071d3b5554
-    m_Address: ui/sprite/addcat/greenbg
+    m_Address: ui/sprite/common/greenbg
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

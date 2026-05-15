@@ -15,7 +15,7 @@ MonoBehaviour:
   m_GroupName: data
   m_Data:
     m_SerializedData: []
-  m_GUID: 4797be4e96cef6f47999f91cc25b569c
+  m_GUID: 59e7ed984db250e40bbece87c5bbcc95
   m_SerializeEntries:
   - m_GUID: 31d080bbf47946a99e67db72dd8e9f0d
     m_Address: data/avatar/definitions/xianluo_avataranimdef
@@ -74,6 +74,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b376febd7a8e9884395b17ee63085149
     m_Address: data/avatar/definitions/enemy_avataranimdef
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b4c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3
+    m_Address: data/avatar/definitions/nainiuleader_avataranimdef
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

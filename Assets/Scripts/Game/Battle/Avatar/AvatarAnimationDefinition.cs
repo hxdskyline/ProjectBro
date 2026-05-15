@@ -28,9 +28,9 @@ namespace BattleSystem.Avatar
 
         /// <summary>
         /// 运行时创建 AvatarAnimationDefinition（用于族群战斗单位）
-        /// idleAddress: 站立帧地址, attackAddress: 攻击帧地址
+        /// idleAddress: 站立帧地址, attackAddress: 攻击帧地址, deathAddress: 死亡帧地址
         /// </summary>
-        public static AvatarAnimationDefinition CreateRuntime(string avatarId, string idleAddress, string attackAddress)
+        public static AvatarAnimationDefinition CreateRuntime(string avatarId, string idleAddress, string attackAddress, string deathAddress = null)
         {
             var def = CreateInstance<AvatarAnimationDefinition>();
             def._avatarId = avatarId;
@@ -39,7 +39,7 @@ namespace BattleSystem.Avatar
                 new ActionDefinition(AvatarActionType.Idle,   new List<string> { idleAddress },   4f, true),
                 new ActionDefinition(AvatarActionType.Run,    new List<string> { idleAddress },   4f, true),
                 new ActionDefinition(AvatarActionType.Attack, new List<string> { attackAddress, idleAddress }, 8f, false),
-                new ActionDefinition(AvatarActionType.Death,  new List<string> { attackAddress, idleAddress }, 4f, false),
+                new ActionDefinition(AvatarActionType.Death,  new List<string> { string.IsNullOrEmpty(deathAddress) ? attackAddress : deathAddress }, 4f, false),
             };
             return def;
         }

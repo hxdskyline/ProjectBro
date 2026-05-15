@@ -327,6 +327,15 @@ namespace BattleSystem.Fighter
             // 重新计算属性（确保 innate buff 和 aura buff 的修正生效）
             runtimeAttributes.Recalculate();
 
+            // 创建受击火花（初始隐藏）
+            GameObject hitEffect = new GameObject("HitEffect");
+            hitEffect.transform.SetParent(go.transform, false);
+            hitEffect.transform.localPosition = Vector3.zero;
+            hitEffect.transform.localScale = Vector3.one;
+            SpriteRenderer hitSr = hitEffect.AddComponent<SpriteRenderer>();
+            hitSr.sortingOrder = 200;
+            hitEffect.SetActive(false);
+
             // === 诊断日志：CreateFighter 完成后 ===
             Debug.Log($"[CreateFighter] {objectName} final stats: ATK={runtimeAttributes.Attack}, DEF={runtimeAttributes.Defense}, HP={runtimeAttributes.MaxHp}, SPD={runtimeAttributes.MoveSpeed}, totalBuffs={runtimeAttributes.ActiveBuffs.Count}");
             for (int bi = 0; bi < runtimeAttributes.ActiveBuffs.Count; bi++)
@@ -347,7 +356,8 @@ namespace BattleSystem.Fighter
                 BaseScale = scale,
                 TribeType = tribeType,
                 FighterId = fighterId,
-                InnateBuffIds = innateBuffIds
+                InnateBuffIds = innateBuffIds,
+                HitEffect = hitEffect
             };
         }
 

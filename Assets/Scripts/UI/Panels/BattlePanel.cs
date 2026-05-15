@@ -54,8 +54,8 @@ public class BattlePanel : UIPanel
         if (string.IsNullOrEmpty(avatarId)) return null;
         if (_avatarIdCache.TryGetValue(avatarId, out var cached)) return cached;
 
-        // 运行时创建（从 avatartemp/{avatarId}1 和 {avatarId}2 加载帧）
-        var def = AvatarAnimationDefinition.CreateRuntime(avatarId, $"avatartemp/{avatarId}1", $"avatartemp/{avatarId}2");
+        // 运行时创建（从 avatartemp/{avatarId}1 和 {avatarId}2 加载帧，死亡使用 2deffect/xue）
+        var def = AvatarAnimationDefinition.CreateRuntime(avatarId, $"avatartemp/{avatarId}1", $"avatartemp/{avatarId}2", "2deffect/xue");
 
         _avatarIdCache[avatarId] = def;
         return def;
