@@ -38,7 +38,6 @@ namespace TribeSystem.UI
         [SerializeField] private RandomEventPanel _randomEventPanel;
         [SerializeField] private BackpackPanel _backpackPanelPrefab;
         private BackpackPanel _backpackPanelInstance;
-        private AccessoryCodexPanel _codexPanel;
         private RecruitmentResultPanel _recruitmentResultPanel;
         [SerializeField] private TribeAuraChoicePanel _auraChoicePanel;
 
@@ -289,9 +288,6 @@ namespace TribeSystem.UI
 
             // 背包面板（运行时创建）
             CreateBackpackPanel();
-
-            // 图鉴面板（运行时创建）
-            CreateCodexPanel();
 
             // 招募结果面板（运行时创建）
             CreateRecruitmentResultPanel();
@@ -860,34 +856,6 @@ namespace TribeSystem.UI
             if (_backpackPanelInstance != null)
             {
                 _backpackPanelInstance.Show();
-            }
-        }
-
-        private void CreateCodexPanel()
-        {
-            if (_codexPanel != null) return;
-
-            GameObject go = new GameObject("AccessoryCodexPanel", typeof(RectTransform));
-            go.transform.SetParent(transform, false);
-            RectTransform rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-
-            _codexPanel = go.AddComponent<AccessoryCodexPanel>();
-            _codexPanel.Initialize();
-            _codexPanel.Hide();
-        }
-
-        /// <summary>
-        /// 打开图鉴面板（可由UI按钮调用）
-        /// </summary>
-        public void OpenCodex()
-        {
-            if (_codexPanel != null)
-            {
-                _codexPanel.Show();
             }
         }
 

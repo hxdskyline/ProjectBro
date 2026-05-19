@@ -35,6 +35,7 @@ namespace TribeSystem
         private ChoiceConfigWrapper _choiceConfig;
         private List<FighterConfig> _fighterConfigs;
         private List<BuffConfig> _buffConfigs;
+        private ArtifactConfig _artifactConfig;
 
         // 配置文件路径 (StreamingAssets)
         private const string TRIBE_CONFIG_PATH = "Tables/tribe_config.json";
@@ -46,6 +47,7 @@ namespace TribeSystem
         private const string CHOICE_CONFIG_PATH = "Tables/choice_config.json";
         private const string FIGHTER_CONFIG_PATH = "Tables/fighter_config.json";
         private const string BUFF_CONFIG_PATH = "Tables/buff_config.json";
+        private const string ARTIFACT_CONFIG_PATH = "Tables/artifact_config.json";
 
         private string GetStreamingAssetsPath(string relativePath)
         {
@@ -82,6 +84,7 @@ namespace TribeSystem
             _choiceConfig = LoadChoiceConfig();
             _fighterConfigs = LoadFighterConfigs();
             _buffConfigs = LoadBuffConfigs();
+            _artifactConfig = LoadArtifactConfig();
 
             _isLoaded = true;
 
@@ -291,6 +294,41 @@ namespace TribeSystem
                 if (cfg != null) result.Add(cfg);
             }
             return result;
+        }
+
+        /// <summary>
+        /// 获取奇物配置
+        /// </summary>
+        public ArtifactConfig GetArtifactConfig()
+        {
+            EnsureLoaded();
+            return _artifactConfig;
+        }
+
+        /// <summary>
+        /// 按 ID 获取奇物条目
+        /// </summary>
+        public ArtifactEntry GetArtifactEntry(string artifactId)
+        {
+            EnsureLoaded();
+            if (_artifactConfig?.artifacts == null) return null;
+            return _artifactConfig.artifacts.Find(a => a.id == artifactId);
+        }
+
+        /// <summary>
+        /// 从指定掉落池随机获取一个奇物
+        /// </summary>
+        public ArtifactEntry GetRandomArtifactFromPool(string poolName)
+        {
+            EnsureLoaded();
+            if (_artifactConfig?.dropPools == null || !_artifactConfig.dropPools.ContainsKey(poolName))
+                return null;
+
+            var pool = _artifactConfig.dropPools[poolName];
+            if (pool.artifactIds == null || pool.artifactIds.Count == 0) return null;
+
+            string randomId = pool.artifactIds[UnityEngine.Random.Range(0, pool.artifactIds.Count)];
+            return GetArtifactEntry(randomId);
         }
 
         private void EnsureLoaded()
@@ -513,6 +551,30 @@ namespace TribeSystem
             {
                 Debug.LogError($"[TribeConfigLoader] Error parsing buff config: {e.Message}");
                 return new List<BuffConfig>();
+            }
+        }
+
+        private ArtifactConfig LoadArtifactConfig()
+        {
+            string filePath = GetStreamingAssetsPath(ARTIFACT_CONFIG_PATH);
+            if (!File.Exists(filePath))
+            {
+                Debug.LogWarning($"[TribeConfigLoader] artifact_config.json not found at {filePath}");
+                return new ArtifactConfig { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
+            }
+
+            try
+            {
+                string jsonText = File.ReadAllText(filePath);
+                var json = JsonMapper.ToObject<ArtifactConfig>(jsonText);
+                int count = json.artifacts?.Count ?? 0;
+                Debug.Log($"[TribeConfigLoader] Loaded {count} artifact configs");
+                return json;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[TribeConfigLoader] Error parsing artifact config: {e.Message}");
+                return new ArtifactConfig { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
             }
         }
 
@@ -803,6 +865,43 @@ namespace TribeSystem
         public int duration;
         public bool visible;
         public int iconColorIndex;
+    }
+
+    #endregion
+
+    #region Artifact Config Classes
+
+    [System.Serializable]
+    public class ArtifactConfig
+    {
+        public List<ArtifactEntry> artifacts;
+        public Dictionary<string, ArtifactDropPool> dropPools;
+    }
+
+    [System.Serializable]
+    public class ArtifactEntry
+    {
+        public string id;
+        public string name;
+        public string description;
+        public string scope;
+        public List<ArtifactEffectEntry> effects;
+    }
+
+    [System.Serializable]
+    public class ArtifactEffectEntry
+    {
+        public string statType;
+        public bool isPercent;
+        public float value;
+        public int gameEffect;
+    }
+
+    [System.Serializable]
+    public class ArtifactDropPool
+    {
+        public List<string> artifactIds;
+        public float dropRate;
     }
 
     #endregion

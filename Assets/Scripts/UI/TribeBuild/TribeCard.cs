@@ -244,16 +244,7 @@ namespace TribeSystem.UI
                 foreach (var buff in _selectedUnit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
-                    if (buff.source == BuffSource.Artifact && buff.sourceId == "Artifact_CatAttackFlat_Global") continue;
                     if (buff.isPercent) percentEntries.Add(buff); else flatEntries.Add(buff);
-                }
-
-                // 攻击属性：补上全局奇物加成条目，使 tooltip 公式与 finalValue 一致
-                if (stat == StatType.Attack)
-                {
-                    var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
-                    if (globalBonus > 0)
-                        flatEntries.Add(UnifiedBuff.CreateStatBuff("global_cat_atk_flat", "奇物：苍蝇拍", BuffSource.Artifact, "Artifact_CatAttackFlat_Global", StatType.Attack, false, globalBonus));
                 }
 
                 EnsureTooltipInstance();
@@ -552,16 +543,7 @@ namespace TribeSystem.UI
                 foreach (var buff in _selectedUnit.ActiveBuffs)
                 {
                     if (buff.statType != stat) continue;
-                    if (buff.source == BuffSource.Artifact && buff.sourceId == "Artifact_CatAttackFlat_Global") continue;
                     if (buff.isPercent) percentEntries.Add(buff); else flatEntries.Add(buff);
-                }
-
-                // 攻击属性：补上全局奇物加成条目，使 tooltip 公式与 finalValue 一致
-                if (stat == StatType.Attack)
-                {
-                    var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
-                    if (globalBonus > 0)
-                        flatEntries.Add(UnifiedBuff.CreateStatBuff("global_cat_atk_flat", "奇物：苍蝇拍", BuffSource.Artifact, "Artifact_CatAttackFlat_Global", StatType.Attack, false, globalBonus));
                 }
 
                 EnsureTooltipInstance();

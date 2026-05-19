@@ -89,11 +89,6 @@ namespace TribeSystem
                 acc.ApplyTo(ref atk, ref def, ref hp, ref moveSpd, ref atkSpd);
             }
 
-            // 全局奇物加成：直接从 PlayerData 读取，确保所有单位一致
-            var globalBonus = GameManager.Instance?.DataManager?.PlayerData?.globalCatAttackFlatBonus ?? 0;
-            if (globalBonus > 0)
-                atk += globalBonus;
-
             // 应用心情修正
             if (!string.IsNullOrEmpty(moodId))
             {

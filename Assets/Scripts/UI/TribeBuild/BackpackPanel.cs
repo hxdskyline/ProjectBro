@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace TribeSystem.UI
 {
     /// <summary>
-    /// 饰品背包面板 - 展示所有已收集和未收集的饰品
+    /// 奇物背包面板 - 展示当前生效的奇物
     /// </summary>
     public class BackpackPanel : MonoBehaviour
     {
@@ -28,7 +28,7 @@ namespace TribeSystem.UI
         public void Show()
         {
             ClearEntries();
-            BuildAccessoryList();
+            BuildEquipmentList();
             gameObject.SetActive(true);
             transform.SetAsLastSibling();
         }
@@ -47,7 +47,7 @@ namespace TribeSystem.UI
             _entries.Clear();
         }
 
-        private void BuildAccessoryList()
+        private void BuildEquipmentList()
         {
             if (_contentRoot == null || _itemPrefab == null) return;
 

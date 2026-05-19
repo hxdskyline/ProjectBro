@@ -42,7 +42,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostPercent:   return "族长百分比强化";
                 case RitualRewardType.CatFood:   return "获得猫粮";
                 case RitualRewardType.Consumable:return "获得道具";
-                case RitualRewardType.Accessory: return "获得饰品";
                 default: return "祝福";
             }
         }

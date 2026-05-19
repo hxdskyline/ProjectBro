@@ -50,7 +50,6 @@ namespace TribeSystem
             }
             else if (round == 10)
             {
-                events.Add(CreateAccessoryEvent());
                 events.Add(CreateRiskBuffEvent());
                 events.Add(CreatePriceIncreaseEvent());
             }
@@ -175,37 +174,6 @@ namespace TribeSystem
         }
 
         /// <summary>
-        /// 创建饰品事件
-        /// </summary>
-        private RandomEvent CreateAccessoryEvent()
-        {
-            return new RandomEvent
-            {
-                eventId = "accessory_001",
-                eventName = "神秘商人",
-                lowRiskOption = new RandomEventOption
-                {
-                    optionType = RandomEventOptionType.Accessory,
-                    description = "获得1个普通饰品"
-                },
-                highRiskOption = new RandomEventOption
-                {
-                    optionType = RandomEventOptionType.RareAccessoryWithDebuff,
-                    description = "获得1个稀有饰品，但下场战斗移动速度降低15%",
-                    debuffType = "moveSpeed",
-                    debuffPercent = -0.15f,
-                    debuffDuration = 1
-                },
-                bothOption = new RandomEventOption
-                {
-                    optionType = RandomEventOptionType.AccessoryWithWeather,
-                    description = "获得2个饰品，但下场战斗出现2种天气效果",
-                    extraWeatherCount = 2
-                }
-            };
-        }
-
-        /// <summary>
         /// 创建风险增益事件
         /// </summary>
         private RandomEvent CreateRiskBuffEvent()
@@ -321,12 +289,6 @@ namespace TribeSystem
                     Debug.Log($"[RandomEventService] {option.catsToTrain}只猫咪前往训练，{option.trainDuration}回合后返回{option.catsToReturn}只");
                     break;
 
-                case RandomEventOptionType.Accessory:
-                case RandomEventOptionType.RareAccessoryWithDebuff:
-                case RandomEventOptionType.AccessoryWithWeather:
-                    // 饰品会在后续获得
-                    Debug.Log($"[RandomEventService] 获得饰品");
-                    break;
             }
 
             _dataManager.SavePlayerData();
@@ -407,9 +369,6 @@ namespace TribeSystem
         TemporaryBuff,              // 临时增益
         TemporaryBuffWithWeather,   // 临时增益+额外天气
         PermanentBuffWithDebuff,    // 永久增益+临时减益
-        TrainCats,                  // 训练猫咪
-        Accessory,                  // 获得饰品
-        RareAccessoryWithDebuff,    // 稀有饰品+减益
-        AccessoryWithWeather        // 饰品+额外天气
+        TrainCats                   // 训练猫咪
     }
 }

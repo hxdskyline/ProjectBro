@@ -504,7 +504,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostPermanent:
                 case RitualRewardType.LeaderStatBoostPercent: return new Color(0.3f, 0.4f, 0.6f);
                 case RitualRewardType.CatFood:  return new Color(0.5f, 0.4f, 0.2f);
-                case RitualRewardType.Accessory:return new Color(0.55f, 0.3f, 0.5f);
                 default:                        return new Color(0.45f, 0.45f, 0.45f);
             }
         }
@@ -518,7 +517,6 @@ namespace TribeSystem.UI
                 case RitualRewardType.LeaderStatBoostPercent:   return "族长百分比强化";
                 case RitualRewardType.CatFood:   return "获得猫粮";
                 case RitualRewardType.Consumable:return "获得道具";
-                case RitualRewardType.Accessory: return "获得饰品";
                 default: return "祝福";
             }
         }

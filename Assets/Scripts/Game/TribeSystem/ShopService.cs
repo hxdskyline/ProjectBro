@@ -74,7 +74,7 @@ namespace TribeSystem
             switch (item.itemType)
             {
                 case ShopItemType.Artifact:
-                    return $"Artifact_{item.artifactEffectType}";
+                    return $"Artifact_{item.artifactConfigId}";
                 case ShopItemType.Consumable:
                     return $"Consumable_{item.consumableEffectType}";
                 case ShopItemType.Cat:
@@ -169,9 +169,9 @@ namespace TribeSystem
             switch (item.itemType)
             {
                 case ShopItemType.Artifact:
-                    if (item.artifactEffectType.HasValue)
+                    if (!string.IsNullOrEmpty(item.artifactConfigId))
                     {
-                        ApplyArtifactEffect(item.artifactEffectType.Value);
+                        ApplyArtifactEffect(item.artifactConfigId);
                     }
                     break;
 
@@ -202,51 +202,57 @@ namespace TribeSystem
             return 1;
         }
 
-        private void ApplyArtifactEffect(ArtifactEffectType effectType)
+        private void ApplyArtifactEffect(string artifactConfigId)
         {
-            // 读取奇物配置获取效果值
-            var config = TribeConfigLoader.Instance.GetShopConfig();
-            int value = GetArtifactEffectValue(effectType, config);
-
-            string artifactName = effectType == ArtifactEffectType.LeaderHpFlat ? "猫爬架" : "苍蝇拍";
-            StatType stat = effectType == ArtifactEffectType.LeaderHpFlat ? StatType.Hp : StatType.Attack;
+            var artifactEntry = TribeConfigLoader.Instance.GetArtifactEntry(artifactConfigId);
+            if (artifactEntry == null)
+            {
+                Debug.LogWarning($"[ShopService] Artifact not found in config: {artifactConfigId}");
+                return;
+            }
 
             // 确定影响范围：全部生效
             var scopeFilter = new BuffScopeFilter { role = ScopeRoleFilter.Any };
 
-            // 小猫攻击力奇物：累计全局值，新小猫自动继承
-            if (effectType == ArtifactEffectType.CatAttackFlat)
+            // 从配置构建 BuffEffectItem 列表
+            var buffEffects = new List<BuffEffectItem>();
+            if (artifactEntry.effects != null)
             {
-                _dataManager.PlayerData.globalCatAttackFlatBonus += value;
+                foreach (var effect in artifactEntry.effects)
+                {
+                    StatType stat = ParseStatType(effect.statType);
+                    buffEffects.Add(new BuffEffectItem(stat, effect.isPercent, effect.value, effect.gameEffect));
+                }
             }
 
             // 构造 EquipmentRecord 并注册
             var equip = new EquipmentRecord
             {
-                equipmentId = $"Artifact_{effectType}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-                configId = $"Artifact_{effectType}",
-                displayName = artifactName,
-                description = effectType == ArtifactEffectType.LeaderHpFlat ? $"全体生命值+{value}" : $"全体攻击力+{value}",
+                equipmentId = $"{artifactConfigId}_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                configId = artifactConfigId,
+                displayName = artifactEntry.name,
+                description = artifactEntry.description,
                 buffScopeFilter = scopeFilter,
                 buffScopeText = scopeFilter.GetDisplayString(),
                 buffApplyType = BuffApplyType.Aura,
                 acquiredRound = _dataManager.GetCurrentRound(),
-                effects = new List<BuffEffectItem> { new BuffEffectItem(stat, false, value, (int)(effectType == ArtifactEffectType.LeaderHpFlat ? GameEffect.HpFlat : GameEffect.AttackFlat)) }
+                effects = buffEffects
             };
 
             _auraService?.RegisterEquipment(equip);
         }
 
-        private int GetArtifactEffectValue(ArtifactEffectType effectType, ShopConfig config)
+        private static StatType ParseStatType(string statType)
         {
-            // 从配置读取，JSON 中新增 artifactEffects 字段
-            if (config.items.artifactEffects != null &&
-                config.items.artifactEffects.ContainsKey(effectType.ToString()))
+            switch (statType)
             {
-                return config.items.artifactEffects[effectType.ToString()];
+                case "Attack": return StatType.Attack;
+                case "Defense": return StatType.Defense;
+                case "Hp": return StatType.Hp;
+                case "MoveSpeed": return StatType.MoveSpeed;
+                case "AttackSpeed": return StatType.AttackSpeed;
+                default: return StatType.Attack;
             }
-            // 默认值
-            return effectType == ArtifactEffectType.LeaderHpFlat ? 500 : 20;
         }
 
         /// <summary>
@@ -299,31 +305,25 @@ namespace TribeSystem
 
         private ShopItem GenerateArtifactItem(ShopConfig config)
         {
-            // 两种奇物：族长加血 / 小猫加攻
-            bool isLeaderHp = Random.value < 0.5f;
-            ArtifactEffectType effectType = isLeaderHp ? ArtifactEffectType.LeaderHpFlat : ArtifactEffectType.CatAttackFlat;
-            string name = isLeaderHp ? "猫爬架" : "苍蝇拍";
-
-            // 从配置读取效果值
-            int value = GetArtifactEffectValue(effectType, config);
-            string desc = isLeaderHp ? $"族长生命值+{value}" : $"小猫攻击力+{value}";
+            // 从 artifact_config.json 的 battle_normal 池随机选一个奇物
+            var artifactEntry = TribeConfigLoader.Instance.GetRandomArtifactFromPool("battle_normal");
+            if (artifactEntry == null)
+            {
+                Debug.LogWarning("[ShopService] No artifacts available in battle_normal pool");
+                return null;
+            }
 
             // 从配置读取图标
-            string icon = config.items.artifact.icon ?? "";
-            if (config.items.artifact.icons != null &&
-                config.items.artifact.icons.ContainsKey(effectType.ToString()))
-            {
-                icon = config.items.artifact.icons[effectType.ToString()];
-            }
+            string icon = config.items.artifact?.icon ?? "";
 
             return new ShopItem
             {
                 itemId = Random.Range(100, 200),
                 itemType = ShopItemType.Artifact,
-                artifactEffectType = effectType,
-                basePrice = config.items.artifact.basePrice,
-                name = name,
-                description = desc,
+                artifactConfigId = artifactEntry.id,
+                basePrice = config.items.artifact?.basePrice ?? 500,
+                name = artifactEntry.name,
+                description = artifactEntry.description,
                 iconAddress = icon
             };
         }

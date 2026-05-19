@@ -103,11 +103,14 @@ FDMG = MAX(DMG * DR * SkillMultiplier, 1) + TrueDamage
 
 ## Design Docs
 
+**需求以 `DesignDocs/正式文档` 为准。** 正式文档是需求的唯一来源。
+
+`DesignDocs/描述性介绍/` 仅作整理用，**除非用户明确要求，不要主动读取。**
+
 Located in `DesignDocs/`:
-- `System_Design.md` — master design doc, all systems
-- `Combat_Power_System.md` — damage formulas, stat tables
-- `新需求/新的需求改动很大.txt` — requirements spec (source of truth for recent changes)
-- `场景配置说明.txt` — scene setup requirements
+- `正式文档/` — 正式需求文档（权威来源）
+- `描述性介绍/` — 整理性文档，不作为需求依据
+- `旧需求/` — 旧版需求（已过时）
 
 **人工添加**
 研发期间，功能全部都不做存档兼容。每次运行我都会清空存档。

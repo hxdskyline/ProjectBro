@@ -574,7 +574,6 @@ namespace TribeSystem
         LeaderStatBoostPercent,     // 兵种属性百分比提升
         Consumable,                 // 一次性道具
         CatFood,                    // 猫粮
-        Accessory,                  // 饰品
         LeaderSkill                 // 固有技能
     }
 
@@ -626,7 +625,6 @@ namespace TribeSystem
         public TribeType catTribeType;     // 小猫族群
         public CatQuality? catQuality;     // 小猫品质
         public int consumableId;           // 道具ID
-        public int accessoryId;            // 饰品ID
         public int leaderSkillId;          // 固有技能ID
         public string displayName;         // UI 显示文本（在 DrawBlessings 时生成）
 
@@ -639,7 +637,6 @@ namespace TribeSystem
             catTribeType = TribeType.Tabby;
             catQuality = null;
             consumableId = -1;
-            accessoryId = -1;
             leaderSkillId = -1;
             displayName = "";
         }
@@ -657,15 +654,6 @@ namespace TribeSystem
         Artifact,       // 奇物
         Consumable,     // 一次性道具
         Cat             // 小猫
-    }
-
-    /// <summary>
-    /// 奇物效果类型
-    /// </summary>
-    public enum ArtifactEffectType
-    {
-        LeaderHpFlat,    // 兵种生命值+500
-        CatAttackFlat    // 兵种攻击力+20
     }
 
     /// <summary>
@@ -712,7 +700,7 @@ namespace TribeSystem
         public CatQuality? catQuality;  // 猫的品质
         public UnitTier? catTier;       // 猫的等级（T1/T2/T3）
         public ConsumableEffectType? consumableEffectType; // 消耗品效果类型
-        public ArtifactEffectType? artifactEffectType; // 奇物效果类型
+        public string artifactConfigId; // 奇物配置ID
         public int basePrice;
         public string name;
         public string description;
@@ -730,6 +718,7 @@ namespace TribeSystem
             name = "";
             description = "";
             stock = 1;
+            artifactConfigId = "";
             iconAddress = "";
         }
 

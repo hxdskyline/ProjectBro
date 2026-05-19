@@ -395,7 +395,7 @@ public class GameFlowController : MonoBehaviour
             _dataManager.LoadPlayerData();
             _dataManager.SetCurrentRound(1);
             // 清空本局饰品
-            _dataManager.ClearRunAccessories();
+            _dataManager.ClearRunEquipment();
         }
 
         // 重新进行初始族群选择

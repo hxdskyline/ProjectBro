@@ -95,8 +95,6 @@ public class DataManager : MonoBehaviour
         _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
         _playerData.currentRound = 1;
         _playerData.catFood = 1000; // Initial cat food
-        _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
-        _playerData.globalCatAttackFlatBonus = 0;
         _playerData.shopRefreshCount = 0;
         _playerData.lastShopRound = 0;
         _playerData.runChoices = new System.Collections.Generic.List<TribeSystem.GameChoice>();
@@ -376,76 +374,16 @@ public class DataManager : MonoBehaviour
         return true;
     }
 
-    public void UnlockAccessory(string accessoryId, bool saveImmediately = true)
-    {
-        if (_playerData == null || string.IsNullOrEmpty(accessoryId)) return;
-        EnsurePlayerDataDefaults();
-        if (!_playerData.unlockedAccessories.Contains(accessoryId))
-        {
-            _playerData.unlockedAccessories.Add(accessoryId);
-            if (saveImmediately) SavePlayerData();
-        }
-    }
-
-    public bool IsAccessoryUnlocked(string accessoryId)
-    {
-        if (_playerData == null || string.IsNullOrEmpty(accessoryId)) return false;
-        EnsurePlayerDataDefaults();
-        return _playerData.unlockedAccessories.Contains(accessoryId);
-    }
-
-    public System.Collections.Generic.List<string> GetUnlockedAccessories()
-    {
-        if (_playerData == null) return new System.Collections.Generic.List<string>();
-        EnsurePlayerDataDefaults();
-        return new System.Collections.Generic.List<string>(_playerData.unlockedAccessories);
-    }
-
     /// <summary>
-    /// 清空本局获得的饰品（新游戏开始时调用）
+    /// 清空本局获得的装备（新游戏开始时调用）
     /// </summary>
-    public void ClearRunAccessories()
+    public void ClearRunEquipment()
     {
         if (_playerData == null) return;
         EnsurePlayerDataDefaults();
-        _playerData.unlockedAccessories.Clear();
         _playerData.runChoices?.Clear();
         _playerData.runEquipments?.Clear();
         SavePlayerData();
-    }
-
-    /// <summary>
-    /// 随机解锁一个未获得的饰品，返回饰品ID（若已全部获得则返回null）
-    /// </summary>
-    public string UnlockRandomAccessory(bool saveImmediately = true)
-    {
-        if (_playerData == null) return null;
-        EnsurePlayerDataDefaults();
-
-        // 加载饰品配置获取所有饰品ID
-        string configPath = UnityEngine.Application.streamingAssetsPath + "/Tables/accessory_config.json";
-        if (!System.IO.File.Exists(configPath)) return null;
-
-        var configText = System.IO.File.ReadAllText(configPath);
-        var root = LitJson.JsonMapper.ToObject(configText);
-        var accessoriesJson = root["accessories"];
-
-        // 找出未解锁的饰品ID
-        var unaccessedIds = new System.Collections.Generic.List<string>();
-        for (int i = 0; i < accessoriesJson.Count; i++)
-        {
-            string accId = accessoriesJson[i]["id"].ToString();
-            if (!string.IsNullOrEmpty(accId) && !_playerData.unlockedAccessories.Contains(accId))
-            {
-                unaccessedIds.Add(accId);
-            }
-        }
-
-        if (unaccessedIds.Count == 0) return null;
-
-        var pickedId = unaccessedIds[UnityEngine.Random.Range(0, unaccessedIds.Count)];
-        UnlockAccessory(pickedId, saveImmediately);
-        return pickedId;
     }
 
     public int GetShopRefreshCount()
@@ -639,11 +577,6 @@ public class DataManager : MonoBehaviour
         // 从 runChoices / runEquipments 重建单位的 ActiveBuffs
         RebuildAuraBuffs();
 
-        if (_playerData.unlockedAccessories == null)
-        {
-            _playerData.unlockedAccessories = new System.Collections.Generic.List<string>();
-        }
-
         if (_playerData.consumables == null)
         {
             _playerData.consumables = new System.Collections.Generic.List<TribeSystem.ConsumableItem>();
@@ -801,13 +734,9 @@ public class PlayerData
     public System.Collections.Generic.List<TribeSystem.TribeRecord> tribes;
     public int currentRound;
     public long catFood;
-    public System.Collections.Generic.List<string> unlockedAccessories;
     public int shopRefreshCount;
     public int lastShopRound;
     public System.Collections.Generic.List<TribeSystem.ConsumableItem> consumables;
-
-    // 奇物全局加成（累计值，新小猫自动继承）
-    public int globalCatAttackFlatBonus;
 
     // 统一 Choice / Equipment 系统（本局记录）
     public System.Collections.Generic.List<TribeSystem.GameChoice> runChoices;
@@ -868,7 +797,6 @@ public class CatRecord
     public int energyMax;
     public System.Collections.Generic.List<int> skills;
     public System.Collections.Generic.List<int> traits;
-    public long accessoryInstanceId;
     public System.Collections.Generic.List<long> parents;
     public System.Collections.Generic.List<long> children;
     public CatFlags flags;
