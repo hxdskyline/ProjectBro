@@ -1097,23 +1097,14 @@ namespace TribeSystem.UI
             if (victory)
             {
                 Debug.Log("[TribeBuildPanel] 战斗胜利！");
-
-                // 通知GameFlowController战斗结束
-                GameFlowController.Instance?.OnBattleEnded(victory);
-
-                // 战斗胜利后推进回合
-                AdvanceRound();
             }
             else
             {
                 Debug.Log("[TribeBuildPanel] 战斗失败，奖励减半，继续推进");
-
-                // 通知GameFlowController战斗结束
-                GameFlowController.Instance?.OnBattleEnded(victory);
-
-                // 失败也推进回合
-                AdvanceRound();
             }
+
+            // 通知GameFlowController战斗结束（GameFlowController会处理流程）
+            GameFlowController.Instance?.OnBattleEnded(victory);
 
             RefreshUI();
         }

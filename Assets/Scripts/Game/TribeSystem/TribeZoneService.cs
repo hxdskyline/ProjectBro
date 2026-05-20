@@ -24,7 +24,7 @@ namespace TribeSystem
 
         // 事件
         public event Action OnUnitsChanged;
-        public event Action<int, UnitZone> OnUnitMoved;
+        public event Action<long, UnitZone> OnUnitMoved;
 
         public TribeZoneService()
         {
@@ -163,9 +163,8 @@ namespace TribeSystem
         /// </summary>
         public int GetMaxPopulation()
         {
-            // TODO: 从主角属性获取领导力值
-            // 目前返回默认值3
-            return 3;
+            // 从主角属性获取领导力值
+            return _dataManager?.GetLeadership() ?? 3;
         }
 
         /// <summary>

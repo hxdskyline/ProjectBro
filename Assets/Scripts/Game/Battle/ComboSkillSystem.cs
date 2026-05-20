@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BattleSystem.Fighter;
 
 namespace BattleSystem
 {
@@ -262,7 +263,7 @@ namespace BattleSystem
                 if (target != null && target.IsAlive && target.RuntimeAttributes != null)
                 {
                     // TODO: 添加临时buff
-                    target.RuntimeAttributes.Attack *= (1 + combo.config.effectValue);
+                    target.RuntimeAttributes.Attack = (int)(target.RuntimeAttributes.Attack * (1 + combo.config.effectValue));
                 }
             }
 
@@ -284,7 +285,7 @@ namespace BattleSystem
             {
                 if (target != null && target.IsAlive && target.RuntimeAttributes != null)
                 {
-                    target.RuntimeAttributes.CurrentHp -= combo.config.effectValue;
+                    target.RuntimeAttributes.CurrentHp -= (int)combo.config.effectValue;
                 }
             }
 

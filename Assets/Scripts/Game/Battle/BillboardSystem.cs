@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BattleSystem.Fighter;
 
 namespace BattleSystem
 {
@@ -239,7 +240,7 @@ namespace BattleSystem
                 if (target == null || !target.IsAlive)
                     continue;
 
-                float distance = Vector3.Distance(billboard.position, target.transform.position);
+                float distance = Vector3.Distance(billboard.position, target.Transform.position);
                 if (distance < nearestDistance && distance <= billboard.attackRange)
                 {
                     nearestDistance = distance;

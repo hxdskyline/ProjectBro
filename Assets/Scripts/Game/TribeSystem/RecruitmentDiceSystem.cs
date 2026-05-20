@@ -101,7 +101,7 @@ namespace TribeSystem
             var card = new RecruitmentCard
             {
                 fighterId = fighterId,
-                fighterName = fighterConfig.name,
+                fighterName = fighterConfig.fighterName,
                 populationCost = fighterConfig.populationCost,
                 recruitmentCost = CalculateRecruitmentCost(fighterConfig),
                 successRate = CalculateSuccessRate(fighterConfig)
@@ -161,7 +161,7 @@ namespace TribeSystem
                 return false;
 
             // 检查木天蓼叶是否足够
-            int currentCatFood = _dataManager?.PlayerData?.catFood ?? 0;
+            int currentCatFood = (int)(_dataManager?.PlayerData?.catFood ?? 0);
             if (currentCatFood < card.recruitmentCost)
             {
                 Debug.LogWarning("[RecruitmentDiceSystem] 木天蓼叶不足");
@@ -169,7 +169,7 @@ namespace TribeSystem
             }
 
             // 消耗木天蓼叶
-            _dataManager?.SpendCatFood(card.recruitmentCost);
+            _dataManager?.AddCatFood(-card.recruitmentCost);
 
             // 创建新单位
             var newUnit = CreateRecruitedUnit(card.fighterId);

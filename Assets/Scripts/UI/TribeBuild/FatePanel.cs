@@ -73,7 +73,7 @@ namespace TribeSystem.UI
 
             if (_catFoodText != null)
             {
-                int catFood = _dataManager?.PlayerData?.catFood ?? 0;
+                int catFood = (int)(_dataManager?.PlayerData?.catFood ?? 0);
                 _catFoodText.text = $"木天蓼叶: {catFood}";
             }
         }

@@ -448,7 +448,7 @@ namespace TribeSystem
                 lowRiskOption = new ChoiceEventOption
                 {
                     optionType = ChoiceOptionType.LowRisk,
-                    optionName": "防御训练",
+                    optionName = "防御训练",
                     description = "3 回合内防御力 +20%",
                     rewards = new List<RewardEffect>
                     {

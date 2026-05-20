@@ -16,7 +16,7 @@ namespace TribeSystem.UI
         [SerializeField] private Text _titleText;
         [SerializeField] private Text _currentLevelText;
         [SerializeField] private Text _regionText;
-        [SerializeField] private ScrollView _mapScrollView;
+        [SerializeField] private ScrollRect _mapScrollView;
         [SerializeField] private RectTransform _nodesContainer;
         [SerializeField] private RectTransform _edgesContainer;
 
@@ -229,7 +229,7 @@ namespace TribeSystem.UI
             if (_regionText == null)
                 _regionText = transform.Find("Region")?.GetComponent<Text>();
             if (_mapScrollView == null)
-                _mapScrollView = transform.Find("MapScrollView")?.GetComponent<ScrollView>();
+                _mapScrollView = transform.Find("MapScrollView")?.GetComponent<ScrollRect>();
             if (_nodesContainer == null)
                 _nodesContainer = transform.Find("MapScrollView/NodesContainer") as RectTransform;
             if (_edgesContainer == null)

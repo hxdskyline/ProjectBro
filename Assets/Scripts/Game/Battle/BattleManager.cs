@@ -170,6 +170,9 @@ namespace BattleSystem
             // 将战斗内 Persistent buff 同步回 FighterData（饱食层等）
             BattleBuffService.SyncPersistentBuffsToUnits(_playerFighters);
 
+            // 同步战斗后的HP状态回FighterData
+            SyncHealthToFighterData(victory);
+
             // 清除所有战斗内 buff（BattleOnly 类型）
             BuffService.ClearAllBattleBuffs();
 
@@ -178,7 +181,8 @@ namespace BattleSystem
             _simulation?.SummonManager?.Clear();
 
             // 处理HP持久化（满目疮痍debuff等）
-            bool isBossBattle = GameManager.Instance?.BattleCampaignRuntime?.IsBossBattle(_levelId) ?? false;
+            var campaign = GameManager.Instance?.BattleCampaignRuntime;
+            bool isBossBattle = campaign != null && _levelId >= campaign.MaxBattleCount;
             var healthPersistence = new HealthPersistenceSystem();
             healthPersistence.OnBattleEnd(victory, isBossBattle);
 
@@ -220,6 +224,58 @@ namespace BattleSystem
                 StopCoroutine(_battleCoroutine);
                 _battleCoroutine = null;
             }
+        }
+
+        /// <summary>
+        /// 同步战斗后的HP状态回FighterData
+        /// </summary>
+        private void SyncHealthToFighterData(bool victory)
+        {
+            if (_playerFighters == null) return;
+
+            DataManager dataManager = GameManager.Instance?.DataManager;
+            var tribes = dataManager?.PlayerData?.tribes;
+            if (tribes == null) return;
+
+            foreach (BattleFighter fighter in _playerFighters)
+            {
+                if (fighter == null || fighter.RuntimeAttributes == null) continue;
+
+                // 查找对应的FighterData
+                FighterData unit = FindUnit(tribes, fighter.TribeType, fighter.FighterId);
+                if (unit == null) continue;
+
+                // 同步HP
+                if (fighter.IsDead || fighter.IsDying || fighter.IsRemoved)
+                {
+                    unit.currentHp = 0;
+                }
+                else
+                {
+                    unit.currentHp = fighter.RuntimeAttributes.CurrentHp;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 查找对应的FighterData
+        /// </summary>
+        private FighterData FindUnit(List<TribeSystem.TribeRecord> tribes, TribeSystem.TribeType tribeType, int fighterId)
+        {
+            foreach (var tribe in tribes)
+            {
+                if (tribe.tribeType != tribeType) continue;
+                if (tribe.units == null) continue;
+
+                foreach (var unit in tribe.units)
+                {
+                    if (unit.fighterId == fighterId)
+                    {
+                        return unit;
+                    }
+                }
+            }
+            return null;
         }
 
         private void BuildDemoFighters()

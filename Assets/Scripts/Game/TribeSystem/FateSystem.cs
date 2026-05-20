@@ -101,7 +101,7 @@ namespace TribeSystem
         public bool CanSelectTier(PrayerTier tier)
         {
             int cost = GetTierCost(tier);
-            int currentCatFood = _dataManager?.PlayerData?.catFood ?? 0;
+            int currentCatFood = (int)(_dataManager?.PlayerData?.catFood ?? 0);
 
             return currentCatFood >= cost;
         }
@@ -124,7 +124,7 @@ namespace TribeSystem
             int cost = GetTierCost(tier);
             if (cost > 0)
             {
-                _dataManager?.SpendCatFood(cost);
+                _dataManager?.AddCatFood(-cost);
             }
 
             // 生成奖励

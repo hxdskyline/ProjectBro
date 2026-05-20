@@ -35,7 +35,7 @@ namespace TribeSystem
         private ChoiceConfigWrapper _choiceConfig;
         private List<FighterConfig> _fighterConfigs;
         private List<BuffConfig> _buffConfigs;
-        private ArtifactConfig _artifactConfig;
+        private ArtifactConfigData _artifactConfig;
 
         // 配置文件路径 (StreamingAssets)
         private const string TRIBE_CONFIG_PATH = "Tables/tribe_config.json";
@@ -84,7 +84,7 @@ namespace TribeSystem
             _choiceConfig = LoadChoiceConfig();
             _fighterConfigs = LoadFighterConfigs();
             _buffConfigs = LoadBuffConfigs();
-            _artifactConfig = LoadArtifactConfig();
+            _artifactConfig = LoadArtifactConfigData();
 
             _isLoaded = true;
 
@@ -299,7 +299,7 @@ namespace TribeSystem
         /// <summary>
         /// 获取奇物配置
         /// </summary>
-        public ArtifactConfig GetArtifactConfig()
+        public ArtifactConfigData GetArtifactConfigData()
         {
             EnsureLoaded();
             return _artifactConfig;
@@ -554,19 +554,19 @@ namespace TribeSystem
             }
         }
 
-        private ArtifactConfig LoadArtifactConfig()
+        private ArtifactConfigData LoadArtifactConfigData()
         {
             string filePath = GetStreamingAssetsPath(ARTIFACT_CONFIG_PATH);
             if (!File.Exists(filePath))
             {
                 Debug.LogWarning($"[TribeConfigLoader] artifact_config.json not found at {filePath}");
-                return new ArtifactConfig { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
+                return new ArtifactConfigData { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
             }
 
             try
             {
                 string jsonText = File.ReadAllText(filePath);
-                var json = JsonMapper.ToObject<ArtifactConfig>(jsonText);
+                var json = JsonMapper.ToObject<ArtifactConfigData>(jsonText);
                 int count = json.artifacts?.Count ?? 0;
                 Debug.Log($"[TribeConfigLoader] Loaded {count} artifact configs");
                 return json;
@@ -574,7 +574,7 @@ namespace TribeSystem
             catch (System.Exception e)
             {
                 Debug.LogError($"[TribeConfigLoader] Error parsing artifact config: {e.Message}");
-                return new ArtifactConfig { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
+                return new ArtifactConfigData { artifacts = new List<ArtifactEntry>(), dropPools = new Dictionary<string, ArtifactDropPool>() };
             }
         }
 
@@ -874,7 +874,7 @@ namespace TribeSystem
     #region Artifact Config Classes
 
     [System.Serializable]
-    public class ArtifactConfig
+    public class ArtifactConfigData
     {
         public List<ArtifactEntry> artifacts;
         public Dictionary<string, ArtifactDropPool> dropPools;
