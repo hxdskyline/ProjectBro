@@ -764,10 +764,18 @@ namespace BattleSystem
             List<BattleFighter> toRemove = null;
             foreach (var kv in _hitEffectTimers)
             {
+                // fighter 已销毁，直接清理
+                if (kv.Key.Transform == null)
+                {
+                    if (toRemove == null) toRemove = new List<BattleFighter>();
+                    toRemove.Add(kv.Key);
+                    continue;
+                }
                 kv.Key.HitEffectTimer -= deltaTime;
                 if (kv.Key.HitEffectTimer <= 0f)
                 {
-                    kv.Key.HitEffect?.SetActive(false);
+                    if (kv.Key.HitEffect != null)
+                        kv.Key.HitEffect.SetActive(false);
                     if (toRemove == null) toRemove = new List<BattleFighter>();
                     toRemove.Add(kv.Key);
                 }

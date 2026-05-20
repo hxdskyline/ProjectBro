@@ -928,7 +928,7 @@ namespace TribeSystem.UI
 
         private void OnShopItemBuy(ShopItem item)
         {
-            Debug.Log($"[TribeBuildPanel][Debug] OnShopItemBuy: type={item.itemType}, name={item.name}, artifactEffectType={item.artifactEffectType}");
+            Debug.Log($"[TribeBuildPanel][Debug] OnShopItemBuy: type={item.itemType}, name={item.name}");
             int result = _shopService.BuyItem(item);
             Debug.Log($"[TribeBuildPanel][Debug] BuyItem result={result}");
             if (result == 1)
