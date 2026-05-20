@@ -177,6 +177,11 @@ namespace BattleSystem
             _simulation?.CorpseManager?.Clear();
             _simulation?.SummonManager?.Clear();
 
+            // 处理HP持久化（满目疮痍debuff等）
+            bool isBossBattle = GameManager.Instance?.BattleCampaignRuntime?.IsBossBattle(_levelId) ?? false;
+            var healthPersistence = new HealthPersistenceSystem();
+            healthPersistence.OnBattleEnd(victory, isBossBattle);
+
             // Ensure settlement UI appears over a clean battlefield.
             ClearBattlefield();
 

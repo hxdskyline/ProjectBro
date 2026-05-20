@@ -28,8 +28,9 @@ namespace TribeSystem
 
         /// <summary>
         /// 获取总关卡数（从配置中读取）
+        /// 默认45关（3个地区×15层）
         /// </summary>
-        public int MaxRounds => Campaign?.MaxBattleCount ?? 20;
+        public int MaxRounds => Campaign?.MaxBattleCount ?? 45;
 
         public bool IsFinalRound => _currentRound >= MaxRounds;
         public bool IsGameOver => _currentRound > MaxRounds;

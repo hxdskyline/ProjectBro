@@ -845,6 +845,8 @@ namespace TribeSystem
         public List<int> innateBuffIds;
         public string avatarId;       // 外观 ID（空=使用族群默认外观）
         public List<string> tags;     // 设计标签（如 glass_cannon、tank、summoner）
+        public List<string> weightClass;  // 重量级标签（轻量级/中量级/重量级）
+        public int populationCost;    // 人口占用（默认1）
     }
 
     [System.Serializable]

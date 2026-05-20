@@ -77,6 +77,11 @@ namespace TribeSystem
         public CatQuality quality;         // 品质
         public UnitTier tier;              // 等级
 
+        // 区域状态
+        public UnitZone zone;              // 所在区域（待上阵/上阵/生产）
+        public float currentHp;            // 当前生命值
+        public bool hasWoundsDebuff;       // 是否有"满目疮痍"debuff
+
         // 静态属性（从 fighter_config 加载）
         public float staticAttack;
         public float staticDefense;
@@ -112,6 +117,9 @@ namespace TribeSystem
             fighterId = 0;
             quality = CatQuality.White;
             tier = UnitTier.Tier1;
+            zone = UnitZone.Pending;
+            currentHp = 0;
+            hasWoundsDebuff = false;
             staticAttack = 0;
             staticDefense = 0;
             staticHp = 0;

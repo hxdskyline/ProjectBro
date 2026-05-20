@@ -91,6 +91,11 @@ public class DataManager : MonoBehaviour
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Gold), 0, false);
         SetCurrencyAmount(CurrencyManager.GetCurrencyKey(CurrencyType.Diamond), 0, false);
 
+        // 初始化主角属性
+        _playerData.leadership = 3;      // 领导力初始值3
+        _playerData.streetIntel = 1;     // 街头情报初始值1
+        _playerData.charisma = 1;        // 咪格魅力初始值1
+
         // Initialize TribeSystem fields
         _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
         _playerData.currentRound = 1;
@@ -386,6 +391,79 @@ public class DataManager : MonoBehaviour
         SavePlayerData();
     }
 
+    // --- 主角属性方法 ---
+
+    /// <summary>
+    /// 获取领导力（决定人口上限）
+    /// </summary>
+    public int GetLeadership()
+    {
+        if (_playerData == null) return 3;
+        EnsurePlayerDataDefaults();
+        return _playerData.leadership;
+    }
+
+    /// <summary>
+    /// 设置领导力
+    /// </summary>
+    public void SetLeadership(int value, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.leadership = Mathf.Max(1, value);
+        if (saveImmediately) SavePlayerData();
+    }
+
+    /// <summary>
+    /// 获取人口上限（等于领导力）
+    /// </summary>
+    public int GetPopulationCap()
+    {
+        return GetLeadership();
+    }
+
+    /// <summary>
+    /// 获取街头情报（决定地图敌人信息准确度）
+    /// </summary>
+    public int GetStreetIntel()
+    {
+        if (_playerData == null) return 1;
+        EnsurePlayerDataDefaults();
+        return _playerData.streetIntel;
+    }
+
+    /// <summary>
+    /// 设置街头情报
+    /// </summary>
+    public void SetStreetIntel(int value, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.streetIntel = Mathf.Max(0, value);
+        if (saveImmediately) SavePlayerData();
+    }
+
+    /// <summary>
+    /// 获取咪格魅力（影响招募成功率等）
+    /// </summary>
+    public int GetCharisma()
+    {
+        if (_playerData == null) return 1;
+        EnsurePlayerDataDefaults();
+        return _playerData.charisma;
+    }
+
+    /// <summary>
+    /// 设置咪格魅力
+    /// </summary>
+    public void SetCharisma(int value, bool saveImmediately = true)
+    {
+        if (_playerData == null) return;
+        EnsurePlayerDataDefaults();
+        _playerData.charisma = Mathf.Max(0, value);
+        if (saveImmediately) SavePlayerData();
+    }
+
     public int GetShopRefreshCount()
     {
         if (_playerData == null) return 0;
@@ -551,6 +629,20 @@ public class DataManager : MonoBehaviour
         if (_playerData.currencies == null)
         {
             _playerData.currencies = new System.Collections.Generic.List<CurrencyData>();
+        }
+
+        // 确保主角属性有默认值
+        if (_playerData.leadership <= 0)
+        {
+            _playerData.leadership = 3;  // 领导力初始值3
+        }
+        if (_playerData.streetIntel <= 0)
+        {
+            _playerData.streetIntel = 1; // 街头情报初始值1
+        }
+        if (_playerData.charisma <= 0)
+        {
+            _playerData.charisma = 1;    // 咪格魅力初始值1
         }
 
         // Ensure TribeSystem collections exist
@@ -729,6 +821,11 @@ public class PlayerData
     public int currentLevel;
     public long lastSaveTime;
     public System.Collections.Generic.List<CurrencyData> currencies;
+
+    // 主角属性
+    public int leadership;          // 领导力 - 决定人口上限（初始值3，每升一级+1）
+    public int streetIntel;         // 街头情报 - 决定地图敌人信息准确度
+    public int charisma;            // 咪格魅力 - 影响招募成功率等
 
     // TribeSystem persistent fields (NEW)
     public System.Collections.Generic.List<TribeSystem.TribeRecord> tribes;
