@@ -124,15 +124,28 @@ namespace TribeSystem
 
         /// <summary>
         /// 计算成功率
+        /// 文档：招募成功率 = 基础概率 + 主角"咪格魅力"加成
         /// </summary>
         private float CalculateSuccessRate(FighterConfig config)
         {
             // 基础成功率
             float baseRate = 0.5f;
 
-            // TODO: 根据主角"咪格魅力"属性调整成功率
-            // 目前返回基础值
-            return baseRate;
+            // 咪格魅力加成：每点魅力+5%成功率
+            int charisma = _dataManager?.GetCharisma() ?? 0;
+            float charismaBonus = charisma * 0.05f;
+
+            // Boss关加成：提升20%成功率
+            bool isBoss = false;
+            var campaign = GameManager.Instance?.BattleCampaignRuntime;
+            if (campaign != null)
+            {
+                int currentRound = _dataManager?.GetCurrentRound() ?? 1;
+                isBoss = currentRound % 15 == 0;
+            }
+            float bossBonus = isBoss ? 0.2f : 0f;
+
+            return Mathf.Clamp01(baseRate + charismaBonus + bossBonus);
         }
 
         /// <summary>

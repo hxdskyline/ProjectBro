@@ -39,6 +39,9 @@ public class GameFlowController : MonoBehaviour
     private TribeBuildPanel _tribeBuildPanel;
     private RoundManager _roundManager;
 
+    // 三区系统
+    private TribeZoneService _zoneService;
+
     // 地图系统
     private MapGenerator _mapGenerator;
     private List<MapData> _mapDataList;
@@ -54,6 +57,7 @@ public class GameFlowController : MonoBehaviour
     public bool IsGameStarted => _isGameStarted;
     public MapData CurrentRegionMap => _currentRegionMap;
     public int CurrentNodeId => _currentNodeId;
+    public TribeZoneService ZoneService => _zoneService;
 
     private void Awake()
     {
@@ -93,6 +97,7 @@ public class GameFlowController : MonoBehaviour
 
         _roundManager = new RoundManager();
         _mapGenerator = new MapGenerator();
+        _zoneService = new TribeZoneService();
 
         if (_uiManager == null)
         {
@@ -355,6 +360,16 @@ public class GameFlowController : MonoBehaviour
                 ShowHotSpringPanel();
                 return;
             }
+
+            // Boss关：全员上阵（包括生产区单位）
+            if (currentNode != null && currentNode.nodeType == MapNodeType.Boss)
+            {
+                Debug.Log("[GameFlowController] Boss关，全员上阵");
+                if (_zoneService != null)
+                {
+                    _zoneService.ForceAllUnitsToBattle();
+                }
+            }
         }
 
         // 显示族群构筑主界面
@@ -439,6 +454,16 @@ public class GameFlowController : MonoBehaviour
         {
             Debug.Log("[GameFlowController] 战斗胜利，进入选关阶段");
 
+            // 结算生产区产出
+            if (_zoneService != null)
+            {
+                int productionOutput = _zoneService.SettleProductionOutput();
+                Debug.Log($"[GameFlowController] 生产区产出: {productionOutput} 木天蓼叶");
+            }
+
+            // 战斗胜利经验奖励
+            GrantBattleExpReward();
+
             // 检查是否是Boss战
             bool isBossBattle = _currentRegionMap != null &&
                                _currentNodeId >= 0 &&
@@ -460,14 +485,132 @@ public class GameFlowController : MonoBehaviour
                 }
             }
 
-            // 进入选关阶段
-            EnterMapSelection();
+            // 进入战斗后招募流程
+            ShowBattleResultRecruitment();
         }
         else
         {
-            Debug.Log("[GameFlowController] 战斗失败，返回准备阶段");
-            ChangeGameState(GameState.RoundPreparation);
+            // 检查是否是Boss关失败
+            bool isBossBattle = _currentRegionMap != null &&
+                               _currentNodeId >= 0 &&
+                               _currentRegionMap.GetNode(_currentNodeId)?.nodeType == MapNodeType.Boss;
+
+            if (isBossBattle)
+            {
+                // Boss关失败 → 本局结束
+                Debug.Log("[GameFlowController] Boss关失败，本局结束");
+                EndGame();
+            }
+            else
+            {
+                Debug.Log("[GameFlowController] 战斗失败，返回准备阶段");
+                ChangeGameState(GameState.RoundPreparation);
+            }
         }
+    }
+
+    /// <summary>
+    /// 战斗胜利经验奖励
+    /// </summary>
+    private void GrantBattleExpReward()
+    {
+        if (_dataManager == null) return;
+
+        // 基础经验 = 50 + 关卡数 * 10
+        int baseExp = 50 + _currentRound * 10;
+
+        // Boss关额外经验
+        bool isBossBattle = _currentRegionMap != null &&
+                           _currentNodeId >= 0 &&
+                           _currentRegionMap.GetNode(_currentNodeId)?.nodeType == MapNodeType.Boss;
+        if (isBossBattle)
+        {
+            baseExp *= 3;
+        }
+
+        bool leveledUp = _dataManager.AddLeaderExp(baseExp);
+        Debug.Log($"[GameFlowController] 战斗经验奖励: {baseExp}{(leveledUp ? " (升级了!)" : "")}");
+    }
+
+    /// <summary>
+    /// 显示战斗后招募界面
+    /// </summary>
+    private void ShowBattleResultRecruitment()
+    {
+        // 获取敌方兵种ID列表
+        List<int> enemyFighterIds = GetEnemyFighterIdsForCurrentLevel();
+
+        if (enemyFighterIds == null || enemyFighterIds.Count == 0)
+        {
+            // 没有可招募的敌方兵种，直接进入构筑阶段
+            Debug.Log("[GameFlowController] 没有可招募的敌方兵种，直接进入构筑阶段");
+            EnterBuildPhase();
+            return;
+        }
+
+        // 显示战斗结果招募界面
+        // 这里需要创建一个UI面板来显示招募卡片和掷骰子动画
+        // 暂时简化处理：直接调用招募系统
+        var recruitmentSystem = new RecruitmentDiceSystem();
+        var cards = recruitmentSystem.GenerateRecruitmentCards(enemyFighterIds);
+
+        Debug.Log($"[GameFlowController] 生成 {cards.Count} 张招募卡片");
+
+        // TODO: 显示招募UI，让玩家选择是否招募
+        // 暂时自动处理：尝试招募所有卡片
+        foreach (var card in cards)
+        {
+            recruitmentSystem.RollDice(card);
+            if (card.diceResult == DiceResult.Success)
+            {
+                recruitmentSystem.RecruitUnit(card);
+            }
+        }
+
+        // 招募完成后进入构筑阶段（命运/抉择/猫市），再选关
+        // 文档流程：战斗 → 招募 → 构筑 → 选关
+        EnterBuildPhase();
+    }
+
+    /// <summary>
+    /// 进入构筑阶段（命运/抉择/猫市），完成后进入选关
+    /// 文档：每关流程 = 战斗准备→战斗→构筑→选关
+    /// </summary>
+    private void EnterBuildPhase()
+    {
+        Debug.Log("[GameFlowController] 进入构筑阶段");
+        ChangeGameState(GameState.RoundPreparation);
+
+        if (_uiManager == null)
+        {
+            _uiManager = GameManager.Instance?.UIManager;
+        }
+
+        // 显示族群构筑主界面（包含命运/抉择/猫市）
+        _tribeBuildPanel = _uiManager?.ShowPanel<TribeBuildPanel>(
+            "ui/tribebuild/tribebuildpanel",
+            UIManager.UILayer.Normal
+        );
+
+        if (_tribeBuildPanel == null)
+        {
+            Debug.LogWarning("[GameFlowController] TribeBuildPanel not found, fallback to MapSelection");
+            EnterMapSelection();
+        }
+    }
+
+    /// <summary>
+    /// 获取当前关卡的敌方兵种ID列表
+    /// </summary>
+    private List<int> GetEnemyFighterIdsForCurrentLevel()
+    {
+        var campaign = GameManager.Instance?.BattleCampaignRuntime;
+        if (campaign == null) return new List<int>();
+
+        int[] enemyUnitIds = campaign.GetEnemyUnitIdsForBattle(_currentRound);
+        if (enemyUnitIds == null) return new List<int>();
+
+        return new List<int>(enemyUnitIds);
     }
 
     /// <summary>

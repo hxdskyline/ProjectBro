@@ -95,6 +95,9 @@ public class DataManager : MonoBehaviour
         _playerData.leadership = 3;      // 领导力初始值3
         _playerData.streetIntel = 1;     // 街头情报初始值1
         _playerData.charisma = 1;        // 咪格魅力初始值1
+        _playerData.leaderExp = 0;       // 主角经验值初始值0
+        _playerData.leaderExpToNextLevel = 100; // 升级所需经验值初始值100
+        _playerData.leaderSkillPoints = 0; // 技能点初始值0
 
         // Initialize TribeSystem fields
         _playerData.tribes = new System.Collections.Generic.List<TribeSystem.TribeRecord>();
@@ -464,6 +467,107 @@ public class DataManager : MonoBehaviour
         if (saveImmediately) SavePlayerData();
     }
 
+    /// <summary>
+    /// 获取主角经验值
+    /// </summary>
+    public int GetLeaderExp()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.leaderExp;
+    }
+
+    /// <summary>
+    /// 获取升级所需经验值
+    /// </summary>
+    public int GetLeaderExpToNextLevel()
+    {
+        if (_playerData == null) return 100;
+        EnsurePlayerDataDefaults();
+        return _playerData.leaderExpToNextLevel;
+    }
+
+    /// <summary>
+    /// 获取技能点
+    /// </summary>
+    public int GetLeaderSkillPoints()
+    {
+        if (_playerData == null) return 0;
+        EnsurePlayerDataDefaults();
+        return _playerData.leaderSkillPoints;
+    }
+
+    /// <summary>
+    /// 添加主角经验值，返回是否升级
+    /// </summary>
+    public bool AddLeaderExp(int exp, bool saveImmediately = true)
+    {
+        if (_playerData == null || exp <= 0) return false;
+        EnsurePlayerDataDefaults();
+
+        _playerData.leaderExp += exp;
+        bool leveledUp = false;
+
+        while (_playerData.leaderExp >= _playerData.leaderExpToNextLevel && _playerData.level < 99)
+        {
+            _playerData.leaderExp -= _playerData.leaderExpToNextLevel;
+            LeaderLevelUp();
+            leveledUp = true;
+        }
+
+        if (saveImmediately) SavePlayerData();
+        return leveledUp;
+    }
+
+    /// <summary>
+    /// 主角升级
+    /// </summary>
+    private void LeaderLevelUp()
+    {
+        _playerData.level++;
+
+        // 领导力每级+1（上限20）
+        if (_playerData.leadership < 20)
+        {
+            _playerData.leadership++;
+        }
+
+        // 每3级街头情报+1（上限3）
+        if (_playerData.level % 3 == 0 && _playerData.streetIntel < 3)
+        {
+            _playerData.streetIntel++;
+        }
+
+        // 每5级咪格魅力+1（上限10）
+        if (_playerData.level % 5 == 0 && _playerData.charisma < 10)
+        {
+            _playerData.charisma++;
+        }
+
+        // 获得技能点
+        _playerData.leaderSkillPoints++;
+
+        // 更新升级所需经验值（指数增长）
+        _playerData.leaderExpToNextLevel = Mathf.RoundToInt(100 * Mathf.Pow(1.2f, _playerData.level - 1));
+
+        Debug.Log($"[DataManager] 主角升级! 等级: {_playerData.level}, 领导力: {_playerData.leadership}, 街头情报: {_playerData.streetIntel}, 咪格魅力: {_playerData.charisma}");
+    }
+
+    /// <summary>
+    /// 消耗技能点
+    /// </summary>
+    public bool SpendSkillPoints(int points, bool saveImmediately = true)
+    {
+        if (_playerData == null || points <= 0) return false;
+        EnsurePlayerDataDefaults();
+
+        if (_playerData.leaderSkillPoints < points) return false;
+
+        _playerData.leaderSkillPoints -= points;
+        if (saveImmediately) SavePlayerData();
+        return true;
+    }
+
     public int GetShopRefreshCount()
     {
         if (_playerData == null) return 0;
@@ -643,6 +747,18 @@ public class DataManager : MonoBehaviour
         if (_playerData.charisma <= 0)
         {
             _playerData.charisma = 1;    // 咪格魅力初始值1
+        }
+        if (_playerData.leaderExp < 0)
+        {
+            _playerData.leaderExp = 0;   // 主角经验值初始值0
+        }
+        if (_playerData.leaderExpToNextLevel <= 0)
+        {
+            _playerData.leaderExpToNextLevel = 100; // 升级所需经验值初始值100
+        }
+        if (_playerData.leaderSkillPoints < 0)
+        {
+            _playerData.leaderSkillPoints = 0; // 技能点初始值0
         }
 
         // Ensure TribeSystem collections exist
@@ -826,6 +942,9 @@ public class PlayerData
     public int leadership;          // 领导力 - 决定人口上限（初始值3，每升一级+1）
     public int streetIntel;         // 街头情报 - 决定地图敌人信息准确度
     public int charisma;            // 咪格魅力 - 影响招募成功率等
+    public int leaderExp;           // 主角经验值
+    public int leaderExpToNextLevel; // 升级所需经验值
+    public int leaderSkillPoints;   // 技能点（每次升级获得1点）
 
     // TribeSystem persistent fields (NEW)
     public System.Collections.Generic.List<TribeSystem.TribeRecord> tribes;

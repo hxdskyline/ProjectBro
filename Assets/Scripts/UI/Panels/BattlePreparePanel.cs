@@ -840,6 +840,41 @@ public class BattlePreparePanel : UIPanel
 
     private void EnsureDropZones()
     {
+        // 创建环形战场区域
+        RectTransform contentRoot = _tribesRoot?.parent as RectTransform;
+        if (contentRoot == null) return;
+
+        // 检查是否已存在战场区域
+        Transform battlefieldRoot = contentRoot.Find("BattlefieldRoot");
+        if (battlefieldRoot != null) return;
+
+        // 创建战场区域
+        GameObject battlefieldGo = new GameObject("BattlefieldRoot", typeof(RectTransform));
+        battlefieldGo.transform.SetParent(contentRoot, false);
+
+        RectTransform battlefieldRect = battlefieldGo.GetComponent<RectTransform>();
+        battlefieldRect.anchorMin = new Vector2(0.25f, 0.15f);
+        battlefieldRect.anchorMax = new Vector2(0.75f, 0.85f);
+        battlefieldRect.sizeDelta = Vector2.zero;
+
+        Image bg = battlefieldGo.AddComponent<Image>();
+        bg.color = new Color(0.1f, 0.15f, 0.2f, 0.8f);
+
+        // 添加环形战场组件
+        BattlefieldRing battlefieldRing = battlefieldGo.AddComponent<BattlefieldRing>();
+
+        // 添加拖拽处理器
+        FormationDragHandler dragHandler = battlefieldGo.AddComponent<FormationDragHandler>();
+
+        // 初始化
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            battlefieldRing.Initialize(canvas, battlefieldRect);
+            dragHandler.Initialize(canvas, battlefieldRing);
+        }
+
+        Debug.Log("[BattlePreparePanel] 战场区域已创建");
     }
 
     private void EnsureZoneLayouts()

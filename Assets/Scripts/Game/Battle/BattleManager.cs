@@ -29,6 +29,9 @@ namespace BattleSystem
         [SerializeField] private BattleUnitTypeConfig _playerUnitType;
         [SerializeField] private BattleUnitTypeConfig _enemyUnitType;
 
+        [Header("Battlefield Ring")]
+        [SerializeField] private BattlefieldRing _battlefieldRing;
+
         [Header("Demo Battle Stats")]
         [SerializeField] private float _attackResolveDelay = 0.45f;
         [SerializeField] private float _attackCooldown = 0.6f;
@@ -48,7 +51,13 @@ namespace BattleSystem
         private WeatherType _currentWeather = WeatherType.Sunny;
         private int _artifactAtkPerDeadCat;
         private int _artifactLeaderLastDeadCount;
+
+        // 看板系统
+        private BillboardSystem _billboardSystem;
         private int _lastEnemyDeathCount;
+        private bool _soldiersPhaseEnded;
+        private bool _enemyBillboardDestroyed;
+        private bool _playerBillboardDestroyed;
 
         public System.Action<bool> BattleEnded;
 
@@ -107,6 +116,9 @@ namespace BattleSystem
 
             BuildDemoFighters();
 
+            // 初始化看板系统
+            InitializeBillboardSystem();
+
             // 初始化奇物动态效果（亡猫之力等）— 从 runEquipments 读取
             InitArtifactEffects();
 
@@ -149,6 +161,9 @@ namespace BattleSystem
             _isInBattle = false;
             BattleSimulation.OnBulletFired -= SpawnBullet;
 
+            // 清理看板系统
+            CleanupBillboardSystem();
+
             if (_battleCoroutine != null)
             {
                 StopCoroutine(_battleCoroutine);
@@ -190,6 +205,23 @@ namespace BattleSystem
             ClearBattlefield();
 
             BattleEnded?.Invoke(victory);
+        }
+
+        /// <summary>
+        /// 清理看板系统
+        /// </summary>
+        private void CleanupBillboardSystem()
+        {
+            if (_billboardSystem != null)
+            {
+                // 取消订阅事件
+                _billboardSystem.OnBillboardStateChanged -= OnBillboardStateChanged;
+                _billboardSystem.OnCurrencyDropped -= OnCurrencyDropped;
+                _billboardSystem.OnBillboardDamaged -= OnBillboardDamaged;
+                _billboardSystem.OnBillboardDestroyed -= OnBillboardDestroyed;
+
+                _billboardSystem = null;
+            }
         }
 
         public void PauseBattle()
@@ -288,6 +320,12 @@ namespace BattleSystem
             ClearOldAvatars();
             SpawnBattleBackground();
 
+            // 初始化环形战场
+            if (_battlefieldRing != null)
+            {
+                _battlefieldRing.Initialize(GetComponent<Canvas>(), transform as RectTransform);
+            }
+
             BattleSpawnResult result = BattleSpawner.Spawn(
                 transform,
                 new BattleSpawnConfig
@@ -316,6 +354,27 @@ namespace BattleSystem
             Debug.Log($"[BattleManager] Demo fighters ready. Player={_playerFighters.Length}, Enemy={_enemyFighters.Length}");
         }
 
+        /// <summary>
+        /// 初始化看板系统
+        /// </summary>
+        private void InitializeBillboardSystem()
+        {
+            _billboardSystem = new BillboardSystem();
+
+            // 设置看板位置（我方在左侧，敌方在右侧）
+            Vector3 playerBillboardPos = new Vector3(-7f, 0f, 0f);
+            Vector3 enemyBillboardPos = new Vector3(7f, 0f, 0f);
+            _billboardSystem.Initialize(playerBillboardPos, enemyBillboardPos);
+
+            // 订阅看板事件
+            _billboardSystem.OnBillboardStateChanged += OnBillboardStateChanged;
+            _billboardSystem.OnCurrencyDropped += OnCurrencyDropped;
+            _billboardSystem.OnBillboardDamaged += OnBillboardDamaged;
+            _billboardSystem.OnBillboardDestroyed += OnBillboardDestroyed;
+
+            Debug.Log("[BattleManager] BillboardSystem initialized");
+        }
+
         private IEnumerator DemoBattleLoop()
         {
             if (_simulation == null || !_simulation.IsReady)
@@ -327,20 +386,217 @@ namespace BattleSystem
 
             while (_isInBattle)
             {
-                // 动态更新奶牛族长的猫群之力 buff
-                // 天生 buff 的动态更新由 IBuffEffect.OnTick 处理
+                float dt = Time.deltaTime;
+
                 // 动态更新奇物：每死一只小猫+攻击
                 UpdateArtifactLeaderBuff();
                 // 战斗内成长触发
                 UpdateBattleGrowth();
 
-                if (_simulation.Tick(Time.deltaTime, out bool playerVictory))
+                bool playerSoldiersAlive = AreSoldiersAlive(_playerFighters);
+                bool enemySoldiersAlive = AreSoldiersAlive(_enemyFighters);
+
+                // 更新看板状态（休眠/激活切换）
+                if (_billboardSystem != null)
                 {
-                    EndBattle(playerVictory);
-                    yield break;
+                    _billboardSystem.Update(dt, playerSoldiersAlive, enemySoldiersAlive);
+                }
+
+                if (!_soldiersPhaseEnded)
+                {
+                    // 正常战斗阶段：双方小兵互殴
+                    if (_simulation.Tick(dt, out bool playerVictory))
+                    {
+                        // 一方小兵全灭 → 进入看板阶段，不直接结束战斗
+                        _soldiersPhaseEnded = true;
+                        Debug.Log("[BattleManager] 小兵阶段结束，进入看板阶段");
+                    }
+                    else
+                    {
+                        // 正常阶段：看板攻击小兵
+                        BillboardAttackOnSoldiers();
+                    }
+                }
+                else
+                {
+                    // 看板阶段：存活小兵自动攻击看板，看板攻击小兵
+                    HandleBillboardCombat(dt, playerSoldiersAlive, enemySoldiersAlive);
                 }
 
                 yield return null;
+            }
+        }
+
+        /// <summary>
+        /// 看板阶段：存活小兵自动攻击敌方看板，看板攻击小兵
+        /// 文档要求：胜利条件=敌方小兵全灭+敌方看板被摧毁
+        /// </summary>
+        private void HandleBillboardCombat(float deltaTime, bool playerSoldiersAlive, bool enemySoldiersAlive)
+        {
+            if (_billboardSystem == null) return;
+
+            bool enemySoldiersAllDead = !enemySoldiersAlive;
+            bool playerSoldiersAllDead = !playerSoldiersAlive;
+
+            // 存活小兵自动攻击敌方看板（简化DPS模型）
+            if (enemySoldiersAllDead && !_enemyBillboardDestroyed && playerSoldiersAlive)
+            {
+                float dps = CalculateSurvivingSoldierDps(_playerFighters);
+                if (dps > 0)
+                {
+                    _billboardSystem.DamageBillboard(BillboardCamp.Enemy, dps * deltaTime);
+                }
+            }
+
+            if (playerSoldiersAllDead && !_playerBillboardDestroyed && enemySoldiersAlive)
+            {
+                float dps = CalculateSurvivingSoldierDps(_enemyFighters);
+                if (dps > 0)
+                {
+                    _billboardSystem.DamageBillboard(BillboardCamp.Player, dps * deltaTime);
+                }
+            }
+
+            // 看板攻击小兵
+            BillboardAttackOnSoldiers();
+        }
+
+        /// <summary>
+        /// 看板攻击小兵
+        /// </summary>
+        private void BillboardAttackOnSoldiers()
+        {
+            if (_billboardSystem == null) return;
+
+            BillboardAttackResult playerAttack = _billboardSystem.Attack(BillboardCamp.Player,
+                _enemyFighters != null ? new System.Collections.Generic.List<BattleFighter>(_enemyFighters) : new System.Collections.Generic.List<BattleFighter>());
+            if (playerAttack != null && playerAttack.target != null)
+            {
+                ApplyBillboardDamage(playerAttack.target, playerAttack.damage);
+            }
+
+            BillboardAttackResult enemyAttack = _billboardSystem.Attack(BillboardCamp.Enemy,
+                _playerFighters != null ? new System.Collections.Generic.List<BattleFighter>(_playerFighters) : new System.Collections.Generic.List<BattleFighter>());
+            if (enemyAttack != null && enemyAttack.target != null)
+            {
+                ApplyBillboardDamage(enemyAttack.target, enemyAttack.damage);
+            }
+        }
+
+        /// <summary>
+        /// 计算存活小兵的总DPS（用于自动攻击看板）
+        /// </summary>
+        private float CalculateSurvivingSoldierDps(BattleFighter[] fighters)
+        {
+            if (fighters == null) return 0f;
+            float totalDps = 0f;
+            for (int i = 0; i < fighters.Length; i++)
+            {
+                var f = fighters[i];
+                if (f == null || !f.IsAlive || f.RuntimeAttributes == null) continue;
+                float attackSpeed = Mathf.Max(0.1f, f.RuntimeAttributes.CorrectedAttackSpeed);
+                totalDps += f.RuntimeAttributes.Attack / attackSpeed;
+            }
+            return totalDps;
+        }
+
+        /// <summary>
+        /// 检查是否有小兵存活
+        /// </summary>
+        private bool AreSoldiersAlive(BattleFighter[] fighters)
+        {
+            if (fighters == null) return false;
+
+            for (int i = 0; i < fighters.Length; i++)
+            {
+                if (fighters[i] != null && fighters[i].IsAlive)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 应用看板伤害
+        /// </summary>
+        private void ApplyBillboardDamage(BattleFighter target, float damage)
+        {
+            if (target == null || target.IsDead || target.IsDying) return;
+
+            target.RuntimeAttributes.CurrentHp -= Mathf.RoundToInt(damage);
+            if (target.RuntimeAttributes.CurrentHp <= 0)
+            {
+                target.RuntimeAttributes.CurrentHp = 0;
+                // 触发死亡
+                _simulation?.StartDeath(target);
+            }
+
+            // 更新HUD
+            var hud = target.Transform?.GetComponent<FighterHUD>();
+            if (hud != null)
+            {
+                hud.UpdateHp(target.RuntimeAttributes.CurrentHp);
+            }
+        }
+
+        /// <summary>
+        /// 看板状态改变事件处理
+        /// </summary>
+        private void OnBillboardStateChanged(BillboardCamp camp, BillboardState state)
+        {
+            Debug.Log($"[BattleManager] 看板状态改变: {camp} -> {state}");
+
+            // 更新环形战场UI中的看板状态
+            if (_battlefieldRing != null)
+            {
+                bool isPlayer = camp == BillboardCamp.Player;
+                bool isActive = state == BillboardState.Active;
+                BillboardData billboardData = _billboardSystem.GetBillboard(camp);
+                _battlefieldRing.UpdateBillboardState(isPlayer, isActive, billboardData.currentHp, billboardData.maxHp);
+            }
+        }
+
+        /// <summary>
+        /// 看板受到伤害事件处理
+        /// </summary>
+        private void OnBillboardDamaged(BillboardCamp camp, float damage)
+        {
+            Debug.Log($"[BattleManager] 看板受到伤害: {camp}, 伤害: {damage}");
+        }
+
+        /// <summary>
+        /// 看板被摧毁事件处理
+        /// </summary>
+        private void OnBillboardDestroyed(BillboardCamp camp)
+        {
+            Debug.Log($"[BattleManager] 看板被摧毁: {camp}");
+
+            // 看板被摧毁隐含对应方小兵已全灭（看板只在激活时可被攻击，激活条件=小兵全灭）
+            // 因此看板被摧毁 = 文档要求的"小兵全灭 + 看板被摧毁"条件满足
+            if (camp == BillboardCamp.Enemy)
+            {
+                _enemyBillboardDestroyed = true;
+                EndBattle(true);
+            }
+            else if (camp == BillboardCamp.Player)
+            {
+                _playerBillboardDestroyed = true;
+                EndBattle(false);
+            }
+        }
+
+        /// <summary>
+        /// 货币掉落事件处理
+        /// </summary>
+        private void OnCurrencyDropped(int amount)
+        {
+            Debug.Log($"[BattleManager] 货币掉落: {amount} 木天蓼叶");
+
+            // 添加货币到玩家数据
+            DataManager dataManager = GameManager.Instance?.DataManager;
+            if (dataManager != null)
+            {
+                dataManager.AddCatFood(amount);
             }
         }
 
@@ -380,6 +636,9 @@ namespace BattleSystem
             _artifactAtkPerDeadCat = 0;
             _artifactLeaderLastDeadCount = 0;
             _lastEnemyDeathCount = 0;
+            _soldiersPhaseEnded = false;
+            _enemyBillboardDestroyed = false;
+            _playerBillboardDestroyed = false;
             ClearOldAvatars();
         }
 

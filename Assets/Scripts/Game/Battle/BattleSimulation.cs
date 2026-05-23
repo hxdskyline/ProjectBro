@@ -646,7 +646,7 @@ namespace BattleSystem
                 : 1.0f;
         }
 
-        private void StartDeath(BattleFighter fighter)
+        public void StartDeath(BattleFighter fighter)
         {
             if (fighter == null || fighter.IsRemoved || fighter.IsDying)
             {
